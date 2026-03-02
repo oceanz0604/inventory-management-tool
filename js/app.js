@@ -166,7 +166,11 @@ const App = (() => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
         _navigate(item.dataset.view);
-        document.getElementById('sidebar').classList.remove('open');
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        sidebar.classList.remove('open');
+        overlay.classList.add('hidden');
+        overlay.setAttribute('aria-hidden', 'true');
       });
     });
   }
@@ -196,8 +200,17 @@ const App = (() => {
 
   // ========== Sidebar Toggle ==========
   function _bindSidebarToggle() {
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
     document.getElementById('sidebar-toggle').addEventListener('click', () => {
-      document.getElementById('sidebar').classList.toggle('open');
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('hidden', !sidebar.classList.contains('open'));
+      overlay.setAttribute('aria-hidden', sidebar.classList.contains('open') ? 'false' : 'true');
+    });
+    overlay.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      overlay.classList.add('hidden');
+      overlay.setAttribute('aria-hidden', 'true');
     });
   }
 
