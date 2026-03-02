@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>झटपट - Inventory Management</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Tiro+Devanagari+Marathi:ital@0;1&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+
+<!-- ==================== Auth Screen ==================== -->
+<div id="auth-screen" class="auth-screen">
+  <div class="auth-container">
+    <div class="auth-brand">
+      <div class="auth-logo"><i class="fas fa-bolt"></i></div>
+      <h1>झटपट</h1>
+      <p>Multi-Location Inventory Marketplace</p>
+    </div>
+    <form id="login-form" class="auth-form">
+      <h2>Welcome back</h2>
+      <p class="auth-subtitle">Sign in to your account</p>
+      <div class="form-group">
+        <label for="login-email">Email</label>
+        <div class="input-icon"><i class="fas fa-envelope"></i>
+          <input type="email" id="login-email" placeholder="you@example.com" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="login-password">Password</label>
+        <div class="input-icon"><i class="fas fa-lock"></i>
+          <input type="password" id="login-password" placeholder="Enter your password" required>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+      <p class="auth-switch">Don't have an account? <a href="#" id="show-signup">Sign up</a></p>
+      <div class="auth-divider"><span>or try a demo</span></div>
+      <div class="demo-buttons-grid">
+        <button type="button" class="btn btn-demo btn-full" data-demo="user_a">
+          <i class="fas fa-microchip"></i> TechSupply Co
+        </button>
+        <button type="button" class="btn btn-demo-alt btn-full" data-demo="user_b">
+          <i class="fas fa-leaf"></i> GreenGoods
+        </button>
+        <button type="button" class="btn btn-demo-cyan btn-full" data-demo="user_c">
+          <i class="fas fa-heart-pulse"></i> MediPharma
+        </button>
+        <button type="button" class="btn btn-demo-orange btn-full" data-demo="user_d">
+          <i class="fas fa-hammer"></i> BuildRight Hardware
+        </button>
+        <button type="button" class="btn btn-demo-rose btn-full" data-demo="user_e">
+          <i class="fas fa-utensils"></i> FreshBite Catering
+        </button>
+      </div>
+    </form>
+    <form id="signup-form" class="auth-form hidden">
+      <h2>Create account</h2>
+      <p class="auth-subtitle">Get started with झटपट</p>
+      <div class="form-group">
+        <label for="signup-name">Shop / Business Name</label>
+        <div class="input-icon"><i class="fas fa-store"></i>
+          <input type="text" id="signup-name" placeholder="My Shop" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="signup-email">Email</label>
+        <div class="input-icon"><i class="fas fa-envelope"></i>
+          <input type="email" id="signup-email" placeholder="you@example.com" required>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="signup-password">Password</label>
+        <div class="input-icon"><i class="fas fa-lock"></i>
+          <input type="password" id="signup-password" placeholder="Min. 6 characters" required minlength="6">
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Create Account</button>
+      <p class="auth-switch">Already have an account? <a href="#" id="show-login">Sign in</a></p>
+    </form>
+    <div id="auth-error" class="auth-error hidden"></div>
+  </div>
+</div>
+
+<!-- ==================== Main App ==================== -->
+<div id="app" class="app-layout hidden">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <i class="fas fa-bolt"></i><span>झटपट</span>
+    </div>
+    <div class="sidebar-section-label">My Store</div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item active" data-view="dashboard">
+        <i class="fas fa-chart-pie"></i><span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-view="locations">
+        <i class="fas fa-location-dot"></i><span>Locations</span>
+      </a>
+      <a href="#" class="nav-item" data-view="products">
+        <i class="fas fa-box"></i><span>Products</span>
+      </a>
+      <a href="#" class="nav-item" data-view="inventory">
+        <i class="fas fa-warehouse"></i><span>Inventory</span>
+      </a>
+      <a href="#" class="nav-item" data-view="pos">
+        <i class="fas fa-cash-register"></i><span>POS Counter</span>
+      </a>
+      <a href="#" class="nav-item" data-view="orders">
+        <i class="fas fa-file-invoice"></i><span>Orders</span>
+      </a>
+      <a href="#" class="nav-item" data-view="categories">
+        <i class="fas fa-tags"></i><span>Categories</span>
+      </a>
+    </nav>
+    <div class="sidebar-section-label">Marketplace</div>
+    <nav class="sidebar-nav">
+      <a href="#" class="nav-item" data-view="shop">
+        <i class="fas fa-cart-shopping"></i><span>Shop</span>
+        <span class="nav-badge hidden" id="cart-badge-nav">0</span>
+      </a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="user-info">
+        <div class="user-avatar" id="user-avatar">TS</div>
+        <div class="user-details">
+          <span class="user-name" id="user-name">TechSupply Co</span>
+          <span class="user-email" id="user-email">admin@techsupply.com</span>
+        </div>
+      </div>
+      <div class="sidebar-footer-actions">
+        <button class="btn-icon" id="switch-user-btn" title="Switch Demo User">
+          <i class="fas fa-people-arrows"></i>
+        </button>
+        <button class="btn-icon" id="logout-btn" title="Logout">
+          <i class="fas fa-right-from-bracket"></i>
+        </button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Top Bar -->
+    <header class="topbar">
+      <button class="btn-icon sidebar-toggle" id="sidebar-toggle"><i class="fas fa-bars"></i></button>
+      <div class="topbar-title"><h2 id="page-title">Dashboard</h2></div>
+      <div class="topbar-actions">
+        <button class="theme-toggle" id="theme-toggle" title="Toggle dark mode">
+          <i class="fas fa-moon"></i><i class="fas fa-sun"></i>
+        </button>
+        <div class="notification-bell" id="notification-bell">
+          <i class="fas fa-bell"></i>
+          <span class="notification-badge hidden" id="notification-badge">0</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Notification Dropdown -->
+    <div class="notification-dropdown hidden" id="notification-dropdown">
+      <div class="notification-header">
+        <h3>Low Stock Alerts</h3>
+        <button class="btn-text" id="dismiss-all-notifications">Dismiss All</button>
+      </div>
+      <div class="notification-list" id="notification-list"></div>
+    </div>
+
+    <!-- ===== Dashboard View ===== -->
+    <section id="view-dashboard" class="view active">
+      <div class="stats-grid">
+        <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-box"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-total-products">0</span><span class="stat-label">Products</span></div></div>
+        <div class="stat-card"><div class="stat-icon green"><i class="fas fa-cubes"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-total-stock">0</span><span class="stat-label">Total Stock</span></div></div>
+        <div class="stat-card"><div class="stat-icon purple"><i class="fas fa-file-invoice-dollar"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-pending-orders">0</span><span class="stat-label">Pending Orders</span></div></div>
+        <div class="stat-card"><div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-low-stock">0</span><span class="stat-label">Low Stock</span></div></div>
+      </div>
+      <div class="charts-grid">
+        <div class="card"><div class="card-header"><h3>Stock by Location</h3></div>
+          <div class="card-body chart-container"><canvas id="chart-location"></canvas></div></div>
+        <div class="card"><div class="card-header"><h3>Inventory Value by Category</h3></div>
+          <div class="card-body chart-container"><canvas id="chart-value"></canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h3>Low Stock Items</h3></div>
+        <div class="card-body">
+          <table class="data-table"><thead><tr>
+            <th>Product</th><th>SKU</th><th>Location</th><th>Qty</th><th>Min</th><th>Status</th>
+          </tr></thead><tbody id="low-stock-table-body"></tbody></table>
+          <div class="empty-state hidden" id="no-low-stock"><i class="fas fa-check-circle"></i><p>All items are well stocked!</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Locations View ===== -->
+    <section id="view-locations" class="view hidden">
+      <div class="view-toolbar">
+        <div class="search-bar"><i class="fas fa-search"></i>
+          <input type="text" id="location-search" placeholder="Search locations..."></div>
+        <div class="toolbar-actions">
+          <button class="btn btn-primary" id="add-location-btn"><i class="fas fa-plus"></i> Add Location</button>
+        </div>
+      </div>
+      <div class="locations-grid" id="locations-grid"></div>
+      <div class="empty-state hidden" id="no-locations"><i class="fas fa-location-dot"></i><p>No locations yet</p>
+        <button class="btn btn-primary" id="add-first-location-btn">Add Your First Location</button></div>
+    </section>
+
+    <!-- ===== Products View ===== -->
+    <section id="view-products" class="view hidden">
+      <div class="view-toolbar">
+        <div class="search-bar"><i class="fas fa-search"></i>
+          <input type="text" id="product-search" placeholder="Search products by name or SKU..."></div>
+        <div class="toolbar-filters">
+          <select id="product-filter-category" class="select-input"><option value="">All Categories</option></select>
+          <select id="product-filter-published" class="select-input">
+            <option value="">All Status</option><option value="1">Published</option><option value="0">Unpublished</option>
+          </select>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn btn-primary" id="add-product-btn"><i class="fas fa-plus"></i> Add Product</button>
+        </div>
+      </div>
+      <div class="card"><div class="card-body">
+        <table class="data-table"><thead><tr>
+          <th class="sortable" data-sort="name">Name <i class="fas fa-sort"></i></th>
+          <th class="sortable" data-sort="sku">SKU <i class="fas fa-sort"></i></th>
+          <th>Category</th>
+          <th class="sortable" data-sort="costPrice">Cost <i class="fas fa-sort"></i></th>
+          <th class="sortable" data-sort="price">Sell Price <i class="fas fa-sort"></i></th>
+          <th>Margin</th>
+          <th>Total Stock</th>
+          <th>Published</th>
+          <th>Actions</th>
+        </tr></thead><tbody id="products-table-body"></tbody></table>
+        <div class="empty-state hidden" id="no-products"><i class="fas fa-box-open"></i><p>No products yet</p>
+          <button class="btn btn-primary" id="add-first-product-btn">Add Your First Product</button></div>
+      </div></div>
+    </section>
+
+    <!-- ===== Inventory (Stock) View ===== -->
+    <section id="view-inventory" class="view hidden">
+      <div class="view-toolbar">
+        <div class="search-bar"><i class="fas fa-search"></i>
+          <input type="text" id="inventory-search" placeholder="Search by product name or SKU..."></div>
+        <div class="toolbar-filters">
+          <select id="filter-location" class="select-input"><option value="">All Locations</option></select>
+          <select id="filter-category" class="select-input"><option value="">All Categories</option></select>
+          <select id="filter-stock" class="select-input">
+            <option value="">All Stock Levels</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option>
+          </select>
+        </div>
+        <div class="toolbar-actions">
+          <div class="export-dropdown">
+            <button class="btn btn-secondary" id="export-btn"><i class="fas fa-download"></i> Export</button>
+            <div class="export-menu hidden" id="export-menu">
+              <button class="export-option" data-format="csv"><i class="fas fa-file-csv"></i> Export CSV</button>
+              <button class="export-option" data-format="pdf"><i class="fas fa-file-pdf"></i> Export PDF</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="add-stock-btn"><i class="fas fa-plus"></i> Add Stock Entry</button>
+        </div>
+      </div>
+      <div class="card"><div class="card-body">
+        <table class="data-table"><thead><tr>
+          <th class="sortable" data-sort="product">Product <i class="fas fa-sort"></i></th>
+          <th>SKU</th>
+          <th>Location</th>
+          <th class="sortable" data-sort="quantity">Qty <i class="fas fa-sort"></i></th>
+          <th>Min Stock</th>
+          <th>Status</th>
+          <th>Actions</th>
+        </tr></thead><tbody id="inventory-table-body"></tbody></table>
+        <div class="empty-state hidden" id="no-inventory"><i class="fas fa-warehouse"></i><p>No stock entries yet</p>
+          <button class="btn btn-primary" id="add-first-stock-btn">Add Stock Entry</button></div>
+      </div></div>
+    </section>
+
+    <!-- ===== Orders View ===== -->
+    <section id="view-orders" class="view hidden">
+      <div class="tabs" id="order-tabs">
+        <button class="tab active" data-tab="sales">Sales Orders</button>
+        <button class="tab" data-tab="purchase">Purchase Orders</button>
+      </div>
+      <div class="card" style="margin-top:1rem"><div class="card-body">
+        <table class="data-table"><thead><tr>
+          <th>Order #</th><th>Date</th><th id="order-party-header">Customer</th><th>Items</th><th>Total</th><th>Status</th><th>Actions</th>
+        </tr></thead><tbody id="orders-table-body"></tbody></table>
+        <div class="empty-state hidden" id="no-orders"><i class="fas fa-file-invoice"></i><p>No orders yet</p></div>
+      </div></div>
+    </section>
+
+    <!-- ===== POS Counter View ===== -->
+    <section id="view-pos" class="view hidden">
+      <div class="pos-layout">
+        <!-- Left: Product Picker -->
+        <div class="pos-products">
+          <div class="pos-toolbar">
+            <div class="search-bar" style="max-width:none"><i class="fas fa-search"></i>
+              <input type="text" id="pos-search" placeholder="Scan barcode or search product..."></div>
+            <select id="pos-location" class="select-input"></select>
+            <select id="pos-cat-filter" class="select-input"><option value="">All Categories</option></select>
+          </div>
+          <div class="pos-product-grid" id="pos-product-grid"></div>
+          <div class="empty-state hidden" id="no-pos-products"><i class="fas fa-box-open"></i><p>No products at this location</p></div>
+        </div>
+        <!-- Right: Bill / Receipt -->
+        <div class="pos-bill">
+          <div class="pos-bill-header">
+            <h3><i class="fas fa-receipt"></i> Current Bill</h3>
+            <button class="btn btn-sm btn-secondary" id="pos-clear-bill"><i class="fas fa-trash"></i> Clear</button>
+          </div>
+          <div class="pos-bill-items" id="pos-bill-items">
+            <div class="pos-bill-empty"><i class="fas fa-hand-pointer"></i><p>Tap products to add</p></div>
+          </div>
+          <div class="pos-bill-summary">
+            <div class="pos-bill-line"><span>Items</span><strong id="pos-item-count">0</strong></div>
+            <div class="pos-bill-line pos-bill-total"><span>Total</span><strong id="pos-total">₹0.00</strong></div>
+          </div>
+          <div class="pos-bill-actions">
+            <div class="form-row" style="margin-bottom:.75rem">
+              <div class="form-group" style="margin-bottom:0"><input type="text" id="pos-customer-name" placeholder="Customer name (optional)"></div>
+              <select id="pos-payment" class="select-input" style="width:auto;min-width:110px">
+                <option value="cash">💵 Cash</option>
+                <option value="upi">📱 UPI</option>
+                <option value="card">💳 Card</option>
+              </select>
+            </div>
+            <button class="btn btn-success btn-full" id="pos-checkout-btn" disabled>
+              <i class="fas fa-check-circle"></i> Complete Sale
+            </button>
+          </div>
+          <!-- Today's summary -->
+          <div class="pos-today-summary" id="pos-today-summary"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Categories View ===== -->
+    <section id="view-categories" class="view hidden">
+      <div class="view-toolbar">
+        <div class="search-bar"><i class="fas fa-search"></i>
+          <input type="text" id="category-search" placeholder="Search categories..."></div>
+        <div class="toolbar-actions">
+          <button class="btn btn-primary" id="add-category-btn"><i class="fas fa-plus"></i> Add Category</button>
+        </div>
+      </div>
+      <div class="categories-grid" id="categories-grid"></div>
+      <div class="empty-state hidden" id="no-categories"><i class="fas fa-tags"></i><p>No categories yet</p>
+        <button class="btn btn-primary" id="add-first-category-btn">Add Your First Category</button></div>
+    </section>
+
+    <!-- ===== Shop View ===== -->
+    <section id="view-shop" class="view hidden">
+      <div class="view-toolbar">
+        <div class="search-bar"><i class="fas fa-search"></i>
+          <input type="text" id="shop-search" placeholder="Search products..."></div>
+        <div class="toolbar-filters">
+          <select id="shop-seller-filter" class="select-input"><option value="">All Shops</option></select>
+          <select id="shop-category-filter" class="select-input"><option value="">All Categories</option></select>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn btn-primary" id="open-cart-btn">
+            <i class="fas fa-cart-shopping"></i> Cart <span class="cart-count" id="cart-count">0</span>
+          </button>
+        </div>
+      </div>
+      <div class="shop-grid" id="shop-grid"></div>
+      <div class="empty-state hidden" id="no-shop-products"><i class="fas fa-store-slash"></i><p>No products available from other shops</p></div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ==================== Cart Drawer ==================== -->
+<div class="cart-overlay hidden" id="cart-overlay"></div>
+<div class="cart-drawer hidden" id="cart-drawer">
+  <div class="cart-header">
+    <h3><i class="fas fa-cart-shopping"></i> Your Cart</h3>
+    <button class="btn-icon" id="close-cart-btn"><i class="fas fa-xmark"></i></button>
+  </div>
+  <div class="cart-body" id="cart-body">
+    <div class="empty-state" id="cart-empty"><i class="fas fa-cart-shopping"></i><p>Your cart is empty</p></div>
+  </div>
+  <div class="cart-footer hidden" id="cart-footer">
+    <div class="cart-total">
+      <span>Total</span><strong id="cart-total-value">$0.00</strong>
+    </div>
+    <button class="btn btn-primary btn-full" id="place-order-btn"><i class="fas fa-paper-plane"></i> Place Order</button>
+    <button class="btn btn-secondary btn-full" id="clear-cart-btn" style="margin-top:0.5rem"><i class="fas fa-trash"></i> Clear Cart</button>
+  </div>
+</div>
+
+<!-- ==================== Modals ==================== -->
+
+<!-- Location Modal -->
+<div class="modal hidden" id="location-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3 id="location-modal-title">Add Location</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <form id="location-form">
+      <div class="modal-body">
+        <div class="form-group"><label for="location-name">Name *</label>
+          <input type="text" id="location-name" placeholder="e.g. Main Warehouse" required></div>
+        <div class="form-group"><label for="location-address">Address</label>
+          <input type="text" id="location-address" placeholder="123 Street, City"></div>
+        <div class="form-group"><label class="checkbox-label">
+          <input type="checkbox" id="location-default"> Set as default location</label></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Location</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Product Modal -->
+<div class="modal hidden" id="product-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <div class="modal-header"><h3 id="product-modal-title">Add Product</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <form id="product-form">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label for="product-name">Name *</label>
+            <input type="text" id="product-name" required></div>
+          <div class="form-group"><label for="product-sku">SKU *</label>
+            <input type="text" id="product-sku" required></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label for="product-category">Category</label>
+            <select id="product-category" class="select-input"><option value="">Select category</option></select></div>
+          <div class="form-group"><label for="product-cost-price">Cost Price (₹)</label>
+            <input type="number" id="product-cost-price" step="0.01" min="0" value="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label for="product-price">Selling Price (₹) *</label>
+            <input type="number" id="product-price" step="0.01" min="0" value="0" required></div>
+          <div class="form-group"><label>Margin</label>
+            <input type="text" id="product-margin-preview" class="input-readonly" readonly tabindex="-1"></div>
+        </div>
+        <div class="form-group"><label for="product-description">Description</label>
+          <textarea id="product-description" rows="3"></textarea></div>
+        <div class="form-group"><label class="checkbox-label">
+          <input type="checkbox" id="product-published" checked> Publish to marketplace (visible to other shops)</label></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Stock Modal -->
+<div class="modal hidden" id="stock-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3 id="stock-modal-title">Adjust Stock</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <form id="stock-form">
+      <div class="modal-body">
+        <div class="form-group"><label for="stock-product">Product *</label>
+          <select id="stock-product" class="select-input" required><option value="">Select product</option></select></div>
+        <div class="form-group"><label for="stock-location">Location *</label>
+          <select id="stock-location" class="select-input" required><option value="">Select location</option></select></div>
+        <div class="form-row">
+          <div class="form-group"><label for="stock-quantity">Quantity *</label>
+            <input type="number" id="stock-quantity" min="0" value="0" required></div>
+          <div class="form-group"><label for="stock-min">Min Stock</label>
+            <input type="number" id="stock-min" min="0" value="5"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Order Detail Modal -->
+<div class="modal hidden" id="order-detail-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <div class="modal-header"><h3 id="order-detail-title">Order Details</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <div class="modal-body" id="order-detail-body"></div>
+    <div class="modal-footer" id="order-detail-footer"></div>
+  </div>
+</div>
+
+<!-- Category Modal -->
+<div class="modal hidden" id="category-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3 id="category-modal-title">Add Category</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <form id="category-form">
+      <div class="modal-body">
+        <div class="form-group"><label for="category-name">Name *</label>
+          <input type="text" id="category-name" required></div>
+        <div class="form-group"><label for="category-color">Color</label>
+          <div class="color-picker">
+            <input type="color" id="category-color" value="#6366f1">
+            <span class="color-preview" id="color-preview" style="background:#6366f1"></span>
+          </div></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Category</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Switch User Modal -->
+<div class="modal hidden" id="switch-user-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3>Switch Demo User</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <div class="modal-body">
+      <p style="font-size:.85rem;color:var(--text-secondary);margin-bottom:1rem">Select a shop to switch to:</p>
+      <div class="switch-user-list" id="switch-user-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- POS Receipt Modal -->
+<div class="modal hidden" id="pos-receipt-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3><i class="fas fa-receipt" style="margin-right:.5rem"></i>Sale Complete</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <div class="modal-body" id="pos-receipt-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Close</button>
+      <button class="btn btn-primary" id="pos-print-receipt"><i class="fas fa-print"></i> Print</button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal hidden" id="delete-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3>Confirm Delete</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <div class="modal-body"><p id="delete-message">Are you sure?</p></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Cancel</button>
+      <button class="btn btn-danger" id="confirm-delete-btn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container" class="toast-container"></div>
+
+<script src="js/store.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/locations.js"></script>
+<script src="js/products.js"></script>
+<script src="js/inventory.js"></script>
+<script src="js/orders.js"></script>
+<script src="js/shop.js"></script>
+<script src="js/pos.js"></script>
+<script src="js/dashboard.js"></script>
+<script src="js/export.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

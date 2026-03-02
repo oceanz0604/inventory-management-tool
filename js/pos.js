@@ -1,0 +1,254 @@
+const POS = (() => {
+  let bill = [];
+  const catIcons = { cat_elec: 'fa-microchip', cat_furn: 'fa-couch', cat_supp: 'fa-paperclip', cat_clth: 'fa-shirt', cat_food: 'fa-mug-hot', cat_health: 'fa-heart-pulse', cat_tools: 'fa-wrench' };
+
+  function init() {
+    document.getElementById('pos-search').addEventListener('input', renderProducts);
+    document.getElementById('pos-location').addEventListener('change', renderProducts);
+    document.getElementById('pos-cat-filter').addEventListener('change', renderProducts);
+    document.getElementById('pos-clear-bill').addEventListener('click', clearBill);
+    document.getElementById('pos-checkout-btn').addEventListener('click', checkout);
+    document.getElementById('pos-print-receipt').addEventListener('click', _printReceipt);
+  }
+
+  function populateFilters() {
+    const user = Auth.getUser();
+    const locations = Store.getLocationsByOwner(user.id);
+    const cats = Store.getCategories();
+    const locSel = document.getElementById('pos-location');
+    locSel.innerHTML = locations.map(l => `<option value="${l.id}"${l.isDefault ? ' selected' : ''}>${l.name}</option>`).join('');
+    document.getElementById('pos-cat-filter').innerHTML = '<option value="">All</option>' + cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+  }
+
+  function renderProducts() {
+    const user = Auth.getUser();
+    const locId = document.getElementById('pos-location').value;
+    const search = document.getElementById('pos-search').value.toLowerCase().trim();
+    const catFilter = document.getElementById('pos-cat-filter').value;
+
+    let products = Store.getProductsByOwner(user.id);
+    if (catFilter) products = products.filter(p => p.categoryId === catFilter);
+    if (search) products = products.filter(p => p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search));
+
+    const stockMap = {};
+    if (locId) {
+      Store.getStockByLocation(locId).forEach(s => { stockMap[s.productId] = s.quantity; });
+    }
+
+    const grid = document.getElementById('pos-product-grid');
+    const empty = document.getElementById('no-pos-products');
+    const available = products.filter(p => (stockMap[p.id] || 0) > 0);
+
+    if (available.length === 0) {
+      grid.innerHTML = '';
+      empty.classList.remove('hidden');
+      return;
+    }
+    empty.classList.add('hidden');
+
+    grid.innerHTML = available.map(p => {
+      const qty = stockMap[p.id] || 0;
+      const icon = catIcons[p.categoryId] || 'fa-box';
+      const inBill = bill.find(b => b.productId === p.id);
+      const billQty = inBill ? inBill.qty : 0;
+      return `<div class="pos-item-card ${billQty > 0 ? 'in-bill' : ''}" onclick="POS.addToBill('${p.id}')">
+        <div class="pos-item-icon"><i class="fas ${icon}"></i></div>
+        <div class="pos-item-name">${_esc(p.name)}</div>
+        <div class="pos-item-price">₹${p.price.toFixed(2)}</div>
+        <div class="pos-item-stock">${qty} in stock</div>
+        ${billQty > 0 ? `<div class="pos-item-badge">${billQty}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  function addToBill(productId) {
+    const locId = document.getElementById('pos-location').value;
+    const product = Store.getProductById(productId);
+    if (!product) return;
+
+    const stockRec = Store.getStockRecord(productId, locId);
+    const available = stockRec ? stockRec.quantity : 0;
+
+    const existing = bill.find(b => b.productId === productId);
+    const currentQty = existing ? existing.qty : 0;
+
+    if (currentQty >= available) {
+      App.showToast('No more stock available', 'warning');
+      return;
+    }
+
+    if (existing) {
+      existing.qty++;
+    } else {
+      bill.push({ productId, name: product.name, sku: product.sku, price: product.price, costPrice: product.costPrice || 0, qty: 1 });
+    }
+
+    _renderBill();
+    renderProducts();
+  }
+
+  function updateBillQty(productId, qty) {
+    if (qty <= 0) {
+      bill = bill.filter(b => b.productId !== productId);
+    } else {
+      const locId = document.getElementById('pos-location').value;
+      const stockRec = Store.getStockRecord(productId, locId);
+      const available = stockRec ? stockRec.quantity : 0;
+      if (qty > available) { App.showToast('Exceeds available stock', 'warning'); return; }
+      const item = bill.find(b => b.productId === productId);
+      if (item) item.qty = qty;
+    }
+    _renderBill();
+    renderProducts();
+  }
+
+  function removeBillItem(productId) {
+    bill = bill.filter(b => b.productId !== productId);
+    _renderBill();
+    renderProducts();
+  }
+
+  function _renderBill() {
+    const container = document.getElementById('pos-bill-items');
+    const btn = document.getElementById('pos-checkout-btn');
+
+    if (bill.length === 0) {
+      container.innerHTML = '<div class="pos-bill-empty"><i class="fas fa-hand-pointer"></i><p>Tap products to add</p></div>';
+      document.getElementById('pos-item-count').textContent = '0';
+      document.getElementById('pos-total').textContent = '₹0.00';
+      btn.disabled = true;
+      return;
+    }
+    btn.disabled = false;
+
+    let total = 0;
+    let itemCount = 0;
+    container.innerHTML = bill.map(b => {
+      const lineTotal = b.qty * b.price;
+      total += lineTotal;
+      itemCount += b.qty;
+      return `<div class="pos-bill-row">
+        <div class="pos-bill-row-info">
+          <span class="pos-bill-row-name">${_esc(b.name)}</span>
+          <span class="pos-bill-row-price">₹${b.price.toFixed(2)}</span>
+        </div>
+        <div class="pos-bill-row-controls">
+          <button onclick="POS.updateBillQty('${b.productId}',${b.qty - 1})"><i class="fas fa-minus"></i></button>
+          <span>${b.qty}</span>
+          <button onclick="POS.updateBillQty('${b.productId}',${b.qty + 1})"><i class="fas fa-plus"></i></button>
+        </div>
+        <div class="pos-bill-row-total">₹${lineTotal.toFixed(2)}</div>
+        <button class="pos-bill-row-remove" onclick="POS.removeBillItem('${b.productId}')"><i class="fas fa-xmark"></i></button>
+      </div>`;
+    }).join('');
+
+    document.getElementById('pos-item-count').textContent = itemCount;
+    document.getElementById('pos-total').textContent = '₹' + total.toFixed(2);
+  }
+
+  function clearBill() {
+    bill = [];
+    _renderBill();
+    renderProducts();
+  }
+
+  function checkout() {
+    if (bill.length === 0) return;
+    const user = Auth.getUser();
+    const locId = document.getElementById('pos-location').value;
+    const payment = document.getElementById('pos-payment').value;
+    const customerName = document.getElementById('pos-customer-name').value.trim() || 'Walk-in';
+
+    const items = bill.map(b => ({ productId: b.productId, name: b.name, sku: b.sku, price: b.price, costPrice: b.costPrice, qty: b.qty }));
+    const sale = Store.createPosSale(user.id, locId, items, payment, customerName);
+
+    _showReceipt(sale);
+    bill = [];
+    _renderBill();
+    renderProducts();
+    _renderTodaySummary();
+    document.getElementById('pos-customer-name').value = '';
+    App.showToast('Sale completed! Stock updated.', 'success');
+  }
+
+  function _showReceipt(sale) {
+    const user = Auth.getUser();
+    const loc = Store.getLocationById(sale.locationId);
+    const payIcons = { cash: '💵 Cash', upi: '📱 UPI', card: '💳 Card' };
+
+    let html = `<div class="pos-receipt">
+      <div class="pos-receipt-header">
+        <strong>${_esc(user.shopName || user.name)}</strong>
+        <span>${loc ? _esc(loc.name) : ''}</span>
+        <span>${new Date(sale.createdAt).toLocaleString()}</span>
+      </div>
+      <div class="pos-receipt-num">${sale.receiptNumber}</div>
+      <table class="pos-receipt-table">
+        <thead><tr><th>Item</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead>
+        <tbody>${sale.items.map(i => `<tr><td>${_esc(i.name)}</td><td>${i.qty}</td><td>₹${i.price.toFixed(2)}</td><td>₹${(i.qty * i.price).toFixed(2)}</td></tr>`).join('')}</tbody>
+      </table>
+      <div class="pos-receipt-total">
+        <span>Total</span><strong>₹${sale.subtotal.toFixed(2)}</strong>
+      </div>
+      <div class="pos-receipt-meta">
+        <span>Payment: ${payIcons[sale.paymentMethod] || sale.paymentMethod}</span>
+        <span>Customer: ${_esc(sale.customerName)}</span>
+      </div>
+    </div>`;
+
+    document.getElementById('pos-receipt-body').innerHTML = html;
+    document.getElementById('pos-receipt-modal').classList.remove('hidden');
+  }
+
+  function _printReceipt() {
+    const content = document.getElementById('pos-receipt-body').innerHTML;
+    const w = window.open('', '_blank', 'width=350,height=600');
+    w.document.write(`<html><head><title>Receipt</title><style>
+      body{font-family:monospace;font-size:12px;padding:10px;max-width:300px;margin:0 auto}
+      table{width:100%;border-collapse:collapse;margin:8px 0}
+      th,td{text-align:left;padding:2px 4px;border-bottom:1px dashed #ccc}
+      th{font-size:11px}
+      .pos-receipt-header{text-align:center;margin-bottom:8px}
+      .pos-receipt-header strong{font-size:14px;display:block}
+      .pos-receipt-header span{display:block;font-size:11px;color:#666}
+      .pos-receipt-num{text-align:center;font-weight:bold;font-size:13px;margin:6px 0;border-top:1px dashed #000;border-bottom:1px dashed #000;padding:4px 0}
+      .pos-receipt-total{display:flex;justify-content:space-between;font-size:14px;font-weight:bold;border-top:2px solid #000;margin-top:6px;padding-top:6px}
+      .pos-receipt-meta{margin-top:8px;font-size:11px;color:#666}
+      .pos-receipt-meta span{display:block}
+    </style></head><body>${content}<script>window.print();window.close();<\/script></body></html>`);
+    w.document.close();
+  }
+
+  function _renderTodaySummary() {
+    const user = Auth.getUser();
+    const todaySales = Store.getPosSalesToday(user.id);
+    const container = document.getElementById('pos-today-summary');
+    if (todaySales.length === 0) {
+      container.innerHTML = '<div class="pos-summary-empty">No sales today yet</div>';
+      return;
+    }
+    const totalRevenue = todaySales.reduce((s, sale) => s + sale.subtotal, 0);
+    const totalCost = todaySales.reduce((s, sale) => s + sale.items.reduce((is, i) => is + i.qty * (i.costPrice || 0), 0), 0);
+    const totalProfit = totalRevenue - totalCost;
+    const totalItems = todaySales.reduce((s, sale) => s + sale.items.reduce((is, i) => is + i.qty, 0), 0);
+
+    container.innerHTML = `<div class="pos-summary-title"><i class="fas fa-chart-line"></i> Today's Summary</div>
+      <div class="pos-summary-grid">
+        <div class="pos-summary-stat"><span class="pos-stat-value">${todaySales.length}</span><span class="pos-stat-label">Sales</span></div>
+        <div class="pos-summary-stat"><span class="pos-stat-value">${totalItems}</span><span class="pos-stat-label">Items</span></div>
+        <div class="pos-summary-stat"><span class="pos-stat-value">₹${totalRevenue.toFixed(0)}</span><span class="pos-stat-label">Revenue</span></div>
+        <div class="pos-summary-stat"><span class="pos-stat-value" style="color:var(--success)">₹${totalProfit.toFixed(0)}</span><span class="pos-stat-label">Profit</span></div>
+      </div>`;
+  }
+
+  function refresh() {
+    populateFilters();
+    renderProducts();
+    _renderBill();
+    _renderTodaySummary();
+  }
+
+  function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+  return { init, refresh, populateFilters, renderProducts, addToBill, updateBillQty, removeBillItem, clearBill, checkout };
+})();
