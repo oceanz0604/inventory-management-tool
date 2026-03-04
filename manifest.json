@@ -1,12 +1,13 @@
 {
   "name": "झटपट - Multi-Location Inventory",
   "short_name": "झटपट",
-  "description": "B2B multi-location inventory marketplace",
+  "description": "B2B multi-location inventory marketplace with POS, recipes, khata, and reporting",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#1e293b",
   "theme_color": "#6366f1",
   "orientation": "any",
+  "categories": ["business", "productivity"],
   "icons": [
     {
       "src": "icons/icon.svg",

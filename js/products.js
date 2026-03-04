@@ -5,11 +5,18 @@ const Products = (() => {
   function _updateMarginPreview() {
     const cost = parseFloat(document.getElementById('product-cost-price').value) || 0;
     const sell = parseFloat(document.getElementById('product-price').value) || 0;
+    const mrp = parseFloat(document.getElementById('product-mrp').value) || 0;
     const preview = document.getElementById('product-margin-preview');
+    if (mrp > 0 && sell > mrp) {
+      preview.value = 'Sell > MRP!';
+      preview.style.color = 'var(--danger)';
+      return;
+    }
+    preview.style.color = '';
     if (sell > 0 && cost > 0) {
       const margin = ((sell - cost) / sell * 100).toFixed(1);
       const profit = (sell - cost).toFixed(2);
-      preview.value = `₹${profit}  (${margin}%)`;
+      preview.value = '\u20B9' + profit + '  (' + margin + '%)';
     } else {
       preview.value = '-';
     }
@@ -24,6 +31,7 @@ const Products = (() => {
     document.getElementById('product-filter-published').addEventListener('change', render);
     document.getElementById('product-cost-price').addEventListener('input', _updateMarginPreview);
     document.getElementById('product-price').addEventListener('input', _updateMarginPreview);
+    document.getElementById('product-mrp').addEventListener('input', _updateMarginPreview);
 
     document.querySelectorAll('#view-products .sortable').forEach(th => {
       th.addEventListener('click', () => {
@@ -37,7 +45,7 @@ const Products = (() => {
 
   function populateFilters() {
     const cats = Store.getCategories();
-    const opts = cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    const opts = cats.map(c => '<option value="' + c.id + '">' + c.name + '</option>').join('');
     document.getElementById('product-filter-category').innerHTML = '<option value="">All Categories</option>' + opts;
     document.getElementById('product-category').innerHTML = '<option value="">Select category</option>' + opts;
   }
@@ -56,7 +64,7 @@ const Products = (() => {
 
     prods.sort((a, b) => {
       let va = a[currentSort.field], vb = b[currentSort.field];
-      if (typeof va === 'string') { va = va.toLowerCase(); vb = vb.toLowerCase(); }
+      if (typeof va === 'string') { va = va.toLowerCase(); vb = (vb || '').toLowerCase(); }
       if (va < vb) return currentSort.direction === 'asc' ? -1 : 1;
       if (va > vb) return currentSort.direction === 'asc' ? 1 : -1;
       return 0;
@@ -76,31 +84,33 @@ const Products = (() => {
     tbody.closest('.card').querySelector('table').classList.remove('hidden');
 
     if (prods.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-secondary)">No products match your filters</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-secondary)">No products match your filters</td></tr>';
       return;
     }
 
     tbody.innerHTML = prods.map(p => {
       const cat = Store.getCategoryById(p.categoryId);
-      const catTag = cat ? `<span class="category-tag"><span class="dot" style="background:${cat.color}"></span>${cat.name}</span>` : '<span style="color:var(--text-light)">-</span>';
+      const catTag = cat ? '<span class="category-tag"><span class="dot" style="background:' + cat.color + '"></span>' + _esc(cat.name) + '</span>' : '<span style="color:var(--text-light)">-</span>';
       const totalStock = Store.getTotalStockForProduct(p.id);
       const cost = p.costPrice || 0;
       const margin = p.price > 0 ? ((p.price - cost) / p.price * 100) : 0;
       const marginColor = margin >= 30 ? 'var(--success)' : margin >= 15 ? 'var(--warning)' : 'var(--danger)';
-      return `<tr>
-        <td><strong>${_esc(p.name)}</strong></td>
-        <td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:.8rem">${_esc(p.sku)}</code></td>
-        <td>${catTag}</td>
-        <td style="color:var(--text-secondary)">₹${cost.toFixed(2)}</td>
-        <td>₹${p.price.toFixed(2)}</td>
-        <td><span style="font-weight:600;color:${marginColor}">${margin.toFixed(1)}%</span></td>
-        <td>${totalStock.toLocaleString()}</td>
-        <td><label class="toggle"><input type="checkbox" ${p.isPublished ? 'checked' : ''} onchange="Products.togglePublish('${p.id}',this.checked)"><span class="slider"></span></label></td>
-        <td><div class="action-btns">
-          <button class="btn-icon edit" title="Edit" onclick="Products.openModal('${p.id}')"><i class="fas fa-pen"></i></button>
-          <button class="btn-icon delete" title="Delete" onclick="Products.confirmDelete('${p.id}')"><i class="fas fa-trash-can"></i></button>
-        </div></td>
-      </tr>`;
+      return '<tr>' +
+        '<td><strong>' + _esc(p.name) + '</strong></td>' +
+        '<td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:.8rem">' + _esc(p.sku) + '</code></td>' +
+        '<td>' + catTag + '</td>' +
+        '<td>' + _esc(p.unit || 'pcs') + '</td>' +
+        '<td style="color:var(--text-secondary)">\u20B9' + cost.toFixed(2) + '</td>' +
+        '<td>\u20B9' + p.price.toFixed(2) + '</td>' +
+        '<td style="color:var(--text-secondary)">' + (p.mrp ? '\u20B9' + p.mrp.toFixed(2) : '-') + '</td>' +
+        '<td>' + (p.gstRate || 0) + '%</td>' +
+        '<td><span style="font-weight:600;color:' + marginColor + '">' + margin.toFixed(1) + '%</span></td>' +
+        '<td>' + totalStock.toLocaleString() + '</td>' +
+        '<td><label class="toggle"><input type="checkbox" ' + (p.isPublished ? 'checked' : '') + ' onchange="Products.togglePublish(\'' + p.id + '\',this.checked)"><span class="slider"></span></label></td>' +
+        '<td><div class="action-btns">' +
+        '<button class="btn-icon edit" title="Edit" onclick="Products.openModal(\'' + p.id + '\')"><i class="fas fa-pen"></i></button>' +
+        '<button class="btn-icon delete" title="Delete" onclick="Products.confirmDelete(\'' + p.id + '\')"><i class="fas fa-trash-can"></i></button>' +
+        '</div></td></tr>';
     }).join('');
   }
 
@@ -118,8 +128,13 @@ const Products = (() => {
       document.getElementById('product-name').value = p.name;
       document.getElementById('product-sku').value = p.sku;
       document.getElementById('product-category').value = p.categoryId || '';
+      document.getElementById('product-unit').value = p.unit || 'pcs';
       document.getElementById('product-cost-price').value = p.costPrice || 0;
       document.getElementById('product-price').value = p.price;
+      document.getElementById('product-mrp').value = p.mrp || 0;
+      document.getElementById('product-wholesale').value = p.wholesalePrice || 0;
+      document.getElementById('product-gst').value = p.gstRate != null ? p.gstRate : 18;
+      document.getElementById('product-hsn').value = p.hsnCode || '';
       document.getElementById('product-description').value = p.description || '';
       document.getElementById('product-published').checked = p.isPublished;
     } else {
@@ -137,11 +152,21 @@ const Products = (() => {
       name: document.getElementById('product-name').value.trim(),
       sku: document.getElementById('product-sku').value.trim(),
       categoryId: document.getElementById('product-category').value,
+      unit: document.getElementById('product-unit').value,
       costPrice: parseFloat(document.getElementById('product-cost-price').value) || 0,
       price: parseFloat(document.getElementById('product-price').value) || 0,
+      mrp: parseFloat(document.getElementById('product-mrp').value) || 0,
+      wholesalePrice: parseFloat(document.getElementById('product-wholesale').value) || 0,
+      gstRate: parseInt(document.getElementById('product-gst').value) || 0,
+      hsnCode: document.getElementById('product-hsn').value.trim(),
       description: document.getElementById('product-description').value.trim(),
       isPublished: document.getElementById('product-published').checked,
     };
+
+    if (data.mrp > 0 && data.price > data.mrp) {
+      App.showToast('Selling price cannot exceed MRP', 'warning');
+      return;
+    }
 
     if (editingId) {
       Store.updateProduct(editingId, data);
@@ -169,7 +194,7 @@ const Products = (() => {
   function confirmDelete(prodId) {
     const p = Store.getProductById(prodId);
     if (!p) return;
-    document.getElementById('delete-message').textContent = `Delete product "${p.name}"? This will also remove all stock entries for it.`;
+    document.getElementById('delete-message').textContent = 'Delete product "' + p.name + '"? This will also remove all stock entries for it.';
     document.getElementById('delete-modal').classList.remove('hidden');
     const btn = document.getElementById('confirm-delete-btn');
     const clone = btn.cloneNode(true);

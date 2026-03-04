@@ -94,7 +94,6 @@
 <!-- ==================== Main App ==================== -->
 <div id="app" class="app-layout hidden">
 
-  <!-- Sidebar overlay (mobile: tap to close) -->
   <div class="sidebar-overlay hidden" id="sidebar-overlay" aria-hidden="true"></div>
 
   <!-- Sidebar -->
@@ -122,8 +121,17 @@
       <a href="#" class="nav-item" data-view="orders">
         <i class="fas fa-file-invoice"></i><span>Orders</span>
       </a>
+      <a href="#" class="nav-item" data-view="recipes">
+        <i class="fas fa-mortar-pestle"></i><span>Recipes / BOM</span>
+      </a>
       <a href="#" class="nav-item" data-view="categories">
         <i class="fas fa-tags"></i><span>Categories</span>
+      </a>
+      <a href="#" class="nav-item" data-view="reports">
+        <i class="fas fa-chart-bar"></i><span>Reports</span>
+      </a>
+      <a href="#" class="nav-item" data-view="khata">
+        <i class="fas fa-book"></i><span>Khata / Credit</span>
       </a>
     </nav>
     <div class="sidebar-section-label">Marketplace</div>
@@ -242,12 +250,15 @@
         <div class="table-wrap">
           <table class="data-table"><thead><tr>
             <th class="sortable" data-sort="name">Name <i class="fas fa-sort"></i></th>
-            <th class="sortable" data-sort="sku">SKU <i class="fas fa-sort"></i></th>
+            <th>SKU</th>
             <th>Category</th>
+            <th>Unit</th>
             <th class="sortable" data-sort="costPrice">Cost <i class="fas fa-sort"></i></th>
-            <th class="sortable" data-sort="price">Sell Price <i class="fas fa-sort"></i></th>
+            <th class="sortable" data-sort="price">Sell <i class="fas fa-sort"></i></th>
+            <th>MRP</th>
+            <th>GST</th>
             <th>Margin</th>
-            <th>Total Stock</th>
+            <th>Stock</th>
             <th>Published</th>
             <th>Actions</th>
           </tr></thead><tbody id="products-table-body"></tbody></table>
@@ -266,7 +277,7 @@
           <select id="filter-location" class="select-input"><option value="">All Locations</option></select>
           <select id="filter-category" class="select-input"><option value="">All Categories</option></select>
           <select id="filter-stock" class="select-input">
-            <option value="">All Stock Levels</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option>
+            <option value="">All Stock Levels</option><option value="low">Low Stock</option><option value="out">Out of Stock</option><option value="ok">In Stock</option><option value="expiring">Expiring Soon</option>
           </select>
         </div>
         <div class="toolbar-actions">
@@ -288,6 +299,8 @@
             <th>Location</th>
             <th class="sortable" data-sort="quantity">Qty <i class="fas fa-sort"></i></th>
             <th>Min Stock</th>
+            <th>Batch</th>
+            <th>Expiry</th>
             <th>Status</th>
             <th>Actions</th>
           </tr></thead><tbody id="inventory-table-body"></tbody></table>
@@ -316,7 +329,6 @@
     <!-- ===== POS Counter View ===== -->
     <section id="view-pos" class="view hidden">
       <div class="pos-layout">
-        <!-- Left: Product Picker -->
         <div class="pos-products">
           <div class="pos-toolbar">
             <div class="search-bar" style="max-width:none"><i class="fas fa-search"></i>
@@ -327,7 +339,6 @@
           <div class="pos-product-grid" id="pos-product-grid"></div>
           <div class="empty-state hidden" id="no-pos-products"><i class="fas fa-box-open"></i><p>No products at this location</p></div>
         </div>
-        <!-- Right: Bill / Receipt -->
         <div class="pos-bill">
           <div class="pos-bill-header">
             <h3><i class="fas fa-receipt"></i> Current Bill</h3>
@@ -338,25 +349,41 @@
           </div>
           <div class="pos-bill-summary">
             <div class="pos-bill-line"><span>Items</span><strong id="pos-item-count">0</strong></div>
+            <div class="pos-bill-line"><span>Subtotal</span><strong id="pos-subtotal">₹0.00</strong></div>
+            <div class="pos-bill-line"><span>GST</span><strong id="pos-gst">₹0.00</strong></div>
             <div class="pos-bill-line pos-bill-total"><span>Total</span><strong id="pos-total">₹0.00</strong></div>
           </div>
           <div class="pos-bill-actions">
             <div class="form-row" style="margin-bottom:.75rem">
               <div class="form-group" style="margin-bottom:0"><input type="text" id="pos-customer-name" placeholder="Customer name (optional)"></div>
               <select id="pos-payment" class="select-input" style="width:auto;min-width:110px">
-                <option value="cash">💵 Cash</option>
-                <option value="upi">📱 UPI</option>
-                <option value="card">💳 Card</option>
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="card">Card</option>
               </select>
             </div>
             <button class="btn btn-success btn-full" id="pos-checkout-btn" disabled>
               <i class="fas fa-check-circle"></i> Complete Sale
             </button>
           </div>
-          <!-- Today's summary -->
           <div class="pos-today-summary" id="pos-today-summary"></div>
         </div>
       </div>
+    </section>
+
+    <!-- ===== Recipes / BOM View ===== -->
+    <section id="view-recipes" class="view hidden">
+      <div class="view-toolbar">
+        <div class="search-bar"><i class="fas fa-search"></i>
+          <input type="text" id="recipe-search" placeholder="Search recipes..."></div>
+        <div class="toolbar-actions">
+          <button class="btn btn-secondary" id="produce-btn"><i class="fas fa-industry"></i> Produce</button>
+          <button class="btn btn-primary" id="add-recipe-btn"><i class="fas fa-plus"></i> Add Recipe</button>
+        </div>
+      </div>
+      <div class="recipes-grid" id="recipes-grid"></div>
+      <div class="empty-state hidden" id="no-recipes"><i class="fas fa-mortar-pestle"></i><p>No recipes yet. Create one to track production costs.</p>
+        <button class="btn btn-primary" id="add-first-recipe-btn">Create Your First Recipe</button></div>
     </section>
 
     <!-- ===== Categories View ===== -->
@@ -371,6 +398,83 @@
       <div class="categories-grid" id="categories-grid"></div>
       <div class="empty-state hidden" id="no-categories"><i class="fas fa-tags"></i><p>No categories yet</p>
         <button class="btn btn-primary" id="add-first-category-btn">Add Your First Category</button></div>
+    </section>
+
+    <!-- ===== Reports View ===== -->
+    <section id="view-reports" class="view hidden">
+      <div class="view-toolbar">
+        <div class="toolbar-filters">
+          <select id="report-range" class="select-input">
+            <option value="7">Last 7 Days</option>
+            <option value="30" selected>Last 30 Days</option>
+            <option value="90">Last 90 Days</option>
+            <option value="365">Last Year</option>
+          </select>
+        </div>
+      </div>
+      <div class="stats-grid" id="report-stats"></div>
+      <div class="charts-grid">
+        <div class="card"><div class="card-header"><h3>Revenue & Profit</h3></div>
+          <div class="card-body chart-container"><canvas id="chart-revenue"></canvas></div></div>
+        <div class="card"><div class="card-header"><h3>Top Products by Revenue</h3></div>
+          <div class="card-body chart-container"><canvas id="chart-top-products"></canvas></div></div>
+      </div>
+      <div class="charts-grid" style="margin-top:1rem">
+        <div class="card"><div class="card-header"><h3>Stock Valuation by Category</h3></div>
+          <div class="card-body chart-container"><canvas id="chart-stock-val"></canvas></div></div>
+        <div class="card"><div class="card-header"><h3>P&L Summary</h3></div>
+          <div class="card-body chart-container"><canvas id="chart-pnl"></canvas></div></div>
+      </div>
+      <div class="card" style="margin-top:1rem">
+        <div class="card-header"><h3>Expiring Soon</h3></div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table class="data-table"><thead><tr>
+              <th>Product</th><th>Location</th><th>Batch</th><th>Qty</th><th>Expiry Date</th><th>Days Left</th>
+            </tr></thead><tbody id="expiry-table-body"></tbody></table>
+          </div>
+          <div class="empty-state hidden" id="no-expiry"><i class="fas fa-check-circle"></i><p>No items expiring soon</p></div>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1rem">
+        <div class="card-header"><h3>Slow Movers (No sales in period)</h3></div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table class="data-table"><thead><tr>
+              <th>Product</th><th>SKU</th><th>Stock</th><th>Value (Cost)</th>
+            </tr></thead><tbody id="slow-mover-body"></tbody></table>
+          </div>
+          <div class="empty-state hidden" id="no-slow-movers"><i class="fas fa-rocket"></i><p>All products are selling!</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Khata / Credit View ===== -->
+    <section id="view-khata" class="view hidden">
+      <div class="view-toolbar">
+        <div class="search-bar"><i class="fas fa-search"></i>
+          <input type="text" id="khata-search" placeholder="Search parties..."></div>
+        <div class="toolbar-actions">
+          <button class="btn btn-primary" id="add-khata-btn"><i class="fas fa-plus"></i> Add Entry</button>
+        </div>
+      </div>
+      <div class="stats-grid" id="khata-summary" style="margin-bottom:1rem"></div>
+      <div class="khata-parties" id="khata-parties"></div>
+      <div class="empty-state hidden" id="no-khata"><i class="fas fa-book"></i><p>No credit entries yet</p>
+        <button class="btn btn-primary" id="add-first-khata-btn">Add First Entry</button></div>
+      <div class="card hidden" id="khata-ledger-card" style="margin-top:1.25rem">
+        <div class="card-header">
+          <h3 id="khata-ledger-title">Ledger</h3>
+          <button class="btn btn-sm btn-secondary" id="khata-ledger-close"><i class="fas fa-xmark"></i> Close</button>
+        </div>
+        <div class="card-body">
+          <div class="table-wrap">
+            <table class="data-table"><thead><tr>
+              <th>Date</th><th>#</th><th>Description</th><th>Credit</th><th>Debit</th><th>Balance</th>
+            </tr></thead><tbody id="khata-ledger-body"></tbody></table>
+          </div>
+        </div>
+      </div>
     </section>
 
     <!-- ===== Shop View ===== -->
@@ -393,6 +497,45 @@
     </section>
 
   </main>
+
+  <!-- Mobile Bottom Navigation -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="bnav-item active" data-view="dashboard">
+      <i class="fas fa-chart-pie"></i><span>Home</span>
+    </button>
+    <button class="bnav-item" data-view="products">
+      <i class="fas fa-box"></i><span>Products</span>
+    </button>
+    <button class="bnav-item" data-view="pos">
+      <i class="fas fa-cash-register"></i><span>POS</span>
+    </button>
+    <button class="bnav-item" data-view="orders">
+      <i class="fas fa-file-invoice"></i><span>Orders</span>
+    </button>
+    <button class="bnav-item" id="bnav-more">
+      <i class="fas fa-ellipsis"></i><span>More</span>
+    </button>
+  </nav>
+</div>
+
+<!-- Mobile More Sheet -->
+<div class="more-sheet-overlay hidden" id="more-sheet-overlay"></div>
+<div class="more-sheet hidden" id="more-sheet">
+  <div class="more-sheet-handle"></div>
+  <h3 class="more-sheet-title">More</h3>
+  <div class="more-sheet-grid">
+    <button class="more-sheet-item" data-view="locations"><i class="fas fa-location-dot"></i><span>Locations</span></button>
+    <button class="more-sheet-item" data-view="inventory"><i class="fas fa-warehouse"></i><span>Inventory</span></button>
+    <button class="more-sheet-item" data-view="recipes"><i class="fas fa-mortar-pestle"></i><span>Recipes</span></button>
+    <button class="more-sheet-item" data-view="categories"><i class="fas fa-tags"></i><span>Categories</span></button>
+    <button class="more-sheet-item" data-view="reports"><i class="fas fa-chart-bar"></i><span>Reports</span></button>
+    <button class="more-sheet-item" data-view="khata"><i class="fas fa-book"></i><span>Khata</span></button>
+    <button class="more-sheet-item" data-view="shop"><i class="fas fa-cart-shopping"></i><span>Shop</span></button>
+  </div>
+  <div class="more-sheet-footer">
+    <button class="btn btn-secondary btn-full" id="more-switch-user"><i class="fas fa-people-arrows"></i> Switch User</button>
+    <button class="btn btn-secondary btn-full" id="more-logout" style="margin-top:.5rem"><i class="fas fa-right-from-bracket"></i> Logout</button>
+  </div>
 </div>
 
 <!-- ==================== Cart Drawer ==================== -->
@@ -407,7 +550,7 @@
   </div>
   <div class="cart-footer hidden" id="cart-footer">
     <div class="cart-total">
-      <span>Total</span><strong id="cart-total-value">$0.00</strong>
+      <span>Total</span><strong id="cart-total-value">₹0.00</strong>
     </div>
     <button class="btn btn-primary btn-full" id="place-order-btn"><i class="fas fa-paper-plane"></i> Place Order</button>
     <button class="btn btn-secondary btn-full" id="clear-cart-btn" style="margin-top:0.5rem"><i class="fas fa-trash"></i> Clear Cart</button>
@@ -456,14 +599,49 @@
         <div class="form-row">
           <div class="form-group"><label for="product-category">Category</label>
             <select id="product-category" class="select-input"><option value="">Select category</option></select></div>
-          <div class="form-group"><label for="product-cost-price">Cost Price (₹)</label>
-            <input type="number" id="product-cost-price" step="0.01" min="0" value="0"></div>
+          <div class="form-group"><label for="product-unit">Unit</label>
+            <select id="product-unit" class="select-input">
+              <option value="pcs">Pieces (pcs)</option>
+              <option value="kg">Kilogram (kg)</option>
+              <option value="g">Gram (g)</option>
+              <option value="L">Litre (L)</option>
+              <option value="ml">Millilitre (ml)</option>
+              <option value="box">Box</option>
+              <option value="pack">Pack</option>
+              <option value="set">Set</option>
+              <option value="strip">Strip</option>
+              <option value="dozen">Dozen</option>
+              <option value="m">Metre (m)</option>
+            </select></div>
         </div>
         <div class="form-row">
+          <div class="form-group"><label for="product-cost-price">Cost Price (₹)</label>
+            <input type="number" id="product-cost-price" step="0.01" min="0" value="0"></div>
           <div class="form-group"><label for="product-price">Selling Price (₹) *</label>
             <input type="number" id="product-price" step="0.01" min="0" value="0" required></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label for="product-mrp">MRP (₹)</label>
+            <input type="number" id="product-mrp" step="0.01" min="0" value="0"></div>
+          <div class="form-group"><label for="product-wholesale">Wholesale (₹)</label>
+            <input type="number" id="product-wholesale" step="0.01" min="0" value="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label for="product-gst">GST Rate</label>
+            <select id="product-gst" class="select-input">
+              <option value="0">0%</option>
+              <option value="5">5%</option>
+              <option value="12">12%</option>
+              <option value="18" selected>18%</option>
+              <option value="28">28%</option>
+            </select></div>
+          <div class="form-group"><label for="product-hsn">HSN Code</label>
+            <input type="text" id="product-hsn" placeholder="e.g. 8471"></div>
+        </div>
+        <div class="form-row">
           <div class="form-group"><label>Margin</label>
             <input type="text" id="product-margin-preview" class="input-readonly" readonly tabindex="-1"></div>
+          <div class="form-group"></div>
         </div>
         <div class="form-group"><label for="product-description">Description</label>
           <textarea id="product-description" rows="3"></textarea></div>
@@ -495,6 +673,12 @@
             <input type="number" id="stock-quantity" min="0" value="0" required></div>
           <div class="form-group"><label for="stock-min">Min Stock</label>
             <input type="number" id="stock-min" min="0" value="5"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label for="stock-batch">Batch Number</label>
+            <input type="text" id="stock-batch" placeholder="e.g. BATCH-2025-001"></div>
+          <div class="form-group"><label for="stock-expiry">Expiry Date</label>
+            <input type="date" id="stock-expiry"></div>
         </div>
       </div>
       <div class="modal-footer">
@@ -537,6 +721,108 @@
         <button type="submit" class="btn btn-primary">Save Category</button>
       </div>
     </form>
+  </div>
+</div>
+
+<!-- Recipe Modal -->
+<div class="modal hidden" id="recipe-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <div class="modal-header"><h3 id="recipe-modal-title">Add Recipe</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <form id="recipe-form">
+      <div class="modal-body">
+        <div class="form-row">
+          <div class="form-group"><label for="recipe-name">Recipe Name *</label>
+            <input type="text" id="recipe-name" placeholder="e.g. Paneer Tikka Platter" required></div>
+          <div class="form-group"><label for="recipe-output">Output Product *</label>
+            <select id="recipe-output" class="select-input" required><option value="">Select product</option></select></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label for="recipe-output-qty">Output Quantity *</label>
+            <input type="number" id="recipe-output-qty" min="1" value="1" required></div>
+          <div class="form-group"><label>Est. Cost / Unit</label>
+            <input type="text" id="recipe-cost-preview" class="input-readonly" readonly tabindex="-1" value="₹0.00"></div>
+        </div>
+        <div class="form-group">
+          <label>Ingredients</label>
+          <div id="recipe-ingredients"></div>
+          <button type="button" class="btn btn-sm btn-secondary" id="add-ingredient-btn" style="margin-top:.5rem"><i class="fas fa-plus"></i> Add Ingredient</button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Recipe</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Produce Modal -->
+<div class="modal hidden" id="produce-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3>Produce from Recipe</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <form id="produce-form">
+      <div class="modal-body">
+        <div class="form-group"><label for="produce-recipe">Recipe *</label>
+          <select id="produce-recipe" class="select-input" required><option value="">Select recipe</option></select></div>
+        <div class="form-group"><label for="produce-location">Location *</label>
+          <select id="produce-location" class="select-input" required><option value="">Select location</option></select></div>
+        <div class="form-group"><label for="produce-qty">Batches to Produce *</label>
+          <input type="number" id="produce-qty" min="1" value="1" required></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+        <button type="submit" class="btn btn-success"><i class="fas fa-industry"></i> Produce</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Khata Modal -->
+<div class="modal hidden" id="khata-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3 id="khata-modal-title">Add Khata Entry</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <form id="khata-form">
+      <div class="modal-body">
+        <div class="form-group"><label for="khata-party">Party Name *</label>
+          <input type="text" id="khata-party" list="khata-party-list" placeholder="e.g. GreenGoods" required>
+          <datalist id="khata-party-list"></datalist></div>
+        <div class="form-group"><label for="khata-party-id">Link to User (optional)</label>
+          <select id="khata-party-id" class="select-input"><option value="">-- None --</option></select></div>
+        <div class="form-group"><label for="khata-type">Type *</label>
+          <select id="khata-type" class="select-input" required>
+            <option value="credit">Credit Given (they owe you)</option>
+            <option value="debit">Payment Received</option>
+          </select></div>
+        <div class="form-group"><label for="khata-amount">Amount (₹) *</label>
+          <input type="number" id="khata-amount" step="0.01" min="0.01" required></div>
+        <div class="form-group"><label for="khata-desc">Description</label>
+          <input type="text" id="khata-desc" placeholder="e.g. Payment for ORD-1001"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Entry</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Invoice Modal -->
+<div class="modal hidden" id="invoice-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <div class="modal-header"><h3><i class="fas fa-file-invoice-dollar" style="margin-right:.5rem"></i>GST Invoice</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <div class="modal-body" id="invoice-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary modal-close">Close</button>
+      <button class="btn btn-primary" id="print-invoice-btn"><i class="fas fa-print"></i> Print</button>
+    </div>
   </div>
 </div>
 
@@ -592,6 +878,9 @@
 <script src="js/orders.js"></script>
 <script src="js/shop.js"></script>
 <script src="js/pos.js"></script>
+<script src="js/bom.js"></script>
+<script src="js/khata.js"></script>
+<script src="js/reports.js"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/export.js"></script>
 <script src="js/app.js"></script>

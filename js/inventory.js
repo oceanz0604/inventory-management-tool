@@ -27,11 +27,11 @@ const Inventory = (() => {
     const cats = Store.getCategories();
     const prods = Store.getProductsByOwner(user.id);
 
-    document.getElementById('filter-location').innerHTML = '<option value="">All Locations</option>' + locs.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
-    document.getElementById('filter-category').innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+    document.getElementById('filter-location').innerHTML = '<option value="">All Locations</option>' + locs.map(l => '<option value="' + l.id + '">' + _esc(l.name) + '</option>').join('');
+    document.getElementById('filter-category').innerHTML = '<option value="">All Categories</option>' + cats.map(c => '<option value="' + c.id + '">' + _esc(c.name) + '</option>').join('');
 
-    document.getElementById('stock-product').innerHTML = '<option value="">Select product</option>' + prods.map(p => `<option value="${p.id}">${p.name} (${p.sku})</option>`).join('');
-    document.getElementById('stock-location').innerHTML = '<option value="">Select location</option>' + locs.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+    document.getElementById('stock-product').innerHTML = '<option value="">Select product</option>' + prods.map(p => '<option value="' + p.id + '">' + _esc(p.name) + ' (' + p.sku + ')</option>').join('');
+    document.getElementById('stock-location').innerHTML = '<option value="">Select location</option>' + locs.map(l => '<option value="' + l.id + '">' + _esc(l.name) + '</option>').join('');
   }
 
   function _getFilteredStock() {
@@ -55,6 +55,11 @@ const Inventory = (() => {
     if (stockFilter === 'low') entries = entries.filter(s => s.quantity > 0 && s.quantity <= s.minStock);
     else if (stockFilter === 'out') entries = entries.filter(s => s.quantity === 0);
     else if (stockFilter === 'ok') entries = entries.filter(s => s.quantity > s.minStock);
+    else if (stockFilter === 'expiring') entries = entries.filter(s => {
+      if (!s.expiryDate) return false;
+      const daysLeft = Math.ceil((new Date(s.expiryDate) - new Date()) / 86400000);
+      return daysLeft <= 30;
+    });
 
     entries.sort((a, b) => {
       let va, vb;
@@ -86,24 +91,32 @@ const Inventory = (() => {
     tbody.closest('.card').querySelector('table').classList.remove('hidden');
 
     if (entries.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:2rem;color:var(--text-secondary)">No stock entries match your filters</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:2rem;color:var(--text-secondary)">No stock entries match your filters</td></tr>';
       return;
     }
 
     tbody.innerHTML = entries.map(s => {
-      const cat = Store.getCategoryById(s.product.categoryId);
       const badge = s.quantity === 0 ? '<span class="badge badge-danger">Out of Stock</span>' : s.quantity <= s.minStock ? '<span class="badge badge-warning">Low Stock</span>' : '<span class="badge badge-success">In Stock</span>';
-      return `<tr>
-        <td><strong>${_esc(s.product.name)}</strong></td>
-        <td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:.8rem">${_esc(s.product.sku)}</code></td>
-        <td>${_esc(s.location.name)}</td>
-        <td>${s.quantity}</td>
-        <td>${s.minStock}</td>
-        <td>${badge}</td>
-        <td><div class="action-btns">
-          <button class="btn-icon edit" title="Edit Stock" onclick="Inventory.openStockModal('${s.productId}','${s.locationId}')"><i class="fas fa-pen"></i></button>
-        </div></td>
-      </tr>`;
+      const batch = s.batchNumber ? '<code style="font-size:.75rem">' + _esc(s.batchNumber) + '</code>' : '<span style="color:var(--text-light)">—</span>';
+      let expiry = '<span style="color:var(--text-light)">—</span>';
+      if (s.expiryDate) {
+        const daysLeft = Math.ceil((new Date(s.expiryDate) - new Date()) / 86400000);
+        const color = daysLeft <= 0 ? 'var(--danger)' : daysLeft <= 30 ? 'var(--warning)' : daysLeft <= 90 ? 'var(--info)' : 'var(--text-secondary)';
+        const label = daysLeft <= 0 ? 'Expired' : daysLeft + 'd';
+        expiry = '<span style="color:' + color + ';font-weight:600" title="' + new Date(s.expiryDate).toLocaleDateString('en-IN') + '">' + label + '</span>';
+      }
+      return '<tr>' +
+        '<td><strong>' + _esc(s.product.name) + '</strong></td>' +
+        '<td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:.8rem">' + _esc(s.product.sku) + '</code></td>' +
+        '<td>' + _esc(s.location.name) + '</td>' +
+        '<td>' + s.quantity + '</td>' +
+        '<td>' + s.minStock + '</td>' +
+        '<td>' + batch + '</td>' +
+        '<td>' + expiry + '</td>' +
+        '<td>' + badge + '</td>' +
+        '<td><div class="action-btns">' +
+        '<button class="btn-icon edit" title="Edit Stock" onclick="Inventory.openStockModal(\'' + s.productId + '\',\'' + s.locationId + '\')"><i class="fas fa-pen"></i></button>' +
+        '</div></td></tr>';
     }).join('');
   }
 
@@ -123,6 +136,8 @@ const Inventory = (() => {
       document.getElementById('stock-location').disabled = true;
       document.getElementById('stock-quantity').value = rec ? rec.quantity : 0;
       document.getElementById('stock-min').value = rec ? rec.minStock : 5;
+      document.getElementById('stock-batch').value = rec ? (rec.batchNumber || '') : '';
+      document.getElementById('stock-expiry').value = rec ? (rec.expiryDate || '') : '';
     } else {
       title.textContent = 'Add Stock Entry';
       document.getElementById('stock-product').disabled = false;
@@ -137,10 +152,12 @@ const Inventory = (() => {
     const locationId = document.getElementById('stock-location').value;
     const quantity = parseInt(document.getElementById('stock-quantity').value) || 0;
     const minStock = parseInt(document.getElementById('stock-min').value) || 0;
+    const batchNumber = document.getElementById('stock-batch').value.trim();
+    const expiryDate = document.getElementById('stock-expiry').value || null;
 
     if (!productId || !locationId) { App.showToast('Select product and location', 'warning'); return; }
 
-    Store.setStock(productId, locationId, quantity, minStock);
+    Store.setStock(productId, locationId, quantity, minStock, { batchNumber, expiryDate });
     App.showToast('Stock updated', 'success');
 
     document.getElementById('stock-modal').classList.add('hidden');

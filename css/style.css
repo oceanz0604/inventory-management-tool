@@ -542,13 +542,89 @@ textarea { resize:vertical; }
 .pos-receipt-meta { margin-top:.75rem; font-size:.75rem; color:var(--text-secondary); }
 .pos-receipt-meta span { display:block; }
 
+/* ========== Recipe / BOM Cards ========== */
+.recipes-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:1.25rem; }
+.recipe-card { background:var(--bg-card); border-radius:var(--radius-lg); box-shadow:var(--shadow); padding:1.25rem; transition:box-shadow var(--transition); }
+.recipe-card:hover { box-shadow:var(--shadow-lg); }
+.recipe-card-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:.75rem; }
+.recipe-card-header h4 { font-size:1rem; font-weight:600; }
+.recipe-card-output { font-size:.8rem; color:var(--text-secondary); margin-bottom:.75rem; }
+.recipe-card-output strong { color:var(--text); }
+.recipe-card-ingredients { margin-bottom:.75rem; }
+.recipe-card-ingredients .ing-label { font-size:.7rem; font-weight:600; text-transform:uppercase; letter-spacing:.04em; color:var(--text-secondary); margin-bottom:.375rem; }
+.recipe-card-ingredients ul { list-style:none; padding:0; display:flex; flex-wrap:wrap; gap:.375rem; }
+.recipe-card-ingredients li { font-size:.75rem; background:var(--bg); padding:.25rem .625rem; border-radius:999px; color:var(--text-secondary); }
+.recipe-card-footer { display:flex; align-items:center; justify-content:space-between; padding-top:.75rem; border-top:1px solid var(--border); }
+.recipe-cost { font-size:.85rem; }
+.recipe-cost strong { color:var(--primary); }
+.ingredient-row { display:flex; align-items:center; gap:.5rem; margin-bottom:.5rem; }
+.ingredient-row .select-input { flex:2; }
+.ingredient-row input { flex:1; }
+.ingredient-row .btn-icon { flex-shrink:0; }
+
+/* ========== Khata / Credit ========== */
+.khata-parties { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:1rem; }
+.khata-party-card { background:var(--bg-card); border-radius:var(--radius-lg); box-shadow:var(--shadow); padding:1.25rem; display:flex; align-items:center; gap:1rem; cursor:pointer; transition:all var(--transition); }
+.khata-party-card:hover { box-shadow:var(--shadow-lg); transform:translateY(-1px); }
+.khata-party-avatar { width:44px; height:44px; border-radius:50%; background:var(--primary); color:white; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:.9rem; flex-shrink:0; }
+.khata-party-info { flex:1; min-width:0; }
+.khata-party-info h4 { font-size:.95rem; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.khata-party-info span { font-size:.8rem; color:var(--text-secondary); }
+.khata-balance { font-size:1.1rem; font-weight:700; white-space:nowrap; }
+.khata-balance.positive { color:var(--success); }
+.khata-balance.negative { color:var(--danger); }
+
+/* ========== Invoice Preview ========== */
+.invoice-preview { font-size:.85rem; }
+.invoice-header { display:flex; justify-content:space-between; margin-bottom:1.25rem; padding-bottom:1rem; border-bottom:2px solid var(--text); }
+.invoice-header .inv-title { font-size:1.2rem; font-weight:700; }
+.invoice-header .inv-meta { text-align:right; font-size:.8rem; color:var(--text-secondary); }
+.invoice-parties { display:grid; grid-template-columns:1fr 1fr; gap:1.5rem; margin-bottom:1.25rem; }
+.invoice-parties .inv-party-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.05em; color:var(--text-secondary); margin-bottom:.375rem; font-weight:600; }
+.invoice-parties strong { display:block; margin-bottom:.125rem; }
+.invoice-table { width:100%; border-collapse:collapse; margin-bottom:1rem; }
+.invoice-table th { background:var(--bg); padding:.5rem .75rem; text-align:left; font-size:.75rem; text-transform:uppercase; letter-spacing:.03em; color:var(--text-secondary); border-bottom:1px solid var(--border); }
+.invoice-table td { padding:.5rem .75rem; border-bottom:1px solid var(--border); }
+.invoice-totals { margin-left:auto; width:250px; }
+.invoice-totals .inv-line { display:flex; justify-content:space-between; padding:.375rem 0; font-size:.85rem; }
+.invoice-totals .inv-line.total { border-top:2px solid var(--text); font-weight:700; font-size:1rem; padding-top:.5rem; margin-top:.25rem; }
+
+/* ========== Mobile Bottom Nav ========== */
+.bottom-nav { display:none; }
+
+/* ========== More Sheet ========== */
+.more-sheet-overlay { position:fixed; inset:0; background:rgba(0,0,0,.4); z-index:800; backdrop-filter:blur(2px); }
+.more-sheet { position:fixed; bottom:0; left:0; right:0; background:var(--bg-card); z-index:801; border-radius:var(--radius-lg) var(--radius-lg) 0 0; box-shadow:0 -4px 25px rgba(0,0,0,.15); padding:1rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom)); transform:translateY(0); transition:transform .3s ease; max-height:80vh; overflow-y:auto; }
+.more-sheet.hidden { transform:translateY(100%); }
+.more-sheet-handle { width:36px; height:4px; background:var(--border); border-radius:2px; margin:0 auto .75rem; }
+.more-sheet-title { font-size:1rem; font-weight:600; margin-bottom:1rem; }
+.more-sheet-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.75rem; margin-bottom:1.25rem; }
+.more-sheet-item { display:flex; flex-direction:column; align-items:center; gap:.375rem; padding:.875rem .5rem; border-radius:var(--radius); border:1.5px solid var(--border); background:var(--bg); cursor:pointer; transition:all var(--transition); font-size:.75rem; font-weight:500; color:var(--text-secondary); }
+.more-sheet-item:hover { border-color:var(--primary); color:var(--primary); background:var(--primary-light); }
+.more-sheet-item i { font-size:1.25rem; }
+.more-sheet-footer { border-top:1px solid var(--border); padding-top:1rem; }
+
+/* ========== Dark theme for new modules ========== */
+[data-theme="dark"] .recipe-card-ingredients li { background:var(--bg-sidebar-hover); }
+[data-theme="dark"] .khata-party-card:hover { background:var(--bg); }
+[data-theme="dark"] .invoice-header { border-bottom-color:var(--border); }
+[data-theme="dark"] .invoice-totals .inv-line.total { border-top-color:var(--border); }
+[data-theme="dark"] .more-sheet-item { background:var(--bg-sidebar-hover); border-color:var(--border); }
+[data-theme="dark"] .pos-item-card.in-bill { background:#14332a; }
+
 /* ========== Responsive ========== */
 @media(max-width:1024px) { .stats-grid { grid-template-columns:repeat(2,1fr); } .charts-grid { grid-template-columns:1fr; } }
 @media(max-width:768px) {
-  .sidebar { transform:translateX(-100%); }
-  .sidebar.open { transform:translateX(0); }
-  .sidebar-toggle { display:flex; min-width:44px; min-height:44px; align-items:center; justify-content:center; }
-  .main-content { margin-left:0; }
+  .sidebar { display:none !important; }
+  .sidebar-overlay { display:none !important; }
+  .sidebar-toggle { display:none !important; }
+  .main-content { margin-left:0; padding-bottom:calc(60px + env(safe-area-inset-bottom)); }
+  .bottom-nav { display:flex; position:fixed; bottom:0; left:0; right:0; height:60px; background:var(--bg-card); border-top:1px solid var(--border); z-index:200; padding-bottom:env(safe-area-inset-bottom); }
+  .bnav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.2rem; border:none; background:none; color:var(--text-light); font-size:.65rem; font-weight:500; cursor:pointer; transition:color var(--transition); padding:.375rem 0; min-height:44px; }
+  .bnav-item i { font-size:1.15rem; }
+  .bnav-item.active { color:var(--primary); }
+  .bnav-item:active { transform:scale(.92); }
+  .topbar { padding-left:1rem; padding-right:1rem; }
   .stats-grid { grid-template-columns:1fr 1fr; }
   .view-toolbar { flex-direction:column; align-items:stretch; min-width:0; }
   .search-bar { max-width:none; min-width:0; }
@@ -568,6 +644,12 @@ textarea { resize:vertical; }
   .nav-item { min-height:44px; padding:.75rem 1rem; }
   .btn-icon { min-width:44px; min-height:44px; }
   .modal-content { max-height:85vh; max-height:85dvh; margin:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .toast-container { bottom:calc(70px + env(safe-area-inset-bottom)); right:1rem; left:1rem; }
+  .toast { max-width:none; }
+  .more-sheet-grid { grid-template-columns:repeat(3,1fr); }
+  .khata-parties { grid-template-columns:1fr; }
+  .recipes-grid { grid-template-columns:1fr; }
+  .topbar-actions { gap:.25rem; }
 }
 @media(max-width:480px) {
   .stats-grid { grid-template-columns:1fr; }
@@ -576,4 +658,5 @@ textarea { resize:vertical; }
   .card-header,.card-body { padding:1rem; }
   .btn { min-height:44px; padding:.75rem 1rem; }
   .topbar-title h2 { font-size:1rem; }
+  .more-sheet-grid { grid-template-columns:repeat(3,1fr); }
 }

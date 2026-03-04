@@ -14,6 +14,7 @@ const App = (() => {
     _bindNotifications();
     _bindSidebarToggle();
     _bindCategoryEvents();
+    _bindBottomNav();
   }
 
   // ========== Theme ==========
@@ -35,6 +36,7 @@ const App = (() => {
       localStorage.setItem('ims_theme', 'dark');
     }
     if (currentView === 'dashboard') Dashboard.refresh();
+    if (currentView === 'reports') Reports.refresh();
   }
 
   // ========== Auth ==========
@@ -54,6 +56,9 @@ const App = (() => {
     Orders.init();
     Shop.init();
     POS.init();
+    BOM.init();
+    KhataModule.init();
+    Reports.init();
     Dashboard.init();
     Export.init();
     _navigate('dashboard');
@@ -105,16 +110,18 @@ const App = (() => {
       _hideAuthError();
     });
 
-    document.getElementById('logout-btn').addEventListener('click', () => {
-      Auth.logout();
-      _showAuth();
-      document.getElementById('login-form').reset();
-      document.getElementById('signup-form').reset();
-      document.getElementById('login-form').classList.remove('hidden');
-      document.getElementById('signup-form').classList.add('hidden');
-    });
-
+    document.getElementById('logout-btn').addEventListener('click', _doLogout);
     document.getElementById('switch-user-btn').addEventListener('click', _openSwitchUserModal);
+  }
+
+  function _doLogout() {
+    Auth.logout();
+    _showAuth();
+    _closeMoreSheet();
+    document.getElementById('login-form').reset();
+    document.getElementById('signup-form').reset();
+    document.getElementById('login-form').classList.remove('hidden');
+    document.getElementById('signup-form').classList.add('hidden');
   }
 
   function _showAuthError(msg) {
@@ -127,6 +134,7 @@ const App = (() => {
 
   // ========== Switch User Modal ==========
   function _openSwitchUserModal() {
+    _closeMoreSheet();
     const current = Auth.getUser();
     const allUsers = Store.getUsers();
     if (allUsers.length <= 1) { showToast('No other demo users available', 'warning'); return; }
@@ -137,11 +145,10 @@ const App = (() => {
       const isCurrent = u.id === current.id;
       const initials = Auth.getInitials(u.name || u.shopName || 'U');
       const icon = icons[u.id] || 'fa-store';
-      return `<div class="switch-user-item ${isCurrent ? 'current' : ''}" data-uid="${u.id}">
-        <div class="su-avatar">${initials}</div>
-        <div class="su-info"><strong><i class="fas ${icon}" style="margin-right:.375rem;font-size:.75rem;opacity:.7"></i>${_esc(u.name || u.shopName)}</strong><span>${_esc(u.email)}</span></div>
-        ${isCurrent ? '<span class="su-current-tag">Current</span>' : ''}
-      </div>`;
+      return '<div class="switch-user-item ' + (isCurrent ? 'current' : '') + '" data-uid="' + u.id + '">' +
+        '<div class="su-avatar">' + initials + '</div>' +
+        '<div class="su-info"><strong><i class="fas ' + icon + '" style="margin-right:.375rem;font-size:.75rem;opacity:.7"></i>' + _esc(u.name || u.shopName) + '</strong><span>' + _esc(u.email) + '</span></div>' +
+        (isCurrent ? '<span class="su-current-tag">Current</span>' : '') + '</div>';
     }).join('');
 
     list.querySelectorAll('.switch-user-item:not(.current)').forEach(el => {
@@ -152,7 +159,7 @@ const App = (() => {
         _refreshUserUI();
         _navigate('dashboard');
         const u = Store.getUserById(uid);
-        showToast(`Switched to ${u.name || u.shopName}`, 'success');
+        showToast('Switched to ' + (u.name || u.shopName), 'success');
         Shop.refreshBadges();
       });
     });
@@ -162,7 +169,7 @@ const App = (() => {
 
   // ========== Navigation ==========
   function _bindNavEvents() {
-    document.querySelectorAll('.nav-item').forEach(item => {
+    document.querySelectorAll('.sidebar .nav-item').forEach(item => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
         _navigate(item.dataset.view);
@@ -175,18 +182,26 @@ const App = (() => {
     });
   }
 
+  const titles = {
+    dashboard: 'Dashboard', locations: 'Locations', products: 'Products',
+    inventory: 'Inventory', pos: 'POS Counter', orders: 'Orders',
+    categories: 'Categories', shop: 'Shop', recipes: 'Recipes / BOM',
+    reports: 'Reports', khata: 'Khata / Credit'
+  };
+
   function _navigate(view) {
     currentView = view;
     document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
     const el = document.getElementById('view-' + view);
     if (el) el.classList.remove('hidden');
 
-    document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-    const nav = document.querySelector(`.nav-item[data-view="${view}"]`);
+    document.querySelectorAll('.sidebar .nav-item').forEach(n => n.classList.remove('active'));
+    const nav = document.querySelector('.sidebar .nav-item[data-view="' + view + '"]');
     if (nav) nav.classList.add('active');
 
-    const titles = { dashboard: 'Dashboard', locations: 'Locations', products: 'Products', inventory: 'Inventory', pos: 'POS Counter', orders: 'Orders', categories: 'Categories', shop: 'Shop' };
     document.getElementById('page-title').textContent = titles[view] || view;
+
+    _syncBottomNav(view);
 
     if (view === 'dashboard') Dashboard.refresh();
     if (view === 'locations') Locations.render();
@@ -196,6 +211,64 @@ const App = (() => {
     if (view === 'orders') Orders.render();
     if (view === 'categories') _renderCategories();
     if (view === 'shop') { Shop.populateFilters(); Shop.renderProducts(); }
+    if (view === 'recipes') BOM.refresh();
+    if (view === 'reports') Reports.refresh();
+    if (view === 'khata') KhataModule.refresh();
+  }
+
+  // ========== Bottom Nav (Mobile) ==========
+  function _bindBottomNav() {
+    const primaryViews = ['dashboard', 'products', 'pos', 'orders'];
+    document.querySelectorAll('#bottom-nav .bnav-item[data-view]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _closeMoreSheet();
+        _navigate(btn.dataset.view);
+      });
+    });
+
+    document.getElementById('bnav-more').addEventListener('click', _toggleMoreSheet);
+    document.getElementById('more-sheet-overlay').addEventListener('click', _closeMoreSheet);
+
+    document.querySelectorAll('#more-sheet .more-sheet-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        _closeMoreSheet();
+        _navigate(btn.dataset.view);
+      });
+    });
+
+    const moreSwitch = document.getElementById('more-switch-user');
+    if (moreSwitch) moreSwitch.addEventListener('click', _openSwitchUserModal);
+    const moreLogout = document.getElementById('more-logout');
+    if (moreLogout) moreLogout.addEventListener('click', _doLogout);
+  }
+
+  function _toggleMoreSheet() {
+    const sheet = document.getElementById('more-sheet');
+    const overlay = document.getElementById('more-sheet-overlay');
+    const isOpen = !sheet.classList.contains('hidden');
+    if (isOpen) {
+      sheet.classList.add('hidden');
+      overlay.classList.add('hidden');
+    } else {
+      sheet.classList.remove('hidden');
+      overlay.classList.remove('hidden');
+    }
+  }
+
+  function _closeMoreSheet() {
+    document.getElementById('more-sheet').classList.add('hidden');
+    document.getElementById('more-sheet-overlay').classList.add('hidden');
+  }
+
+  function _syncBottomNav(view) {
+    const primaryViews = ['dashboard', 'products', 'pos', 'orders'];
+    document.querySelectorAll('#bottom-nav .bnav-item').forEach(btn => btn.classList.remove('active'));
+    if (primaryViews.includes(view)) {
+      const match = document.querySelector('#bottom-nav .bnav-item[data-view="' + view + '"]');
+      if (match) match.classList.add('active');
+    } else {
+      document.getElementById('bnav-more').classList.add('active');
+    }
   }
 
   // ========== Sidebar Toggle ==========
@@ -305,14 +378,12 @@ const App = (() => {
     const user = Auth.getUser();
     grid.innerHTML = cats.map(cat => {
       const prods = Store.getProductsByOwner(user.id).filter(p => p.categoryId === cat.id);
-      return `<div class="category-card">
-        <div class="color-swatch" style="background:${cat.color}"></div>
-        <div class="category-info"><h4>${_esc(cat.name)}</h4><span>${prods.length} product${prods.length !== 1 ? 's' : ''}</span></div>
-        <div class="category-actions">
-          <button class="btn-icon edit" title="Edit" onclick="App.editCategory('${cat.id}')"><i class="fas fa-pen"></i></button>
-          <button class="btn-icon delete" title="Delete" onclick="App.deleteCategory('${cat.id}')"><i class="fas fa-trash-can"></i></button>
-        </div>
-      </div>`;
+      return '<div class="category-card">' +
+        '<div class="color-swatch" style="background:' + cat.color + '"></div>' +
+        '<div class="category-info"><h4>' + _esc(cat.name) + '</h4><span>' + prods.length + ' product' + (prods.length !== 1 ? 's' : '') + '</span></div>' +
+        '<div class="category-actions">' +
+        '<button class="btn-icon edit" title="Edit" onclick="App.editCategory(\'' + cat.id + '\')"><i class="fas fa-pen"></i></button>' +
+        '<button class="btn-icon delete" title="Delete" onclick="App.deleteCategory(\'' + cat.id + '\')"><i class="fas fa-trash-can"></i></button></div></div>';
     }).join('');
   }
 
@@ -321,7 +392,7 @@ const App = (() => {
   function deleteCategory(catId) {
     const cat = Store.getCategoryById(catId);
     if (!cat) return;
-    document.getElementById('delete-message').textContent = `Delete category "${cat.name}"?`;
+    document.getElementById('delete-message').textContent = 'Delete category "' + cat.name + '"?';
     document.getElementById('delete-modal').classList.remove('hidden');
     const btn = document.getElementById('confirm-delete-btn');
     const clone = btn.cloneNode(true);
@@ -338,12 +409,13 @@ const App = (() => {
   }
 
   // ========== Toast ==========
-  function showToast(message, type = 'success') {
+  function showToast(message, type) {
+    type = type || 'success';
     const container = document.getElementById('toast-container');
     const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', warning: 'fa-triangle-exclamation' };
     const toast = document.createElement('div');
-    toast.className = `toast ${type}`;
-    toast.innerHTML = `<i class="fas ${icons[type] || icons.success}"></i><span>${message}</span>`;
+    toast.className = 'toast ' + type;
+    toast.innerHTML = '<i class="fas ' + (icons[type] || icons.success) + '"></i><span>' + message + '</span>';
     container.appendChild(toast);
     setTimeout(() => { toast.style.animation = 'toastOut .3s ease forwards'; setTimeout(() => toast.remove(), 300); }, 3000);
   }
