@@ -4,8 +4,8 @@
   "description": "B2B multi-location inventory marketplace with POS, recipes, khata, and reporting",
   "start_url": "./index.html",
   "display": "standalone",
-  "background_color": "#1e293b",
-  "theme_color": "#6366f1",
+  "background_color": "#0e0c1d",
+  "theme_color": "#6d5dfc",
   "orientation": "any",
   "categories": ["business", "productivity"],
   "icons": [
