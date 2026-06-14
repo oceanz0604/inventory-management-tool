@@ -8,25 +8,25 @@
    4. In the console enable:
         - Authentication  ->  Sign-in method  ->  Email/Password
         - Firestore Database (start in production mode)
-   5. Deploy the security rules:  firebase deploy --only firestore:rules
-        (rules live in firestore.rules at the repo root)
+   5. Security rules live in firestore.rules at the repo root. The project
+      owner deploys them MANUALLY (e.g. paste into the Firebase console).
+      Do NOT deploy via the Firebase CLI from this repo/automation.
 
    NOTE: These web config values are PUBLIC by design — they are shipped to
    the browser and are NOT secrets. Real protection comes from Firestore
    security rules (firestore.rules), not from hiding these values.
 
-   Until FIREBASE_CONFIG is filled in, the app keeps running in its existing
-   local-only (localStorage) mode — nothing breaks.
+   The app also keeps a local (localStorage) fallback if Firebase is
+   unreachable, so it never hard-breaks when offline.
    ============================================================ */
 
 const FIREBASE_CONFIG = {
-  apiKey: "YOUR_API_KEY",
-  authDomain: "YOUR_PROJECT.firebaseapp.com",
-  projectId: "YOUR_PROJECT_ID",
-  storageBucket: "YOUR_PROJECT.appspot.com",
-  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-  appId: "YOUR_APP_ID"
-  // measurementId: "YOUR_MEASUREMENT_ID"  // optional (Analytics)
+  apiKey: "AIzaSyDdHPkc4jfLvz_QhIPpB7r3-3LJwrfo1Q8",
+  authDomain: "inventory-management-oceanz.firebaseapp.com",
+  projectId: "inventory-management-oceanz",
+  storageBucket: "inventory-management-oceanz.firebasestorage.app",
+  messagingSenderId: "112471709088",
+  appId: "1:112471709088:web:7612735ad1804a235300c5"
 };
 
 const Firebase = (() => {

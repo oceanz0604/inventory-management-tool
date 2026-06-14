@@ -35,6 +35,14 @@ After committing, verify before pushing:
 git log -1 --format='%an <%ae> | %cn <%ce>'   # must show decrypter <oceanz.lounge@gmail.com> on both
 ```
 
+## Firebase
+
+- Project: `inventory-management-oceanz` (Firestore + Auth). Web config lives
+  in `js/firebase-config.js` (public, not secret); rules in `firestore.rules`.
+- NEVER deploy Firebase via the CLI (`firebase deploy`, `firebase deploy
+  --only firestore:rules`, etc.). The owner deploys Firestore rules MANUALLY.
+  You may edit `firestore.rules`, but do not run any `firebase` CLI deploy.
+
 ## Notes
 
 - Never run `git config` to set a global/local identity for this — use the env-var form above.
