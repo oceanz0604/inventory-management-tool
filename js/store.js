@@ -15,6 +15,7 @@ const Store = (() => {
     RECIPES: 'ims_recipes',
     KHATA: 'ims_khata',
     KHATA_SEQ: 'ims_khata_seq',
+    PARTIES: 'ims_parties',
     SEED_VER: 'ims_seed_ver',
   };
 
@@ -36,6 +37,7 @@ const Store = (() => {
     [KEYS.USERS]: 'users', [KEYS.CATEGORIES]: 'categories', [KEYS.LOCATIONS]: 'locations',
     [KEYS.PRODUCTS]: 'products', [KEYS.STOCK]: 'stock', [KEYS.ORDERS]: 'orders',
     [KEYS.POS_SALES]: 'pos_sales', [KEYS.RECIPES]: 'recipes', [KEYS.KHATA]: 'khata',
+    [KEYS.PARTIES]: 'parties',
   };
   function _cloudOn() { return typeof window !== 'undefined' && window.Firebase && Firebase.isEnabled(); }
   function _cloudSave(collection, doc) {
@@ -66,6 +68,7 @@ const Store = (() => {
     const u = getUsers().filter(x => x.id !== user.id);
     u.push(user); _set(KEYS.USERS, u);
   }
+  function removeUserLocal(id) { _set(KEYS.USERS, getUsers().filter(x => x.id !== id)); }
   function findUserByEmail(email) { return getUsers().find(u => u.email.toLowerCase() === email.toLowerCase()); }
   function getUserById(id) { return getUsers().find(u => u.id === id); }
   function getCurrentUser() { return _get(KEYS.CURRENT_USER); }
@@ -245,6 +248,105 @@ const Store = (() => {
     return orders[idx];
   }
 
+  function _pushOrder(order) {
+    const orders = getOrders();
+    orders.push(order);
+    _set(KEYS.ORDERS, orders);
+    _cloudSave('orders', order);
+    return order;
+  }
+
+  // Manual purchase from an off-platform seller: buyer = company (ownerId),
+  // seller = a custom party. Items reference the company's own products.
+  function createManualPurchase(ownerId, sellerPartyId, items, locationId) {
+    return _pushOrder({
+      id: generateId(), orderNumber: _nextOrderNumber(), kind: 'manual_purchase',
+      buyerId: ownerId, sellerId: null, sellerPartyId: sellerPartyId,
+      fulfillmentLocationId: locationId || null, items: items,
+      status: 'pending', total: items.reduce((s, i) => s + i.qty * i.unitPrice, 0),
+      amountPaid: 0, paymentStatus: 'unpaid',
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    });
+  }
+
+  // Field sale placed by a marketing worker to their own company.
+  function createFieldSale(ownerId, customerPartyId, items, createdBy) {
+    return _pushOrder({
+      id: generateId(), orderNumber: _nextOrderNumber(), kind: 'field_sale',
+      sellerId: ownerId, buyerId: null, customerPartyId: customerPartyId, createdBy: createdBy || null,
+      fulfillmentLocationId: null, items: items,
+      status: 'pending', total: items.reduce((s, i) => s + i.qty * i.unitPrice, 0),
+      amountPaid: 0, paymentStatus: 'unpaid',
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    });
+  }
+
+  function _setOrder(orderId, mutate) {
+    const orders = getOrders();
+    const idx = orders.findIndex(o => o.id === orderId);
+    if (idx < 0) return null;
+    mutate(orders[idx]);
+    orders[idx].updatedAt = new Date().toISOString();
+    _set(KEYS.ORDERS, orders);
+    _cloudSave('orders', orders[idx]);
+    return orders[idx];
+  }
+
+  function acceptOrder(orderId) { return _setOrder(orderId, o => { o.status = 'accepted'; }); }
+  function cancelOrder(orderId) { return _setOrder(orderId, o => { o.status = 'cancelled'; }); }
+
+  // Deliver a field sale: reduce stock, record payment, post any shortfall to
+  // Khata as credit against the customer (they owe the company).
+  function fulfillFieldSale(orderId, amountReceived, locationId) {
+    const order = getOrderById(orderId);
+    if (!order) return { success: false, message: 'Order not found' };
+    const loc = locationId || order.fulfillmentLocationId || (getDefaultLocation(order.sellerId) || {}).id;
+    if (loc) order.items.forEach(i => adjustStock(i.productId, loc, -i.qty));
+    const paid = Math.max(0, amountReceived || 0);
+    const balance = order.total - paid;
+    const updated = _setOrder(orderId, o => {
+      o.fulfillmentLocationId = loc || o.fulfillmentLocationId;
+      o.amountPaid = paid;
+      if (balance > 0.0001) { o.status = 'open'; o.paymentStatus = paid > 0 ? 'partial' : 'unpaid'; }
+      else { o.status = 'completed'; o.paymentStatus = 'paid'; }
+    });
+    if (balance > 0.0001) {
+      const party = getPartyById(order.customerPartyId);
+      addKhataEntry({ ownerId: order.sellerId, partyId: order.customerPartyId, partyName: party ? party.name : 'Customer', type: 'credit', amount: balance, description: order.orderNumber + ' delivered, balance due', orderId: order.id });
+    }
+    return { success: true, order: updated };
+  }
+
+  // Receive a manual purchase: add stock, refresh cost, record payment, and post
+  // any unpaid balance to Khata as a debit (the company owes the seller).
+  function receiveManualPurchase(orderId, amountPaid, locationId) {
+    const order = getOrderById(orderId);
+    if (!order) return { success: false, message: 'Order not found' };
+    const loc = locationId || order.fulfillmentLocationId || (getDefaultLocation(order.buyerId) || {}).id;
+    if (!loc) return { success: false, message: 'No location selected' };
+    order.items.forEach(i => {
+      adjustStock(i.productId, loc, i.qty);
+      const prod = getProductById(i.productId);
+      if (prod) updateProduct(prod.id, { costPrice: i.unitPrice });
+    });
+    const paid = Math.max(0, amountPaid || 0);
+    const balance = order.total - paid;
+    const updated = _setOrder(orderId, o => {
+      o.fulfillmentLocationId = loc;
+      o.amountPaid = paid;
+      if (balance > 0.0001) { o.status = 'open'; o.paymentStatus = paid > 0 ? 'partial' : 'unpaid'; }
+      else { o.status = 'completed'; o.paymentStatus = 'paid'; }
+    });
+    if (balance > 0.0001) {
+      const party = getPartyById(order.sellerPartyId);
+      addKhataEntry({ ownerId: order.buyerId, partyId: order.sellerPartyId, partyName: party ? party.name : 'Seller', type: 'debit', amount: balance, description: order.orderNumber + ' received, balance payable', orderId: order.id });
+    }
+    return { success: true, order: updated };
+  }
+
+  // Settle the remaining balance on an open order.
+  function settleOrder(orderId) { return _setOrder(orderId, o => { o.status = 'completed'; o.paymentStatus = 'paid'; o.amountPaid = o.total; }); }
+
   // ========== POS Sales ==========
   function _nextReceiptNumber() {
     const seq = (_get(KEYS.POS_SEQ) || 5000) + 1;
@@ -355,6 +457,32 @@ const Store = (() => {
     return Object.values(map);
   }
 
+  // ========== Custom Parties (off-platform customers / sellers) ==========
+  function getParties(ownerId) { return (_get(KEYS.PARTIES) || []).filter(p => p.ownerId === ownerId); }
+  function getPartiesByType(ownerId, type) {
+    return getParties(ownerId).filter(p => p.type === type || p.type === 'both');
+  }
+  function getPartyById(id) { return (_get(KEYS.PARTIES) || []).find(p => p.id === id); }
+  function addParty(party) {
+    party.id = party.id || generateId();
+    party.createdAt = party.createdAt || new Date().toISOString();
+    const all = _get(KEYS.PARTIES) || [];
+    all.push(party);
+    _set(KEYS.PARTIES, all);
+    _cloudSave('parties', party);
+    return party;
+  }
+  function updateParty(id, updates) {
+    let merged = null;
+    _set(KEYS.PARTIES, (_get(KEYS.PARTIES) || []).map(p => p.id === id ? (merged = { ...p, ...updates }) : p));
+    _cloudSave('parties', merged);
+    return merged;
+  }
+  function deleteParty(id) {
+    _set(KEYS.PARTIES, (_get(KEYS.PARTIES) || []).filter(p => p.id !== id));
+    _cloudRemove('parties', id);
+  }
+
   // ========== Revenue Aggregation (for reports) ==========
   function getRevenueData(ownerId, startDate, endDate) {
     const start = startDate ? new Date(startDate) : new Date(0);
@@ -425,37 +553,39 @@ const Store = (() => {
     const isAdmin = user.role === 'superadmin';
     try {
       if (isAdmin) {
-        const [users, cats, locs, prods, stock, orders, pos, recipes, khata] = await Promise.all([
+        const [users, cats, locs, prods, stock, orders, pos, recipes, khata, parties] = await Promise.all([
           Firebase.list('users'), Firebase.list('categories'), Firebase.list('locations'),
           Firebase.list('products'), Firebase.list('stock'), Firebase.list('orders'),
-          Firebase.list('pos_sales'), Firebase.list('recipes'), Firebase.list('khata'),
+          Firebase.list('pos_sales'), Firebase.list('recipes'), Firebase.list('khata'), Firebase.list('parties'),
         ]);
         _set(KEYS.USERS, users); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
         _set(KEYS.PRODUCTS, prods); _set(KEYS.STOCK, stock); _set(KEYS.ORDERS, orders);
-        _set(KEYS.POS_SALES, pos); _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata);
+        _set(KEYS.POS_SALES, pos); _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata); _set(KEYS.PARTIES, parties);
       } else {
-        const uid = user.id;
-        const [users, cats, locs, ownProds, pubProds, stock, ordBuy, ordSell, pos, recipes, khata] = await Promise.all([
+        // Workers scope to their company; owners scope to themselves.
+        const scopeId = user.companyId || user.id;
+        const [users, cats, locs, ownProds, pubProds, stock, ordBuy, ordSell, pos, recipes, khata, parties] = await Promise.all([
           Firebase.list('users'),
           Firebase.list('categories'),
-          Firebase.listByOwner('locations', uid),
-          Firebase.listByOwner('products', uid),
+          Firebase.listByOwner('locations', scopeId),
+          Firebase.listByOwner('products', scopeId),
           Firebase.listWhere('products', 'isPublished', '==', true),
-          Firebase.listByOwner('stock', uid),
-          Firebase.listWhere('orders', 'buyerId', '==', uid),
-          Firebase.listWhere('orders', 'sellerId', '==', uid),
-          Firebase.listByOwner('pos_sales', uid),
-          Firebase.listByOwner('recipes', uid),
-          Firebase.listByOwner('khata', uid),
+          Firebase.listByOwner('stock', scopeId),
+          Firebase.listWhere('orders', 'buyerId', '==', scopeId),
+          Firebase.listWhere('orders', 'sellerId', '==', scopeId),
+          Firebase.listByOwner('pos_sales', scopeId),
+          Firebase.listByOwner('recipes', scopeId),
+          Firebase.listByOwner('khata', scopeId),
+          Firebase.listByOwner('parties', scopeId),
         ]);
         // Shield regular users from seeded test data (demo shops + their catalog).
         const prodMap = {}; ownProds.concat(pubProds.filter(p => !p.isDemo)).forEach(p => { prodMap[p.id] = p; });
         const ordMap = {}; ordBuy.concat(ordSell).forEach(o => { ordMap[o.id] = o; });
-        const realUsers = users.filter(u => !u.isDemo || u.id === uid);
+        const realUsers = users.filter(u => !u.isDemo || u.companyId === scopeId || u.id === user.id);
         _set(KEYS.USERS, realUsers); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
         _set(KEYS.PRODUCTS, Object.values(prodMap)); _set(KEYS.STOCK, stock);
         _set(KEYS.ORDERS, Object.values(ordMap)); _set(KEYS.POS_SALES, pos);
-        _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata);
+        _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata); _set(KEYS.PARTIES, parties);
       }
       _recomputeSequences();
     } catch (e) {
@@ -465,7 +595,7 @@ const Store = (() => {
 
   function _clearLocalData() {
     [KEYS.CATEGORIES, KEYS.LOCATIONS, KEYS.PRODUCTS, KEYS.STOCK, KEYS.ORDERS,
-     KEYS.POS_SALES, KEYS.RECIPES, KEYS.KHATA, KEYS.USERS, KEYS.CART].forEach(k => localStorage.removeItem(k));
+     KEYS.POS_SALES, KEYS.RECIPES, KEYS.KHATA, KEYS.PARTIES, KEYS.USERS, KEYS.CART].forEach(k => localStorage.removeItem(k));
   }
 
   // ========== Seed Demo Data ==========
@@ -713,13 +843,15 @@ const Store = (() => {
 
   return {
     generateId,
-    getUsers, addUser, upsertUserLocal, findUserByEmail, getUserById,
+    getUsers, addUser, upsertUserLocal, removeUserLocal, findUserByEmail, getUserById,
     getCurrentUser, setCurrentUser, clearCurrentUser,
     getCategories, addCategory, updateCategory, deleteCategory, getCategoryById,
     getLocations, getLocationsByOwner, getLocationById, addLocation, updateLocation, deleteLocation, getDefaultLocation,
     getProducts, getProductsByOwner, getPublishedProducts, getProductById, addProduct, updateProduct, deleteProduct,
     getStock, getStockByOwner, getStockByLocation, getStockByProduct, getStockRecord, setStock, adjustStock, getTotalStockForProduct, getLowStockItems, getExpiringStock,
     getOrders, getOrderById, getSalesOrders, getPurchaseOrders, createOrder, updateOrderStatus,
+    createManualPurchase, createFieldSale, acceptOrder, cancelOrder, fulfillFieldSale, receiveManualPurchase, settleOrder,
+    getParties, getPartiesByType, getPartyById, addParty, updateParty, deleteParty,
     getPosSales, createPosSale, getPosSalesToday,
     getRecipes, getRecipeById, addRecipe, updateRecipe, deleteRecipe, produceRecipe, calcRecipeCost,
     getKhataEntries, getKhataByParty, addKhataEntry, getKhataBalance, getKhataParties,

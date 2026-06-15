@@ -9,7 +9,18 @@ service cloud.firestore {
     function signedIn() { return request.auth != null; }
     // Super admin (god view) — identified by email on the auth token.
     function isAdmin() { return signedIn() && request.auth.token.email == 'yashtodkar2@gmail.com'; }
-    function isOwner(ownerId) { return signedIn() && (request.auth.uid == ownerId || isAdmin()); }
+
+    // The caller's company id: workers carry a `companyId` on their profile that
+    // points at their owner; owners' companyId equals their own uid. Falls back
+    // to the uid for callers without a profile yet.
+    function callerCompany() {
+      return (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId != null)
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId
+        : request.auth.uid;
+    }
+    // A doc belongs to the caller's company (or the caller is the super admin).
+    function belongs(ownerId) { return signedIn() && (ownerId == callerCompany() || isAdmin()); }
 
     // The super admin can read/write everything (god view + demo seeding).
     match /{document=**} {
@@ -17,9 +28,11 @@ service cloud.firestore {
     }
 
     // User profiles. Never store passwords here — auth is handled by Firebase Auth.
+    // An owner may create/update worker profiles whose companyId is their own uid.
     match /users/{userId} {
       allow read: if signedIn();
-      allow write: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow create, update: if signedIn() && (request.auth.uid == userId || isAdmin() || request.resource.data.companyId == request.auth.uid);
+      allow delete: if signedIn() && (isAdmin() || resource.data.companyId == request.auth.uid);
     }
 
     // Global category catalog — readable by all signed-in users.
@@ -29,46 +42,52 @@ service cloud.firestore {
 
     match /locations/{id} {
       allow read: if signedIn();
-      allow create: if isOwner(request.resource.data.ownerId);
-      allow update, delete: if isOwner(resource.data.ownerId);
+      allow create: if belongs(request.resource.data.ownerId);
+      allow update, delete: if belongs(resource.data.ownerId);
     }
 
-    // Published products are visible to everyone (B2B marketplace); drafts are owner-only.
+    // Published products are visible to everyone (B2B marketplace); drafts are company-only.
     match /products/{id} {
-      allow read: if signedIn() && (resource.data.isPublished == true || isOwner(resource.data.ownerId));
-      allow create: if isOwner(request.resource.data.ownerId);
-      allow update, delete: if isOwner(resource.data.ownerId);
+      allow read: if signedIn() && (resource.data.isPublished == true || belongs(resource.data.ownerId));
+      allow create: if belongs(request.resource.data.ownerId);
+      allow update, delete: if belongs(resource.data.ownerId);
     }
 
     match /recipes/{id} {
-      allow read, write: if isOwner(resource.data.ownerId)
-        || (request.method == 'create' && isOwner(request.resource.data.ownerId));
+      allow read, update, delete: if belongs(resource.data.ownerId);
+      allow create: if belongs(request.resource.data.ownerId);
     }
 
     match /pos_sales/{id} {
-      allow read, delete: if isOwner(resource.data.ownerId);
-      allow create: if isOwner(request.resource.data.ownerId);
-      allow update: if isOwner(resource.data.ownerId);
+      allow read, update, delete: if belongs(resource.data.ownerId);
+      allow create: if belongs(request.resource.data.ownerId);
     }
 
     match /khata/{id} {
-      allow read, delete: if isOwner(resource.data.ownerId);
-      allow create: if isOwner(request.resource.data.ownerId);
-      allow update: if isOwner(resource.data.ownerId);
+      allow read, update, delete: if belongs(resource.data.ownerId);
+      allow create: if belongs(request.resource.data.ownerId);
     }
 
-    // Recommended: denormalize an `ownerId` field onto stock docs for tight rules.
+    // Custom off-platform parties (customers / sellers), company-scoped.
+    match /parties/{id} {
+      allow read, update, delete: if belongs(resource.data.ownerId);
+      allow create: if belongs(request.resource.data.ownerId);
+    }
+
+    // Stock carries a denormalized `ownerId` for company-scoped access.
     match /stock/{id} {
       allow read: if signedIn();
-      allow create: if signedIn() && (!('ownerId' in request.resource.data) || isOwner(request.resource.data.ownerId));
-      allow update, delete: if signedIn() && (!('ownerId' in resource.data) || isOwner(resource.data.ownerId));
+      allow create: if belongs(request.resource.data.ownerId);
+      allow update, delete: if belongs(resource.data.ownerId);
     }
 
-    // Orders link a buyer and a seller; both may read/update.
+    // Orders: platform (buyer+seller uids), manual purchases (buyer=company,
+    // seller=custom party) and field sales (seller=company, marketing-placed).
+    // Any member of the buyer's or seller's company may read/update.
     match /orders/{id} {
-      allow read: if signedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId);
-      allow create: if signedIn() && (request.auth.uid == request.resource.data.buyerId || isAdmin());
-      allow update: if signedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId || isAdmin());
+      allow read: if belongs(resource.data.buyerId) || belongs(resource.data.sellerId);
+      allow create: if belongs(request.resource.data.buyerId) || belongs(request.resource.data.sellerId);
+      allow update: if belongs(resource.data.buyerId) || belongs(resource.data.sellerId);
       allow delete: if isAdmin();
     }
 

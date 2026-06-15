@@ -13,7 +13,7 @@ const POS = (() => {
 
   function populateFilters() {
     const user = Auth.getUser();
-    const locations = Store.getLocationsByOwner(user.id);
+    const locations = Store.getLocationsByOwner(Auth.ownerId());
     const cats = Store.getCategories();
     const locSel = document.getElementById('pos-location');
     locSel.innerHTML = locations.map(l => '<option value="' + l.id + '"' + (l.isDefault ? ' selected' : '') + '>' + _esc(l.name) + '</option>').join('');
@@ -26,7 +26,7 @@ const POS = (() => {
     const search = document.getElementById('pos-search').value.toLowerCase().trim();
     const catFilter = document.getElementById('pos-cat-filter').value;
 
-    let products = Store.getProductsByOwner(user.id);
+    let products = Store.getProductsByOwner(Auth.ownerId());
     if (catFilter) products = products.filter(p => p.categoryId === catFilter);
     if (search) products = products.filter(p => p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search));
 
@@ -145,7 +145,7 @@ const POS = (() => {
     const customerName = document.getElementById('pos-customer-name').value.trim() || 'Walk-in';
 
     const items = bill.map(b => ({ productId: b.productId, name: b.name, sku: b.sku, price: b.price, costPrice: b.costPrice, gstRate: b.gstRate, qty: b.qty }));
-    const sale = Store.createPosSale(user.id, locId, items, payment, customerName);
+    const sale = Store.createPosSale(Auth.ownerId(), locId, items, payment, customerName);
 
     _showReceipt(sale);
     bill = [];
@@ -205,7 +205,7 @@ const POS = (() => {
 
   function _renderTodaySummary() {
     const user = Auth.getUser();
-    const todaySales = Store.getPosSalesToday(user.id);
+    const todaySales = Store.getPosSalesToday(Auth.ownerId());
     const container = document.getElementById('pos-today-summary');
     if (todaySales.length === 0) { container.innerHTML = '<div class="pos-summary-empty">No sales today yet</div>'; return; }
     const totalRevenue = todaySales.reduce((s, sale) => s + (sale.total || sale.subtotal), 0);

@@ -56,7 +56,7 @@ const Products = (() => {
     const catFilter = document.getElementById('product-filter-category').value;
     const pubFilter = document.getElementById('product-filter-published').value;
 
-    let prods = Store.getProductsByOwner(user.id);
+    let prods = Store.getProductsByOwner(Auth.ownerId());
     if (search) prods = prods.filter(p => p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search));
     if (catFilter) prods = prods.filter(p => p.categoryId === catFilter);
     if (pubFilter === '1') prods = prods.filter(p => p.isPublished);
@@ -72,7 +72,7 @@ const Products = (() => {
 
     const tbody = document.getElementById('products-table-body');
     const empty = document.getElementById('no-products');
-    const allProds = Store.getProductsByOwner(user.id);
+    const allProds = Store.getProductsByOwner(Auth.ownerId());
 
     if (allProds.length === 0) {
       tbody.innerHTML = '';
@@ -173,7 +173,7 @@ const Products = (() => {
       App.showToast('Product updated', 'success');
     } else {
       data.id = Store.generateId();
-      data.ownerId = user.id;
+      data.ownerId = Auth.ownerId();
       data.createdAt = new Date().toISOString();
       Store.addProduct(data);
       App.showToast('Product added', 'success');

@@ -34,7 +34,7 @@ const Reports = (() => {
   }
 
   function _renderStats(user, startDate) {
-    const data = Store.getRevenueData(user.id, startDate.toISOString());
+    const data = Store.getRevenueData(Auth.ownerId(), startDate.toISOString());
     const container = document.getElementById('report-stats');
     container.innerHTML =
       '<div class="stat-card"><div class="stat-icon green"><i class="fas fa-indian-rupee-sign"></i></div><div class="stat-info"><span class="stat-value">₹' + data.totalRevenue.toFixed(0) + '</span><span class="stat-label">Revenue</span></div></div>' +
@@ -44,8 +44,8 @@ const Reports = (() => {
   }
 
   function _renderRevenueChart(user, startDate, days) {
-    const sales = Store.getPosSales(user.id).filter(s => new Date(s.createdAt) >= startDate);
-    const orders = Store.getSalesOrders(user.id).filter(o => o.status === 'delivered' && new Date(o.updatedAt) >= startDate);
+    const sales = Store.getPosSales(Auth.ownerId()).filter(s => new Date(s.createdAt) >= startDate);
+    const orders = Store.getSalesOrders(Auth.ownerId()).filter(o => o.status === 'delivered' && new Date(o.updatedAt) >= startDate);
     const buckets = {};
     const fmt = days <= 30 ? 'day' : 'week';
 
@@ -92,12 +92,12 @@ const Reports = (() => {
   }
 
   function _renderTopProducts(user, startDate) {
-    const sales = Store.getPosSales(user.id).filter(s => new Date(s.createdAt) >= startDate);
+    const sales = Store.getPosSales(Auth.ownerId()).filter(s => new Date(s.createdAt) >= startDate);
     const productRevenue = {};
     sales.forEach(s => s.items.forEach(i => {
       productRevenue[i.name] = (productRevenue[i.name] || 0) + i.price * i.qty;
     }));
-    const delivered = Store.getSalesOrders(user.id).filter(o => o.status === 'delivered' && new Date(o.updatedAt) >= startDate);
+    const delivered = Store.getSalesOrders(Auth.ownerId()).filter(o => o.status === 'delivered' && new Date(o.updatedAt) >= startDate);
     delivered.forEach(o => o.items.forEach(i => {
       productRevenue[i.name] = (productRevenue[i.name] || 0) + i.unitPrice * i.qty;
     }));
@@ -118,7 +118,7 @@ const Reports = (() => {
   }
 
   function _renderStockValuation(user) {
-    const prods = Store.getProductsByOwner(user.id);
+    const prods = Store.getProductsByOwner(Auth.ownerId());
     const catValues = {};
     prods.forEach(p => {
       const cat = Store.getCategoryById(p.categoryId);
@@ -140,7 +140,7 @@ const Reports = (() => {
   }
 
   function _renderPnL(user, startDate) {
-    const data = Store.getRevenueData(user.id, startDate.toISOString());
+    const data = Store.getRevenueData(Auth.ownerId(), startDate.toISOString());
     const ctx = document.getElementById('chart-pnl');
     charts.pnl = new Chart(ctx, {
       type: 'bar',
@@ -157,7 +157,7 @@ const Reports = (() => {
   }
 
   function _renderExpiringStock(user) {
-    const expiring = Store.getExpiringStock(user.id, 90);
+    const expiring = Store.getExpiringStock(Auth.ownerId(), 90);
     const tbody = document.getElementById('expiry-table-body');
     const empty = document.getElementById('no-expiry');
 
@@ -175,13 +175,13 @@ const Reports = (() => {
   }
 
   function _renderSlowMovers(user, startDate) {
-    const sales = Store.getPosSales(user.id).filter(s => new Date(s.createdAt) >= startDate);
-    const orders = Store.getSalesOrders(user.id).filter(o => o.status === 'delivered' && new Date(o.updatedAt) >= startDate);
+    const sales = Store.getPosSales(Auth.ownerId()).filter(s => new Date(s.createdAt) >= startDate);
+    const orders = Store.getSalesOrders(Auth.ownerId()).filter(o => o.status === 'delivered' && new Date(o.updatedAt) >= startDate);
     const soldIds = new Set();
     sales.forEach(s => s.items.forEach(i => soldIds.add(i.productId)));
     orders.forEach(o => o.items.forEach(i => soldIds.add(i.productId)));
 
-    const prods = Store.getProductsByOwner(user.id);
+    const prods = Store.getProductsByOwner(Auth.ownerId());
     const slow = prods.filter(p => !soldIds.has(p.id) && Store.getTotalStockForProduct(p.id) > 0);
     const tbody = document.getElementById('slow-mover-body');
     const empty = document.getElementById('no-slow-movers');

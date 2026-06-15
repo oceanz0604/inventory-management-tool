@@ -21,7 +21,7 @@ const Export = (() => {
 
   function _getExportData() {
     const user = Auth.getUser();
-    const stock = Store.getStockByOwner(user.id);
+    const stock = Store.getStockByOwner(Auth.ownerId());
     return stock.map(s => {
       const product = Store.getProductById(s.productId);
       const location = Store.getLocationById(s.locationId);

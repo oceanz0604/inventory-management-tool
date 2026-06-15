@@ -13,11 +13,11 @@ const Dashboard = (() => {
 
   function _updateStats() {
     const user = Auth.getUser();
-    const products = Store.getProductsByOwner(user.id);
-    const stock = Store.getStockByOwner(user.id);
-    const lowStock = Store.getLowStockItems(user.id);
-    const salesOrders = Store.getSalesOrders(user.id);
-    const purchaseOrders = Store.getPurchaseOrders(user.id);
+    const products = Store.getProductsByOwner(Auth.ownerId());
+    const stock = Store.getStockByOwner(Auth.ownerId());
+    const lowStock = Store.getLowStockItems(Auth.ownerId());
+    const salesOrders = Store.getSalesOrders(Auth.ownerId());
+    const purchaseOrders = Store.getPurchaseOrders(Auth.ownerId());
     const pendingCount = salesOrders.filter(o => o.status === 'pending').length + purchaseOrders.filter(o => o.status === 'pending').length;
     const totalStock = stock.reduce((s, e) => s + e.quantity, 0);
 
@@ -29,10 +29,10 @@ const Dashboard = (() => {
 
   function _renderCharts() {
     const user = Auth.getUser();
-    const locations = Store.getLocationsByOwner(user.id);
+    const locations = Store.getLocationsByOwner(Auth.ownerId());
     const categories = Store.getCategories();
-    const stock = Store.getStockByOwner(user.id);
-    const products = Store.getProductsByOwner(user.id);
+    const stock = Store.getStockByOwner(Auth.ownerId());
+    const products = Store.getProductsByOwner(Auth.ownerId());
 
     const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
     const gridColor = isDark ? '#334155' : '#f1f5f9';
@@ -92,7 +92,7 @@ const Dashboard = (() => {
 
   function _renderLowStockTable() {
     const user = Auth.getUser();
-    const lowItems = Store.getLowStockItems(user.id);
+    const lowItems = Store.getLowStockItems(Auth.ownerId());
     const tbody = document.getElementById('low-stock-table-body');
     const empty = document.getElementById('no-low-stock');
     const table = tbody.closest('table');
@@ -123,7 +123,7 @@ const Dashboard = (() => {
 
   function _updateNotifications() {
     const user = Auth.getUser();
-    const lowItems = Store.getLowStockItems(user.id);
+    const lowItems = Store.getLowStockItems(Auth.ownerId());
     const badge = document.getElementById('notification-badge');
     const list = document.getElementById('notification-list');
 

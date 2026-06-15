@@ -112,8 +112,19 @@ const App = (() => {
     Reports.init();
     Dashboard.init();
     Export.init();
-    _navigate('dashboard');
+    Parties.init();
+    Team.init();
+    FieldOrders.init();
+    _navigate(_defaultView());
     Shop.refreshBadges();
+  }
+
+  // Landing view depends on role: staff -> POS, marketing -> field orders.
+  function _defaultView() {
+    const role = Auth.getRole();
+    if (role === 'staff') return 'pos';
+    if (role === 'marketing') return 'field-order';
+    return 'dashboard';
   }
 
   function _refreshUserUI() {
@@ -124,7 +135,21 @@ const App = (() => {
     document.getElementById('user-avatar').textContent = Auth.getInitials(user.name || user.shopName || 'U');
   }
 
-  // Test-data tooling (god-view switch-user) is super-admin only.
+  // Views each role may reach. Owner/super-admin get everything.
+  const ROLE_VIEWS = {
+    owner: ['dashboard', 'locations', 'products', 'inventory', 'pos', 'orders', 'recipes', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties', 'team'],
+    office: ['dashboard', 'locations', 'products', 'inventory', 'orders', 'recipes', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties'],
+    staff: ['pos'],
+    marketing: ['field-order'],
+  };
+
+  function _allowedViews() {
+    const role = Auth.getRole();
+    if (role === 'superadmin' || role === 'owner' || role === 'user') return ROLE_VIEWS.owner;
+    return ROLE_VIEWS[role] || ROLE_VIEWS.owner;
+  }
+
+  // Gate nav + test-data tooling (god-view switch-user is super-admin only).
   function _applyRoleGating() {
     const admin = Auth.isSuperAdmin();
     document.querySelectorAll('[data-admin-only]').forEach(el => { el.style.display = admin ? '' : 'none'; });
@@ -133,6 +158,12 @@ const App = (() => {
     const moreSwitch = document.getElementById('more-switch-user');
     if (moreSwitch) moreSwitch.style.display = admin ? '' : 'none';
     document.body.classList.toggle('is-superadmin', admin);
+
+    // Show only the nav entries this role is allowed to use.
+    const allowed = _allowedViews();
+    document.querySelectorAll('.sidebar .nav-item[data-view], #bottom-nav .bnav-item[data-view], #more-sheet .more-sheet-item[data-view]').forEach(el => {
+      el.style.display = allowed.indexOf(el.dataset.view) >= 0 ? '' : 'none';
+    });
   }
 
   function _bindAuthEvents() {
@@ -223,10 +254,13 @@ const App = (() => {
     dashboard: 'Dashboard', locations: 'Locations', products: 'Products',
     inventory: 'Inventory', pos: 'POS Counter', orders: 'Orders',
     categories: 'Categories', shop: 'Shop', recipes: 'Recipes / BOM',
-    reports: 'Reports', khata: 'Khata / Credit'
+    reports: 'Reports', khata: 'Khata / Credit',
+    'field-order': 'Field Orders', parties: 'Customers / Sellers', team: 'Team'
   };
 
   function _navigate(view) {
+    // Keep workers inside the views their role allows.
+    if (_allowedViews().indexOf(view) < 0) view = _defaultView();
     currentView = view;
     document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
     const el = document.getElementById('view-' + view);
@@ -251,6 +285,9 @@ const App = (() => {
     if (view === 'recipes') BOM.refresh();
     if (view === 'reports') Reports.refresh();
     if (view === 'khata') KhataModule.refresh();
+    if (view === 'field-order') FieldOrders.render();
+    if (view === 'parties') Parties.render();
+    if (view === 'team') Team.render();
   }
 
   // ========== Bottom Nav (Mobile) ==========
@@ -414,7 +451,7 @@ const App = (() => {
 
     const user = Auth.getUser();
     grid.innerHTML = cats.map(cat => {
-      const prods = Store.getProductsByOwner(user.id).filter(p => p.categoryId === cat.id);
+      const prods = Store.getProductsByOwner(Auth.ownerId()).filter(p => p.categoryId === cat.id);
       return '<div class="category-card">' +
         '<div class="color-swatch" style="background:' + cat.color + '"></div>' +
         '<div class="category-info"><h4>' + _esc(cat.name) + '</h4><span>' + prods.length + ' product' + (prods.length !== 1 ? 's' : '') + '</span></div>' +

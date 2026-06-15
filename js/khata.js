@@ -16,7 +16,7 @@ const KhataModule = (() => {
 
   function render() {
     const user = Auth.getUser();
-    const parties = Store.getKhataParties(user.id);
+    const parties = Store.getKhataParties(Auth.ownerId());
     const search = document.getElementById('khata-search').value.toLowerCase().trim();
     const filtered = search ? parties.filter(p => p.partyName.toLowerCase().includes(search)) : parties;
     const container = document.getElementById('khata-parties');
@@ -53,7 +53,7 @@ const KhataModule = (() => {
 
   function showLedger(partyId) {
     const user = Auth.getUser();
-    const entries = Store.getKhataByParty(user.id, partyId);
+    const entries = Store.getKhataByParty(Auth.ownerId(), partyId);
     if (entries.length === 0) return;
     const card = document.getElementById('khata-ledger-card');
     document.getElementById('khata-ledger-title').textContent = 'Ledger: ' + entries[0].partyName;
@@ -80,8 +80,8 @@ const KhataModule = (() => {
     const form = document.getElementById('khata-form');
     form.reset();
     const user = Auth.getUser();
-    const allUsers = Store.getUsers().filter(u => u.id !== user.id);
-    const parties = Store.getKhataParties(user.id);
+    const allUsers = Store.getUsers().filter(u => u.id !== Auth.ownerId());
+    const parties = Store.getKhataParties(Auth.ownerId());
 
     const datalist = document.getElementById('khata-party-list');
     datalist.innerHTML = parties.map(p => '<option value="' + _esc(p.partyName) + '">').join('') +
@@ -106,7 +106,7 @@ const KhataModule = (() => {
 
     const partyId = partyIdSel || partyName.toLowerCase().replace(/\s+/g, '_');
 
-    Store.addKhataEntry({ ownerId: user.id, partyId, partyName, type, amount, description });
+    Store.addKhataEntry({ ownerId: Auth.ownerId(), partyId, partyName, type, amount, description });
     App.showToast('Khata entry added', 'success');
     document.getElementById('khata-modal').classList.add('hidden');
     render();

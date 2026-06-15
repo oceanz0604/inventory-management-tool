@@ -23,9 +23,9 @@ const Inventory = (() => {
 
   function refreshFilters() {
     const user = Auth.getUser();
-    const locs = Store.getLocationsByOwner(user.id);
+    const locs = Store.getLocationsByOwner(Auth.ownerId());
     const cats = Store.getCategories();
-    const prods = Store.getProductsByOwner(user.id);
+    const prods = Store.getProductsByOwner(Auth.ownerId());
 
     document.getElementById('filter-location').innerHTML = '<option value="">All Locations</option>' + locs.map(l => '<option value="' + l.id + '">' + _esc(l.name) + '</option>').join('');
     document.getElementById('filter-category').innerHTML = '<option value="">All Categories</option>' + cats.map(c => '<option value="' + c.id + '">' + _esc(c.name) + '</option>').join('');
@@ -41,7 +41,7 @@ const Inventory = (() => {
     const catFilter = document.getElementById('filter-category').value;
     const stockFilter = document.getElementById('filter-stock').value;
 
-    let entries = Store.getStockByOwner(user.id);
+    let entries = Store.getStockByOwner(Auth.ownerId());
 
     entries = entries.map(s => {
       const product = Store.getProductById(s.productId);
@@ -77,7 +77,7 @@ const Inventory = (() => {
   function render() {
     const entries = _getFilteredStock();
     const user = Auth.getUser();
-    const allStock = Store.getStockByOwner(user.id);
+    const allStock = Store.getStockByOwner(Auth.ownerId());
     const tbody = document.getElementById('inventory-table-body');
     const empty = document.getElementById('no-inventory');
 

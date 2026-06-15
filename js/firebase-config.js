@@ -78,6 +78,23 @@ const Firebase = (() => {
   function currentUser() { return auth ? auth.currentUser : null; }
   function onAuth(cb) { return auth ? auth.onAuthStateChanged(cb) : (cb(null), function () {}); }
 
+  // Create a worker's Auth account WITHOUT disturbing the owner's session, by
+  // using a throwaway secondary Firebase app instance. Returns the new uid.
+  async function createWorkerAccount(email, password) {
+    if (!enabled) throw new Error('Backend unavailable.');
+    const NAME = 'worker-mgmt';
+    let sec;
+    try { sec = firebase.app(NAME); } catch (e) { sec = firebase.initializeApp(FIREBASE_CONFIG, NAME); }
+    try {
+      const cred = await sec.auth().createUserWithEmailAndPassword(email, password);
+      const uid = cred.user.uid;
+      try { await sec.auth().signOut(); } catch (e) { /* ignore */ }
+      return uid;
+    } finally {
+      try { await sec.delete(); } catch (e) { /* ignore */ }
+    }
+  }
+
   /* ---------------- Firestore helpers ---------------- */
 
   // Upsert a single document.  await Firebase.save('products', product)
@@ -126,7 +143,7 @@ const Firebase = (() => {
 
   return {
     init, isEnabled, getAuth, getDb, config: FIREBASE_CONFIG,
-    signIn, signUp, signOut, currentUser, onAuth,
+    signIn, signUp, signOut, currentUser, onAuth, createWorkerAccount,
     save, saveMany, list, listWhere, listByOwner, getDoc, remove,
   };
 })();

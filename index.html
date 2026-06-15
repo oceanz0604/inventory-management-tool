@@ -92,6 +92,15 @@
       <a href="#" class="nav-item" data-view="khata">
         <i class="fas fa-book"></i><span>Khata / Credit</span>
       </a>
+      <a href="#" class="nav-item" data-view="field-order">
+        <i class="fas fa-route"></i><span>Field Orders</span>
+      </a>
+      <a href="#" class="nav-item" data-view="parties">
+        <i class="fas fa-address-book"></i><span>Customers / Sellers</span>
+      </a>
+      <a href="#" class="nav-item" data-view="team">
+        <i class="fas fa-users-gear"></i><span>Team</span>
+      </a>
     </nav>
     <div class="sidebar-section-label">Marketplace</div>
     <nav class="sidebar-nav">
@@ -275,6 +284,9 @@
         <button class="tab active" data-tab="sales">Sales Orders</button>
         <button class="tab" data-tab="purchase">Purchase Orders</button>
       </div>
+      <div class="toolbar-actions hidden" id="orders-actions" style="margin-top:.75rem;justify-content:flex-end">
+        <button class="btn btn-primary" id="new-manual-purchase-btn"><i class="fas fa-plus"></i> New Manual Purchase</button>
+      </div>
       <div class="card" style="margin-top:1rem"><div class="card-body">
         <div class="table-wrap">
           <table class="data-table"><thead><tr>
@@ -455,6 +467,86 @@
       <div class="empty-state hidden" id="no-shop-products"><i class="fas fa-store-slash"></i><p>No products available from other shops</p></div>
     </section>
 
+    <!-- ===== Customers / Sellers (Custom Parties) View ===== -->
+    <section id="view-parties" class="view hidden">
+      <div class="view-toolbar">
+        <div class="search-bar"><i class="fas fa-search"></i>
+          <input type="text" id="parties-search" placeholder="Search customers / sellers..."></div>
+        <div class="toolbar-filters">
+          <select id="parties-type-filter" class="select-input">
+            <option value="">All</option><option value="customer">Customers</option>
+            <option value="seller">Sellers</option><option value="both">Both</option>
+          </select>
+        </div>
+        <div class="toolbar-actions">
+          <button class="btn btn-primary" id="add-party-btn"><i class="fas fa-plus"></i> Add Party</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1rem"><div class="card-body">
+        <div class="table-wrap">
+          <table class="data-table"><thead><tr>
+            <th>Name</th><th>Type</th><th>Location</th><th>Phone</th><th>Actions</th>
+          </tr></thead><tbody id="parties-table-body"></tbody></table>
+        </div>
+        <div class="empty-state hidden" id="no-parties"><i class="fas fa-address-book"></i><p>No custom customers or sellers yet</p>
+          <button class="btn btn-primary" id="add-first-party-btn">Add First Party</button></div>
+      </div></div>
+    </section>
+
+    <!-- ===== Field Order View (marketing) ===== -->
+    <section id="view-field-order" class="view hidden">
+      <div class="field-order-layout">
+        <div class="card">
+          <div class="card-header"><h3>New Field Order</h3></div>
+          <div class="card-body">
+            <div class="form-group"><label for="fo-customer">Customer *</label>
+              <select id="fo-customer" class="select-input"><option value="">-- Select customer --</option></select>
+              <button type="button" class="btn btn-sm btn-secondary" id="fo-add-customer" style="margin-top:.5rem"><i class="fas fa-plus"></i> New customer</button>
+            </div>
+            <div class="form-group"><label for="fo-product">Add product</label>
+              <select id="fo-product" class="select-input"><option value="">-- Select product --</option></select>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table"><thead><tr><th>Product</th><th>Price</th><th>Qty</th><th>Total</th><th></th></tr></thead>
+              <tbody id="fo-items-body"></tbody></table>
+            </div>
+            <div class="cart-total" style="margin-top:1rem"><span>Order Total</span><strong id="fo-total">₹0.00</strong></div>
+            <button class="btn btn-primary btn-full" id="fo-submit" style="margin-top:1rem"><i class="fas fa-paper-plane"></i> Place Order</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>My Field Orders</h3></div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table class="data-table"><thead><tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead>
+              <tbody id="fo-history-body"></tbody></table>
+            </div>
+            <div class="empty-state hidden" id="no-field-orders"><i class="fas fa-route"></i><p>No field orders placed yet</p></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ===== Team View (owner / admin) ===== -->
+    <section id="view-team" class="view hidden">
+      <div class="view-toolbar">
+        <div class="search-bar"><i class="fas fa-search"></i>
+          <input type="text" id="team-search" placeholder="Search team..."></div>
+        <div class="toolbar-actions">
+          <button class="btn btn-primary" id="add-worker-btn"><i class="fas fa-user-plus"></i> Add Worker</button>
+        </div>
+      </div>
+      <div class="card" style="margin-top:1rem"><div class="card-body">
+        <div class="table-wrap">
+          <table class="data-table"><thead><tr>
+            <th>Name</th><th>Email</th><th>Role</th><th>Actions</th>
+          </tr></thead><tbody id="team-table-body"></tbody></table>
+        </div>
+        <div class="empty-state hidden" id="no-team"><i class="fas fa-users-gear"></i><p>No workers yet — add marketing, office, or staff users.</p>
+          <button class="btn btn-primary" id="add-first-worker-btn">Add First Worker</button></div>
+      </div></div>
+    </section>
+
   </main>
 
   <!-- Mobile Bottom Navigation -->
@@ -490,6 +582,9 @@
     <button class="more-sheet-item" data-view="reports"><i class="fas fa-chart-bar"></i><span>Reports</span></button>
     <button class="more-sheet-item" data-view="khata"><i class="fas fa-book"></i><span>Khata</span></button>
     <button class="more-sheet-item" data-view="shop"><i class="fas fa-cart-shopping"></i><span>Shop</span></button>
+    <button class="more-sheet-item" data-view="field-order"><i class="fas fa-route"></i><span>Field Orders</span></button>
+    <button class="more-sheet-item" data-view="parties"><i class="fas fa-address-book"></i><span>Customers</span></button>
+    <button class="more-sheet-item" data-view="team"><i class="fas fa-users-gear"></i><span>Team</span></button>
   </div>
   <div class="more-sheet-footer">
     <button class="btn btn-secondary btn-full" id="more-switch-user"><i class="fas fa-people-arrows"></i> Switch User</button>
@@ -826,6 +921,127 @@
   </div>
 </div>
 
+<!-- Worker Modal -->
+<div class="modal hidden" id="worker-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3>Add Worker</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <form id="worker-form">
+      <div class="modal-body">
+        <div class="form-group"><label for="worker-name">Name *</label>
+          <input type="text" id="worker-name" placeholder="e.g. Ramesh" required></div>
+        <div class="form-group"><label for="worker-email">Email *</label>
+          <input type="email" id="worker-email" placeholder="worker@example.com" required></div>
+        <div class="form-group"><label for="worker-password">Password *</label>
+          <input type="password" id="worker-password" placeholder="Min 6 characters" minlength="6" required></div>
+        <div class="form-group"><label for="worker-role">Role *</label>
+          <select id="worker-role" class="select-input">
+            <option value="office">Office worker — manage data &amp; orders</option>
+            <option value="staff">Staff — POS counter only</option>
+            <option value="marketing">Marketing — field sale orders</option>
+          </select></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+        <button type="submit" class="btn btn-primary" id="worker-submit">Create Worker</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Party Modal (custom customer / seller) -->
+<div class="modal hidden" id="party-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3 id="party-modal-title">Add Party</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <form id="party-form">
+      <input type="hidden" id="party-id">
+      <div class="modal-body">
+        <div class="form-group"><label for="party-name">Name *</label>
+          <input type="text" id="party-name" placeholder="e.g. Sharma Traders" required></div>
+        <div class="form-group"><label for="party-type">Type *</label>
+          <select id="party-type" class="select-input">
+            <option value="customer">Customer</option>
+            <option value="seller">Seller</option>
+            <option value="both">Both</option>
+          </select></div>
+        <div class="form-group"><label for="party-location">Location</label>
+          <input type="text" id="party-location" placeholder="e.g. Pune, MH"></div>
+        <div class="form-group"><label for="party-phone">Phone</label>
+          <input type="text" id="party-phone" placeholder="Optional"></div>
+        <div class="form-group"><label for="party-gstin">GSTIN</label>
+          <input type="text" id="party-gstin" placeholder="Optional"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Party</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Manual Purchase Modal -->
+<div class="modal hidden" id="manual-purchase-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content">
+    <div class="modal-header"><h3>New Manual Purchase</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <div class="modal-body">
+      <div class="form-group"><label for="mp-seller">Seller *</label>
+        <select id="mp-seller" class="select-input"><option value="">-- Select seller --</option></select>
+        <button type="button" class="btn btn-sm btn-secondary" id="mp-add-seller" style="margin-top:.5rem"><i class="fas fa-plus"></i> New seller</button>
+      </div>
+      <div class="form-group"><label for="mp-location">Receive at location *</label>
+        <select id="mp-location" class="select-input"></select></div>
+      <div class="form-row" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:.6rem;align-items:end">
+        <div class="form-group" style="margin:0"><label for="mp-product">Product</label>
+          <select id="mp-product" class="select-input"><option value="">-- Select --</option></select></div>
+        <div class="form-group" style="margin:0"><label for="mp-cost">Unit cost</label>
+          <input type="number" id="mp-cost" min="0" step="0.01" value="0"></div>
+        <div class="form-group" style="margin:0"><label for="mp-qty">Qty</label>
+          <input type="number" id="mp-qty" min="1" value="1"></div>
+        <div class="form-group" style="margin:0"><button type="button" class="btn btn-secondary" id="mp-add-item">Add</button></div>
+      </div>
+      <div class="table-wrap" style="margin-top:.75rem">
+        <table class="data-table"><thead><tr><th>Product</th><th>Cost</th><th>Qty</th><th>Total</th><th></th></tr></thead>
+        <tbody id="mp-items-body"></tbody></table>
+      </div>
+      <div class="cart-total" style="margin-top:.75rem"><span>Total</span><strong id="mp-total">₹0.00</strong></div>
+      <div class="form-group" style="margin-top:.75rem"><label for="mp-paid">Amount paid now</label>
+        <input type="number" id="mp-paid" min="0" step="0.01" value="0">
+        <small class="form-hint">Any unpaid balance is recorded in Khata as payable to the seller.</small></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+      <button type="button" class="btn btn-primary" id="mp-submit">Create &amp; Receive</button>
+    </div>
+  </div>
+</div>
+
+<!-- Order Fulfillment / Payment Modal (field sale deliver) -->
+<div class="modal hidden" id="fulfill-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3 id="fulfill-title">Deliver Order</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="fulfill-order-id">
+      <p id="fulfill-summary" class="form-hint" style="margin-bottom:1rem"></p>
+      <div class="form-group"><label for="fulfill-location">Fulfillment location *</label>
+        <select id="fulfill-location" class="select-input"></select></div>
+      <div class="form-group"><label for="fulfill-amount">Amount received</label>
+        <input type="number" id="fulfill-amount" min="0" step="0.01" value="0">
+        <small class="form-hint">Shortfall is posted to Khata as credit due from the customer.</small></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+      <button type="button" class="btn btn-primary" id="fulfill-confirm">Confirm Delivery</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div id="toast-container" class="toast-container"></div>
 
@@ -849,6 +1065,9 @@
 <script src="js/reports.js"></script>
 <script src="js/dashboard.js"></script>
 <script src="js/export.js"></script>
+<script src="js/parties.js"></script>
+<script src="js/team.js"></script>
+<script src="js/field-orders.js"></script>
 <script src="js/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

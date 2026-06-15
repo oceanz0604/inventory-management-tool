@@ -11,13 +11,13 @@ const Locations = (() => {
   function render() {
     const user = Auth.getUser();
     const search = document.getElementById('location-search').value.toLowerCase().trim();
-    let locs = Store.getLocationsByOwner(user.id);
+    let locs = Store.getLocationsByOwner(Auth.ownerId());
     if (search) locs = locs.filter(l => l.name.toLowerCase().includes(search) || (l.address || '').toLowerCase().includes(search));
 
     const grid = document.getElementById('locations-grid');
     const empty = document.getElementById('no-locations');
 
-    if (Store.getLocationsByOwner(user.id).length === 0) {
+    if (Store.getLocationsByOwner(Auth.ownerId()).length === 0) {
       grid.innerHTML = '';
       empty.classList.remove('hidden');
       return;
@@ -80,7 +80,7 @@ const Locations = (() => {
     const isDefault = document.getElementById('location-default').checked;
 
     if (isDefault) {
-      Store.getLocationsByOwner(user.id).forEach(l => {
+      Store.getLocationsByOwner(Auth.ownerId()).forEach(l => {
         if (l.isDefault) Store.updateLocation(l.id, { isDefault: false });
       });
     }
@@ -89,8 +89,8 @@ const Locations = (() => {
       Store.updateLocation(editingId, { name, address, isDefault });
       App.showToast('Location updated', 'success');
     } else {
-      const existingLocs = Store.getLocationsByOwner(user.id);
-      Store.addLocation({ id: Store.generateId(), ownerId: user.id, name, address, isDefault: isDefault || existingLocs.length === 0 });
+      const existingLocs = Store.getLocationsByOwner(Auth.ownerId());
+      Store.addLocation({ id: Store.generateId(), ownerId: Auth.ownerId(), name, address, isDefault: isDefault || existingLocs.length === 0 });
       App.showToast('Location added', 'success');
     }
 
@@ -104,7 +104,7 @@ const Locations = (() => {
     const loc = Store.getLocationById(locId);
     if (!loc) return;
     const user = Auth.getUser();
-    const locs = Store.getLocationsByOwner(user.id);
+    const locs = Store.getLocationsByOwner(Auth.ownerId());
     if (locs.length <= 1) { App.showToast('You must have at least one location', 'warning'); return; }
 
     const stockCount = Store.getStockByLocation(locId).length;
@@ -117,7 +117,7 @@ const Locations = (() => {
     btn.parentNode.replaceChild(clone, btn);
     clone.addEventListener('click', () => {
       if (loc.isDefault) {
-        const remaining = Store.getLocationsByOwner(user.id).filter(l => l.id !== locId);
+        const remaining = Store.getLocationsByOwner(Auth.ownerId()).filter(l => l.id !== locId);
         if (remaining.length > 0) Store.updateLocation(remaining[0].id, { isDefault: true });
       }
       Store.deleteLocation(locId);

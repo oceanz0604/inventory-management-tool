@@ -12,7 +12,7 @@ const Shop = (() => {
 
   function populateFilters() {
     const user = Auth.getUser();
-    const allUsers = Store.getUsers().filter(u => u.id !== user.id);
+    const allUsers = Store.getUsers().filter(u => u.id !== Auth.ownerId());
     const cats = Store.getCategories();
 
     document.getElementById('shop-seller-filter').innerHTML = '<option value="">All Shops</option>' + allUsers.map(u => `<option value="${u.id}">${u.name || u.shopName}</option>`).join('');
@@ -25,7 +25,7 @@ const Shop = (() => {
     const sellerFilter = document.getElementById('shop-seller-filter').value;
     const catFilter = document.getElementById('shop-category-filter').value;
 
-    const otherUsers = Store.getUsers().filter(u => u.id !== user.id);
+    const otherUsers = Store.getUsers().filter(u => u.id !== Auth.ownerId());
     let products = [];
     otherUsers.forEach(u => {
       Store.getPublishedProducts(u.id).forEach(p => {
@@ -159,7 +159,7 @@ const Shop = (() => {
       return { productId: ci.productId, name: product.name, sku: product.sku, qty: ci.qty, unitPrice: product.price };
     });
 
-    Store.createOrder(user.id, cart.sellerId, orderItems);
+    Store.createOrder(Auth.ownerId(), cart.sellerId, orderItems);
     Store.clearCart();
     renderCart();
     _updateCartBadges();

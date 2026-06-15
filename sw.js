@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zatpat-v8';
+const CACHE_NAME = 'zatpat-v9';
 const STATIC_URLS = [
   './',
   './index.html',
@@ -17,6 +17,9 @@ const STATIC_URLS = [
   './js/reports.js',
   './js/dashboard.js',
   './js/export.js',
+  './js/parties.js',
+  './js/team.js',
+  './js/field-orders.js',
   './js/app.js',
   './manifest.json',
   './icons/icon.svg'

@@ -18,7 +18,7 @@ const BOM = (() => {
 
   function render() {
     const user = Auth.getUser();
-    const recipes = Store.getRecipes(user.id);
+    const recipes = Store.getRecipes(Auth.ownerId());
     const search = document.getElementById('recipe-search').value.toLowerCase().trim();
     const filtered = search ? recipes.filter(r => r.name.toLowerCase().includes(search)) : recipes;
     const grid = document.getElementById('recipes-grid');
@@ -62,7 +62,7 @@ const BOM = (() => {
     document.getElementById('recipe-ingredients').innerHTML = '';
 
     const user = Auth.getUser();
-    const prods = Store.getProductsByOwner(user.id);
+    const prods = Store.getProductsByOwner(Auth.ownerId());
     const optHtml = '<option value="">Select product</option>' + prods.map(p => '<option value="' + p.id + '">' + _esc(p.name) + ' (' + p.sku + ')</option>').join('');
     document.getElementById('recipe-output').innerHTML = optHtml;
 
@@ -84,7 +84,7 @@ const BOM = (() => {
 
   function _addIngredientRow(e, productId, qty) {
     const user = Auth.getUser();
-    const prods = Store.getProductsByOwner(user.id);
+    const prods = Store.getProductsByOwner(Auth.ownerId());
     const container = document.getElementById('recipe-ingredients');
     const row = document.createElement('div');
     row.className = 'ingredient-row';
@@ -138,7 +138,7 @@ const BOM = (() => {
       Store.updateRecipe(editingId, { name, outputProductId, outputQty, ingredients });
       App.showToast('Recipe updated', 'success');
     } else {
-      Store.addRecipe({ id: Store.generateId(), ownerId: user.id, name, outputProductId, outputQty, ingredients, createdAt: new Date().toISOString() });
+      Store.addRecipe({ id: Store.generateId(), ownerId: Auth.ownerId(), name, outputProductId, outputQty, ingredients, createdAt: new Date().toISOString() });
       App.showToast('Recipe created', 'success');
     }
     document.getElementById('recipe-modal').classList.add('hidden');
@@ -164,8 +164,8 @@ const BOM = (() => {
 
   function openProduce(recipeId) {
     const user = Auth.getUser();
-    const recipes = Store.getRecipes(user.id);
-    const locs = Store.getLocationsByOwner(user.id);
+    const recipes = Store.getRecipes(Auth.ownerId());
+    const locs = Store.getLocationsByOwner(Auth.ownerId());
     const rSel = document.getElementById('produce-recipe');
     rSel.innerHTML = '<option value="">Select recipe</option>' + recipes.map(r => '<option value="' + r.id + '"' + (recipeId === r.id ? ' selected' : '') + '>' + _esc(r.name) + '</option>').join('');
     const lSel = document.getElementById('produce-location');

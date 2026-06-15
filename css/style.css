@@ -880,3 +880,19 @@ textarea { resize:vertical; }
   .modal-overlay { display:none; }
   body { background:#fff; }
 }
+
+/* Field order screen + worker/party helpers */
+.field-order-layout { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; align-items:start; }
+@media(max-width:900px){ .field-order-layout { grid-template-columns:1fr; } }
+.form-hint { display:block; margin-top:.35rem; color:var(--text-light); font-size:.78rem; }
+.role-pill { display:inline-block; padding:.15rem .6rem; border-radius:999px; font-size:.72rem; font-weight:600;
+  background:var(--bg-input); color:var(--text-light); text-transform:capitalize; }
+.role-pill.role-office { background:rgba(109,93,252,.15); color:var(--primary); }
+.role-pill.role-staff { background:rgba(16,185,129,.15); color:#10b981; }
+.role-pill.role-marketing { background:rgba(245,158,11,.15); color:#f59e0b; }
+.order-status.accepted { background:#eef4ff; color:#2563eb; }
+.order-status.open { background:#fff7e8; color:#b45309; }
+.order-status.completed { background:#e9fbf2; color:#0e9f5a; }
+[data-theme="dark"] .order-status.accepted { background:rgba(96,165,250,.16); color:#93c5fd; }
+[data-theme="dark"] .order-status.open { background:rgba(251,191,36,.16); color:#fcd34d; }
+[data-theme="dark"] .order-status.completed { background:rgba(52,211,153,.16); color:#4ade80; }
