@@ -29,9 +29,25 @@
       <h1>झटपट</h1>
       <p>Multi-Location Inventory Marketplace</p>
     </div>
-    <form id="login-form" class="auth-form">
-      <h2>Welcome back</h2>
-      <p class="auth-subtitle">Sign in to your account</p>
+
+    <!-- Stage 1: company code (Okta-style) -->
+    <form id="company-form" class="auth-form">
+      <h2>Sign in to your company</h2>
+      <p class="auth-subtitle">Enter your company code to continue</p>
+      <div class="form-group">
+        <label for="company-code">Company code</label>
+        <div class="input-icon"><i class="fas fa-building"></i>
+          <input type="text" id="company-code" placeholder="e.g. romastore123" autocomplete="off" autocapitalize="none" spellcheck="false" required>
+        </div>
+      </div>
+      <button type="submit" class="btn btn-primary btn-full">Continue</button>
+      <button type="button" id="no-code-link" class="auth-link-btn">I don't have a company code</button>
+    </form>
+
+    <!-- Stage 2: credentials for the chosen company -->
+    <form id="login-form" class="auth-form hidden">
+      <h2 id="login-heading">Welcome back</h2>
+      <p class="auth-subtitle" id="login-subtitle">Sign in to your account</p>
       <div class="form-group">
         <label for="login-email">Email</label>
         <div class="input-icon"><i class="fas fa-envelope"></i>
@@ -45,8 +61,11 @@
         </div>
       </div>
       <button type="submit" class="btn btn-primary btn-full">Sign In</button>
+      <button type="button" id="change-company-link" class="auth-link-btn"><i class="fas fa-arrow-left"></i> Use a different company</button>
     </form>
+
     <div id="auth-error" class="auth-error hidden"></div>
+    <p class="auth-admin-hint"><a href="admin.html">Administrator sign in</a></p>
   </div>
 </div>
 

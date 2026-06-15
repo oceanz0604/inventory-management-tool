@@ -21,15 +21,23 @@ alwaysApply: false
 | `ims_recipes` | Recipes | id, ownerId, name, outputProductId, outputQty, ingredients[{productId, qty}], createdAt |
 | `ims_khata` | Khata Ledger | id, ownerId, partyId, partyName, type (credit/debit), amount, description, orderId, entryNumber, createdAt |
 
-Sequence counters: `ims_order_seq`, `ims_pos_seq`, `ims_khata_seq`, `ims_seed_ver`.
+Sequence counters: `ims_order_seq`, `ims_pos_seq`, `ims_khata_seq`.
 
-## Seed Data Versioning
+## Multi-Tenancy (Companies)
 
-`SEED_VERSION` (integer at top of `store.js`) controls demo data. When modifying seed data or the data model shape, bump it — `seedDemoData()` checks against `ims_seed_ver` and does a full `_clearAll()` + re-seed if stale.
+Each client is a **company** (tenant). A company doc lives in the `companies`
+collection (`id == ownerId == companyId`) and carries a human-friendly `code`
+used by the Okta-style code-first login. Owners are auto-provisioned a company +
+code on first login (`Auth._ensureCompany`); the super-admin can also create
+companies via the Admin Console (`admin.html`). There is **no demo/seed data** —
+it was removed. Real data only.
 
 ## Ownership Model
 
-Products, stock, locations, recipes, and khata entries are scoped by `ownerId`. Orders have both `buyerId` and `sellerId`. Always filter by the current user's ID (`Auth.getUser().id`).
+Products, stock, locations, recipes, and khata entries are scoped by `ownerId`.
+Orders have both `buyerId` and `sellerId`. Always scope by the current company:
+use `Auth.ownerId()` (a worker resolves to their `companyId`; an owner to their
+own uid) rather than the raw `Auth.getUser().id`.
 
 ## Order Status Workflow
 

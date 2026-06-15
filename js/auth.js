@@ -58,11 +58,60 @@ const Auth = (() => {
     if (!_useCloud()) return null;
     const fb = Firebase.currentUser();
     if (!fb) return null;
-    const profile = await _ensureProfile(fb, _pendingName);
+    let profile = await _ensureProfile(fb, _pendingName);
     _pendingName = null;
+    try { profile = await _ensureCompany(profile); } catch (e) { /* ignore */ }
     Store.setCurrentUser(profile);
     return profile;
   }
+
+  /* ---------------- Company (tenant) ---------------- */
+  function _slug(s) { return (s || '').toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 12) || 'company'; }
+
+  async function _genUniqueCode(base) {
+    const root = _slug(base);
+    for (let i = 0; i < 6; i++) {
+      const code = root + Math.floor(100 + Math.random() * 900);
+      try { const ex = await Firebase.findCompanyByCode(code); if (!ex) return code; } catch (e) { return code; }
+    }
+    return root + String(Date.now()).slice(-5);
+  }
+
+  // Every owner-level account maps to exactly one company doc (id == companyId).
+  // Auto-provision one (with a shareable code) for new and legacy owners alike.
+  async function _ensureCompany(profile) {
+    if (!_useCloud() || !profile) return profile;
+    if (profile.role === 'superadmin' || WORKER_ROLES.indexOf(profile.role) >= 0) return profile;
+    const cid = profile.companyId || profile.id;
+    let company = null;
+    try { company = await Firebase.getDoc('companies', cid); } catch (e) { company = null; }
+    if (!company) {
+      const code = await _genUniqueCode(profile.shopName || profile.name || profile.email);
+      company = { id: cid, ownerId: cid, name: profile.shopName || profile.name || 'My Company', code: code, createdAt: new Date().toISOString() };
+      try { await Firebase.save('companies', company); } catch (e) { /* ignore */ }
+    }
+    if (profile.companyCode !== company.code) {
+      profile.companyCode = company.code;
+      try { await Firebase.save('users', profile); } catch (e) { /* ignore */ }
+    }
+    return profile;
+  }
+
+  // Step 1 of the code-first login: resolve a company by its code.
+  async function selectCompany(code) {
+    const c = (code || '').trim().toLowerCase();
+    if (!c) return { success: false, message: 'Enter your company code.' };
+    if (!_useCloud()) return { success: false, message: 'Backend unavailable.' };
+    let company = null;
+    try { company = await Firebase.findCompanyByCode(c); } catch (e) { company = null; }
+    if (!company) return { success: false, message: 'No company found for that code.' };
+    try { localStorage.setItem('ims_chosen_company', JSON.stringify({ id: company.id, code: company.code, name: company.name })); } catch (e) { /* ignore */ }
+    return { success: true, company };
+  }
+
+  function getChosenCompany() { try { return JSON.parse(localStorage.getItem('ims_chosen_company') || 'null'); } catch (e) { return null; } }
+  function getChosenCompanyId() { const c = getChosenCompany(); return c && c.id; }
+  function clearChosenCompany() { try { localStorage.removeItem('ims_chosen_company'); } catch (e) { /* ignore */ } }
 
   async function login(email, password) {
     if (!_useCloud()) return { success: false, message: 'Backend unavailable. Check your connection and try again.' };
@@ -83,6 +132,7 @@ const Auth = (() => {
 
   async function logout() {
     try { if (_useCloud()) await Firebase.signOut(); } catch (e) { /* ignore */ }
+    clearChosenCompany();
     Store.clearCurrentUser();
     Store.clearCart();
     Store._clearLocalData();
@@ -159,7 +209,6 @@ const Auth = (() => {
     Store.setCurrentUser(u);
     return { success: true, user: u };
   }
-  function demoLogin(userId) { return switchUser(userId || 'user_a'); }
 
   function _friendly(e) {
     const c = (e && e.code) || '';
@@ -173,10 +222,11 @@ const Auth = (() => {
   }
 
   return {
-    ensureSession, login, signup, logout, demoLogin, switchUser,
+    ensureSession, login, signup, logout, switchUser,
     isAuthenticated, getUser, getInitials, getRole, ownerId,
     isSuperAdmin, isOwnerLevel, isWorker, canManageTeam,
     createWorker, deleteWorker, getWorkers,
     updateProfile, getOnboarding, setOnboarding,
+    selectCompany, getChosenCompany, getChosenCompanyId, clearChosenCompany,
   };
 })();

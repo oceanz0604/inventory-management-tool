@@ -91,6 +91,15 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Companies (tenants). Public read so the code-first login screen can resolve
+    // a company BEFORE the user authenticates (docs hold only name/code/ownerId —
+    // no sensitive data). Admin manages them; an owner may self-provision their own.
+    match /companies/{id} {
+      allow read: if true;
+      allow create, update: if isAdmin() || (signedIn() && request.resource.data.ownerId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
     // Anything not matched above is denied by default (no catch-all needed).
   }
 }

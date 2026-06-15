@@ -57,13 +57,23 @@ const App = (() => {
       return;
     }
     if (!profile) { _showAuth(); return; }
-    if (_bootedUid === profile.id) return; // already inside for this user
 
-    if (profile.role === 'superadmin') {
-      try { await Store.seedCloudIfNeeded(); } catch (e) { console.warn('[seed] skipped:', e && e.message); }
+    // The super admin belongs in the separate admin console, not the client app.
+    if (profile.role === 'superadmin') { window.location.replace('admin.html'); return; }
+
+    // Enforce the company chosen on the code-first login screen.
+    const chosen = Auth.getChosenCompanyId();
+    if (chosen && profile.companyId && profile.companyId !== chosen) {
+      await Auth.logout();
+      _showAuth();
+      _showAuthError("This account doesn't belong to that company code.");
+      return;
     }
+
+    Auth.clearChosenCompany(); // login verified — don't re-check on later reloads
+    if (_bootedUid === profile.id) return; // already inside for this user
     await Store.sync(profile);
-    Store.setCurrentUser(profile); // re-affirm session (demo seeding clears local keys)
+    Store.setCurrentUser(profile); // re-affirm session
     _bootedUid = profile.id;
     _showApp();
   }
@@ -94,6 +104,7 @@ const App = (() => {
   function _showAuth() {
     document.getElementById('auth-screen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
+    _showCompanyStage();
   }
 
   function _showApp() {
@@ -169,6 +180,31 @@ const App = (() => {
   }
 
   function _bindAuthEvents() {
+    // Stage 1 — resolve the company code, then reveal the credentials form.
+    document.getElementById('company-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      _hideAuthError();
+      const btn = e.target.querySelector('button[type="submit"]');
+      const orig = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+      const result = await Auth.selectCompany(document.getElementById('company-code').value);
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
+      if (!result.success) { _showAuthError(result.message); return; }
+      _showLoginStage(result.company.name);
+    });
+
+    document.getElementById('no-code-link').addEventListener('click', () => {
+      Auth.clearChosenCompany();
+      _hideAuthError();
+      _showLoginStage(null);
+    });
+
+    document.getElementById('change-company-link').addEventListener('click', () => {
+      Auth.clearChosenCompany();
+      _hideAuthError();
+      _showCompanyStage();
+    });
+
     document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
       _hideAuthError();
@@ -185,12 +221,30 @@ const App = (() => {
     document.getElementById('switch-user-btn').addEventListener('click', _openSwitchUserModal);
   }
 
+  function _showCompanyStage() {
+    document.getElementById('company-form').classList.remove('hidden');
+    document.getElementById('login-form').classList.add('hidden');
+    document.getElementById('company-form').reset();
+  }
+
+  function _showLoginStage(companyName) {
+    document.getElementById('company-form').classList.add('hidden');
+    document.getElementById('login-form').classList.remove('hidden');
+    const heading = document.getElementById('login-heading');
+    const subtitle = document.getElementById('login-subtitle');
+    if (companyName) { heading.textContent = 'Sign in to ' + companyName; subtitle.textContent = 'Use your team credentials'; }
+    else { heading.textContent = 'Welcome back'; subtitle.textContent = 'Sign in to your account'; }
+    const email = document.getElementById('login-email');
+    if (email) setTimeout(() => email.focus(), 50);
+  }
+
   async function _doLogout() {
     _bootedUid = null;
     await Auth.logout();
     _showAuth();
     _closeMoreSheet();
     document.getElementById('login-form').reset();
+    document.getElementById('company-form').reset();
   }
 
   function _showAuthError(msg) {

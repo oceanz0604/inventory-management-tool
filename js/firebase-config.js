@@ -141,10 +141,34 @@ const Firebase = (() => {
     return db.collection(collection).doc(id).delete();
   }
 
+  // Delete many docs by id in batches (used by the admin demo-cleanup tool).
+  function removeMany(collection, ids) {
+    if (!enabled || !ids || !ids.length) return Promise.resolve(0);
+    const chunks = [];
+    for (let i = 0; i < ids.length; i += 450) chunks.push(ids.slice(i, i + 450));
+    return chunks.reduce((p, chunk) => p.then(() => {
+      const batch = db.batch();
+      chunk.forEach(id => batch.delete(db.collection(collection).doc(id)));
+      return batch.commit();
+    }), Promise.resolve()).then(() => ids.length);
+  }
+
+  // Public-ish lookup so the code-first login screen can resolve a company
+  // before the user authenticates. Company codes are stored lowercase.
+  function findCompanyByCode(code) {
+    if (!enabled) return Promise.resolve(null);
+    return db.collection('companies').where('code', '==', (code || '').trim().toLowerCase())
+      .limit(1).get().then(snap => snap.empty ? null : snap.docs[0].data());
+  }
+
+  // Create any new Auth account (owner or worker) without touching the caller's
+  // session, via a throwaway secondary app. Alias kept for readability.
+  function createAuthAccount(email, password) { return createWorkerAccount(email, password); }
+
   return {
     init, isEnabled, getAuth, getDb, config: FIREBASE_CONFIG,
-    signIn, signUp, signOut, currentUser, onAuth, createWorkerAccount,
-    save, saveMany, list, listWhere, listByOwner, getDoc, remove,
+    signIn, signUp, signOut, currentUser, onAuth, createWorkerAccount, createAuthAccount,
+    save, saveMany, list, listWhere, listByOwner, getDoc, remove, removeMany, findCompanyByCode,
   };
 })();
 

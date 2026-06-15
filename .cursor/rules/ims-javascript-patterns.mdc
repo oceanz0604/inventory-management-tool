@@ -44,8 +44,9 @@ const ModuleName = (() => {
 All data operations go through the `Store` IIFE. Never read/write `localStorage` directly outside `store.js`.
 
 - ID generation: `Store.generateId()` (timestamp + random base-36)
-- Owner-scoped queries: `Store.getProductsByOwner(userId)`, `Store.getStockByOwner(userId)`, etc.
-- Seed versioning: bump `SEED_VERSION` when changing seed data shape, so `seedDemoData()` triggers a full re-seed.
+- Owner-scoped queries: `Store.getProductsByOwner(ownerId)`, `Store.getStockByOwner(ownerId)`, etc. Pass `Auth.ownerId()`.
+- Companies (tenants): `Store.getCompanies()`, `Store.getCompanyById(id)`, `Store.addCompany(company)`.
+- No demo/seed data exists; the app is real-data only. The Admin Console (`admin.html`) onboards companies.
 
 ## Toasts
 
