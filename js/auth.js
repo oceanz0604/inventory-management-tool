@@ -133,6 +133,23 @@ const Auth = (() => {
     return Store.getUsers().filter(u => u.companyId === cid && WORKER_ROLES.indexOf(u.role) >= 0);
   }
 
+  /* ---------------- Profile / onboarding ---------------- */
+  // Merge fields into the current profile and persist (local + cloud).
+  async function updateProfile(patch) {
+    const u = getUser();
+    if (!u) return null;
+    Object.assign(u, patch);
+    Store.setCurrentUser(u);
+    Store.upsertUserLocal(u);
+    if (_useCloud()) { try { await Firebase.save('users', u); } catch (e) { /* ignore */ } }
+    return u;
+  }
+
+  function getOnboarding() { const u = getUser(); return (u && u.onboarding) || {}; }
+  function setOnboarding(patch) {
+    return updateProfile({ onboarding: Object.assign({}, getOnboarding(), patch) });
+  }
+
   // God-view: super admin "acts as" another owner. Local only — no re-auth.
   // All of that owner's data is already in the local cache (admin loads everything).
   function switchUser(userId) {
@@ -160,5 +177,6 @@ const Auth = (() => {
     isAuthenticated, getUser, getInitials, getRole, ownerId,
     isSuperAdmin, isOwnerLevel, isWorker, canManageTeam,
     createWorker, deleteWorker, getWorkers,
+    updateProfile, getOnboarding, setOnboarding,
   };
 })();

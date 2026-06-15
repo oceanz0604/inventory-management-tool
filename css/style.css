@@ -896,3 +896,24 @@ textarea { resize:vertical; }
 [data-theme="dark"] .order-status.accepted { background:rgba(96,165,250,.16); color:#93c5fd; }
 [data-theme="dark"] .order-status.open { background:rgba(251,191,36,.16); color:#fcd34d; }
 [data-theme="dark"] .order-status.completed { background:rgba(52,211,153,.16); color:#4ade80; }
+
+/* Getting-started onboarding wizard */
+.onboarding-overlay { position:fixed; inset:0; z-index:2000; background:rgba(14,12,29,.62); backdrop-filter:blur(6px); display:flex; align-items:center; justify-content:center; padding:1rem; }
+.onboarding-card { width:100%; max-width:680px; max-height:92vh; display:flex; flex-direction:column;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,.35); overflow:hidden; }
+.onboarding-head { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid var(--border); }
+.ob-brand { font-weight:700; display:flex; align-items:center; gap:.5rem; color:var(--primary); }
+.onboarding-stepper { display:flex; gap:.4rem; padding:1rem 1.25rem 0; flex-wrap:wrap; }
+.ob-step { flex:1 1 70px; display:flex; flex-direction:column; gap:.35rem; font-size:.68rem; color:var(--text-light); }
+.ob-step .ob-bar { height:4px; border-radius:999px; background:var(--border); transition:background var(--transition); }
+.ob-step.active .ob-bar, .ob-step.done .ob-bar { background:var(--primary); }
+.ob-step.active { color:var(--primary); font-weight:600; }
+.onboarding-body { padding:1rem 1.25rem; overflow-y:auto; }
+.onboarding-body h2 { margin:.25rem 0; font-size:1.25rem; }
+.ob-desc { color:var(--text-secondary); margin-bottom:1rem; font-size:.88rem; }
+.onboarding-foot { display:flex; justify-content:space-between; gap:.75rem; padding:1rem 1.25rem; border-top:1px solid var(--border); }
+.ob-grid { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; }
+.ob-list { margin-top:.85rem; display:flex; flex-direction:column; gap:.4rem; }
+.ob-list-item { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.5rem .75rem; background:var(--bg-input); border-radius:var(--radius); font-size:.85rem; }
+.ob-list-empty { color:var(--text-light); font-size:.82rem; padding:.4rem 0; }
+@media(max-width:560px){ .ob-grid { grid-template-columns:1fr; } .ob-step span { display:none; } }

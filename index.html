@@ -1042,6 +1042,26 @@
   </div>
 </div>
 
+<!-- Getting Started Onboarding Wizard -->
+<div class="onboarding-overlay hidden" id="onboarding-overlay">
+  <div class="onboarding-card">
+    <div class="onboarding-head">
+      <div class="ob-brand"><i class="fas fa-bolt"></i> Getting Started</div>
+      <button class="btn-text" id="ob-skip">I'll do this later</button>
+    </div>
+    <div class="onboarding-stepper" id="ob-stepper"></div>
+    <div class="onboarding-body">
+      <h2 id="ob-title"></h2>
+      <p class="ob-desc" id="ob-desc"></p>
+      <div id="ob-content"></div>
+    </div>
+    <div class="onboarding-foot">
+      <button class="btn btn-secondary" id="ob-back"><i class="fas fa-arrow-left"></i> Back</button>
+      <button class="btn btn-primary" id="ob-next">Next</button>
+    </div>
+  </div>
+</div>
+
 <!-- Toast Container -->
 <div id="toast-container" class="toast-container"></div>
 
@@ -1068,6 +1088,7 @@
 <script src="js/parties.js"></script>
 <script src="js/team.js"></script>
 <script src="js/field-orders.js"></script>
+<script src="js/onboarding.js"></script>
 <script src="js/app.js"></script>
 <script>
   if ('serviceWorker' in navigator) {

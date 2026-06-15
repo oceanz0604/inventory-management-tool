@@ -115,8 +115,10 @@ const App = (() => {
     Parties.init();
     Team.init();
     FieldOrders.init();
+    Onboarding.init();
     _navigate(_defaultView());
     Shop.refreshBadges();
+    Onboarding.maybeStart();
   }
 
   // Landing view depends on role: staff -> POS, marketing -> field orders.
@@ -496,7 +498,7 @@ const App = (() => {
 
   function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-  return { init, showToast, editCategory, deleteCategory };
+  return { init, showToast, editCategory, deleteCategory, goTo: _navigate };
 })();
 
 document.addEventListener('DOMContentLoaded', App.init);
