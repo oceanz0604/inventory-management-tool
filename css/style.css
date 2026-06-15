@@ -7,6 +7,12 @@
 /* ========== Reset & Base ========== */
 *,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
 
+/* Disable zoom on mobile: kill double-tap-to-zoom (keeps scrolling) and
+   stop iOS auto text-size inflation. Pinch-zoom is blocked via the viewport
+   meta + a small gesture guard in app.js. */
+html { -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+html,body { touch-action:manipulation; }
+
 :root {
   /* Brand */
   --primary: #6d5dfc;

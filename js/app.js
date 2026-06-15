@@ -12,7 +12,22 @@ const App = (() => {
     _bindSidebarToggle();
     _bindCategoryEvents();
     _bindBottomNav();
+    _preventZoomGestures();
     _boot();
+  }
+
+  // iOS Safari ignores user-scalable=no, so block pinch gestures and the
+  // double-tap-to-zoom that survives touch-action in some cases.
+  function _preventZoomGestures() {
+    ['gesturestart', 'gesturechange', 'gestureend'].forEach(evt => {
+      document.addEventListener(evt, (e) => e.preventDefault(), { passive: false });
+    });
+    let lastTouch = 0;
+    document.addEventListener('touchend', (e) => {
+      const now = Date.now();
+      if (now - lastTouch <= 300) e.preventDefault();
+      lastTouch = now;
+    }, { passive: false });
   }
 
   // Drive the session from Firebase Auth state (handles reload + persisted login).
