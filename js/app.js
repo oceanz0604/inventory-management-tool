@@ -133,42 +133,6 @@ const App = (() => {
       if (!result.success) _showAuthError(result.message);
     });
 
-    document.getElementById('signup-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      _hideAuthError();
-      const btn = e.target.querySelector('button[type="submit"]');
-      const orig = btn ? btn.textContent : '';
-      if (btn) { btn.disabled = true; btn.textContent = 'Creating account…'; }
-      const result = await Auth.signup(
-        document.getElementById('signup-name').value,
-        document.getElementById('signup-email').value,
-        document.getElementById('signup-password').value
-      );
-      if (btn) { btn.disabled = false; btn.textContent = orig; }
-      if (!result.success) _showAuthError(result.message);
-    });
-
-    document.querySelectorAll('[data-demo]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const result = Auth.demoLogin(btn.dataset.demo);
-        if (result.success) _showApp(); else _showAuthError(result.message);
-      });
-    });
-
-    document.getElementById('show-signup').addEventListener('click', (e) => {
-      e.preventDefault();
-      document.getElementById('login-form').classList.add('hidden');
-      document.getElementById('signup-form').classList.remove('hidden');
-      _hideAuthError();
-    });
-
-    document.getElementById('show-login').addEventListener('click', (e) => {
-      e.preventDefault();
-      document.getElementById('signup-form').classList.add('hidden');
-      document.getElementById('login-form').classList.remove('hidden');
-      _hideAuthError();
-    });
-
     document.getElementById('logout-btn').addEventListener('click', _doLogout);
     document.getElementById('switch-user-btn').addEventListener('click', _openSwitchUserModal);
   }
@@ -179,9 +143,6 @@ const App = (() => {
     _showAuth();
     _closeMoreSheet();
     document.getElementById('login-form').reset();
-    document.getElementById('signup-form').reset();
-    document.getElementById('login-form').classList.remove('hidden');
-    document.getElementById('signup-form').classList.add('hidden');
   }
 
   function _showAuthError(msg) {
