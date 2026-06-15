@@ -1,0 +1,53 @@
+---
+description: Project architecture and conventions for the झटपट (ZatPat) inventory management system
+globs: 
+alwaysApply: true
+---
+
+# झटपट (ZatPat) — Inventory Management System
+
+## Tech Stack
+
+Vanilla HTML5 + CSS3 + ES6+ JavaScript SPA. No build step, no bundler, no framework.
+All dependencies loaded via CDN in `index.html`: Chart.js 4, jsPDF, jsPDF-AutoTable, Font Awesome 6, Google Fonts (Inter, Tiro Devanagari Marathi).
+
+## Project Layout
+
+```
+inventory-management-system/
+├── index.html          # SPA shell: auth screen + app views + all modals
+├── css/style.css       # All styles (light + dark theme via CSS custom properties)
+├── js/
+│   ├── store.js        # Data layer — localStorage CRUD, seed data, IIFE: `Store`
+│   ├── auth.js         # Auth — login, signup, demo login, switch user; IIFE: `Auth`
+│   ├── app.js          # Orchestrator — init, routing, theme, nav, toasts; IIFE: `App`
+│   ├── locations.js    # Location CRUD; IIFE: `Locations`
+│   ├── products.js     # Product catalog; IIFE: `Products`
+│   ├── inventory.js    # Stock grid (product × location); IIFE: `Inventory`
+│   ├── orders.js       # Sales/Purchase order workflow; IIFE: `Orders`
+│   ├── shop.js         # B2B marketplace browsing & cart; IIFE: `Shop`
+│   ├── pos.js          # Point-of-sale counter; IIFE: `POS`
+│   ├── bom.js          # Bill of Materials / recipes; IIFE: `BOM`
+│   ├── khata.js        # Credit ledger (Khata); IIFE: `KhataModule`
+│   ├── reports.js      # Advanced charts & reports; IIFE: `Reports`
+│   ├── dashboard.js    # Dashboard stats & charts; IIFE: `Dashboard`
+│   └── export.js       # CSV/PDF export; IIFE: `Export`
+├── sw.js               # Service worker (PWA caching)
+├── manifest.json       # PWA manifest
+├── icons/icon.svg      # App icon
+└── docs/MVP.md         # MVP requirements document
+```
+
+## Data Flow
+
+All persistence uses `localStorage`. The `Store` IIFE is the single source of truth.
+Modules call `Store.*` to read/write data, then re-render their own DOM.
+`App._navigate(view)` handles view switching and triggers each module's `render()`/`refresh()`.
+
+## Currency & Locale
+
+All monetary values use ₹ (INR). The Unicode character `\u20B9` is used in JS string concatenation.
+
+## Brand
+
+Name: **झटपट** (ZatPat). Uses Tiro Devanagari Marathi font. Icon: Font Awesome `fa-bolt`.

@@ -1,0 +1,26 @@
+---
+description: PWA and service worker conventions for the inventory management system
+globs: sw.js,manifest.json
+alwaysApply: false
+---
+
+# PWA & Service Worker — ZatPat IMS
+
+## Service Worker (`sw.js`)
+
+- Cache name format: `zatpat-v{N}` — bump version when deploying changes
+- `STATIC_URLS` array lists every file to pre-cache (HTML, CSS, all JS modules, manifest, icon)
+- **When adding a new JS module**: add its path to `STATIC_URLS` and bump `CACHE_NAME`
+- Strategy: cache-first for local assets, network fallback
+- On activate: old caches are purged by name comparison
+
+## Manifest (`manifest.json`)
+
+- `display: standalone`, `orientation: any`
+- Icons: SVG used at all sizes
+- `start_url: ./index.html` (relative paths for Vercel/static hosting)
+
+## Hosting
+
+Deployed as static files on Vercel. No server-side rendering, no API routes.
+All paths in the app are relative (`./`) to support deployment at any base path.

@@ -1,0 +1,41 @@
+---
+description: CSS architecture, theming, and responsive design rules for the inventory management system
+globs: **/*.css
+alwaysApply: false
+---
+
+# CSS & Theming — ZatPat IMS
+
+## Design System
+
+All styles live in a single `css/style.css`. The design is built on CSS custom properties defined on `:root`.
+
+Key variables: `--primary`, `--bg`, `--bg-card`, `--text`, `--text-secondary`, `--border`, `--shadow`, `--radius`, `--sidebar-width`, `--topbar-height`.
+
+## Dark Theme
+
+Dark mode overrides are scoped under `[data-theme="dark"]`. When adding a new component:
+
+1. Define its colors using existing CSS variables (`var(--bg-card)`, `var(--text)`, etc.)
+2. If the component uses hardcoded colors (badges, icons, charts), add a `[data-theme="dark"] .your-class` override
+3. Test both themes — toggled via `document.documentElement.setAttribute('data-theme', 'dark')`
+
+Theme state is stored in `localStorage` key `ims_theme` (`'light'` or `'dark'`).
+
+## Responsive Breakpoints
+
+- **Desktop** (>768px): sidebar visible, bottom nav hidden
+- **Mobile** (<=768px): sidebar hidden, `<nav class="bottom-nav">` visible with 5 tabs + "More" sheet
+
+When adding new views, ensure they work at both breakpoints. Use the existing responsive patterns:
+- Tables: `overflow-x: auto` wrapper
+- Cards: CSS Grid with `repeat(auto-fill, minmax(280px, 1fr))`
+- Modals: full-screen on mobile via `max-width:100vw; height:100dvh` at the breakpoint
+
+## Class Naming
+
+Follow the existing flat naming convention (not BEM):
+- Layout: `.sidebar`, `.topbar`, `.main-content`, `.bottom-nav`
+- Components: `.card`, `.stat-card`, `.data-table`, `.modal`, `.badge`
+- Module-specific: prefix with module name — `.pos-item-card`, `.recipe-card`, `.khata-party-card`
+- State: `.active`, `.hidden`, `.in-bill`, `.current`

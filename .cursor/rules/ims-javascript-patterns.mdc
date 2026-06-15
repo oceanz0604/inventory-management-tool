@@ -1,0 +1,63 @@
+---
+description: JavaScript coding patterns and conventions for the inventory management system
+globs: **/*.js
+alwaysApply: false
+---
+
+# JavaScript Patterns — ZatPat IMS
+
+## Module Pattern (IIFE)
+
+Every JS module is a **named IIFE** assigned to a `const`. Private functions are prefixed with `_`. Only public API is returned.
+
+```javascript
+const ModuleName = (() => {
+  function _privateHelper() { /* ... */ }
+
+  function init() {
+    // bind DOM events here
+  }
+
+  function render() {
+    // re-render the module's view
+  }
+
+  function refresh() { render(); }
+
+  return { init, render, refresh, /* public methods */ };
+})();
+```
+
+- Do NOT use ES modules (`import`/`export`). Scripts are loaded via `<script>` tags in `index.html`.
+- Module names used: `Store`, `Auth`, `App`, `Locations`, `Products`, `Inventory`, `Orders`, `Shop`, `POS`, `BOM`, `KhataModule`, `Reports`, `Dashboard`, `Export`.
+
+## DOM Interaction
+
+- Use `document.getElementById()` and `document.querySelectorAll()` — no jQuery.
+- Build HTML via string concatenation (not template literals in most modules). Use `_esc()` for user-supplied text.
+- Each module defines its own `_esc(s)` helper: `function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }`
+- Toggling visibility: add/remove the `hidden` CSS class.
+- Inline `onclick` handlers reference the module's public methods: `onclick="Products.openModal('id')"`.
+
+## Store API
+
+All data operations go through the `Store` IIFE. Never read/write `localStorage` directly outside `store.js`.
+
+- ID generation: `Store.generateId()` (timestamp + random base-36)
+- Owner-scoped queries: `Store.getProductsByOwner(userId)`, `Store.getStockByOwner(userId)`, etc.
+- Seed versioning: bump `SEED_VERSION` when changing seed data shape, so `seedDemoData()` triggers a full re-seed.
+
+## Toasts
+
+Show user feedback via `App.showToast(message, type)` where type is `'success'`, `'error'`, or `'warning'`.
+
+## Delete Confirmation Pattern
+
+Reuse the shared `#delete-modal`. Clone the confirm button to remove previous listeners:
+
+```javascript
+const btn = document.getElementById('confirm-delete-btn');
+const clone = btn.cloneNode(true);
+btn.parentNode.replaceChild(clone, btn);
+clone.addEventListener('click', () => { /* perform delete */ });
+```

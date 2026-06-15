@@ -1,0 +1,50 @@
+---
+description: HTML structure and conventions for the inventory management system's single-page app
+globs: index.html
+alwaysApply: false
+---
+
+# HTML Structure — ZatPat IMS
+
+## Single File SPA
+
+Everything lives in `index.html`. No routing library — view switching is done by adding/removing the `hidden` class on `<section class="view" id="view-{name}">` elements.
+
+## Structure
+
+```
+<body>
+  #auth-screen          — login/signup forms + demo buttons
+  #app                  — the main app shell (hidden until authenticated)
+    #sidebar            — desktop nav with grouped links
+    #sidebar-overlay    — backdrop for mobile sidebar
+    .topbar             — page title, search, theme toggle, notifications, user avatar
+    .main-content       — contains all <section class="view"> elements
+    #bottom-nav         — mobile-only bottom navigation (5 tabs)
+    .more-sheet-overlay — backdrop for mobile "More" sheet
+    .more-sheet         — slide-up menu for secondary nav items on mobile
+  Modals                — positioned fixed, toggled via `hidden` class
+  #toast-container      — bottom-right toast notifications
+  #delete-modal         — shared confirmation dialog (reused by all modules)
+```
+
+## Adding a New View
+
+1. Add a `<section class="view hidden" id="view-{name}">` inside `.main-content`
+2. Add a nav item in `#sidebar` with `data-view="{name}"`
+3. Add the route in `App._navigate()` (`titles` map + call module's render/refresh)
+4. If it's a primary mobile view, add a `<button class="bnav-item" data-view="{name}">` to `#bottom-nav`; otherwise add it to `.more-sheet`
+5. Update `_syncBottomNav()` if it's a primary view
+
+## Adding a New Modal
+
+- Use the existing pattern: `<div class="modal hidden" id="{name}-modal">`
+- Include `.modal-overlay` + `.modal-content` + `.modal-close` button
+- Open by removing `hidden`, close via the shared `_bindModalClose()` handler in `app.js`
+
+## Script Load Order
+
+Scripts are loaded at the bottom of `<body>` in dependency order:
+`store.js` → `auth.js` → `locations.js` → `products.js` → `inventory.js` → `orders.js` → `shop.js` → `pos.js` → `bom.js` → `khata.js` → `reports.js` → `dashboard.js` → `export.js` → `app.js`
+
+`app.js` must be last — it calls `App.init()` on `DOMContentLoaded`.

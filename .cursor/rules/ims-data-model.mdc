@@ -1,0 +1,41 @@
+---
+description: Data model and localStorage schema for the inventory management system
+globs: **/store.js
+alwaysApply: false
+---
+
+# Data Model — ZatPat IMS
+
+## localStorage Keys (all prefixed `ims_`)
+
+| Key | Entity | Fields |
+|-----|--------|--------|
+| `ims_users` | Users | id, name, email, password, shopName, gstin, createdAt |
+| `ims_categories` | Categories | id, name, color |
+| `ims_locations` | Locations | id, ownerId, name, address, isDefault |
+| `ims_products` | Products | id, ownerId, name, sku, categoryId, costPrice, price, mrp, wholesalePrice, unit, gstRate, hsnCode, description, isPublished, createdAt |
+| `ims_stock` | Stock | id, productId, locationId, quantity, minStock, batchNumber, expiryDate |
+| `ims_orders` | Orders | id, orderNumber, buyerId, sellerId, fulfillmentLocationId, items[], status, total, createdAt, updatedAt |
+| `ims_cart` | Cart | Array of { productId, sellerId, qty } |
+| `ims_pos_sales` | POS Sales | id, receiptNumber, ownerId, locationId, items[], subtotal, taxAmount, total, paymentMethod, customerName, createdAt |
+| `ims_recipes` | Recipes | id, ownerId, name, outputProductId, outputQty, ingredients[{productId, qty}], createdAt |
+| `ims_khata` | Khata Ledger | id, ownerId, partyId, partyName, type (credit/debit), amount, description, orderId, entryNumber, createdAt |
+
+Sequence counters: `ims_order_seq`, `ims_pos_seq`, `ims_khata_seq`, `ims_seed_ver`.
+
+## Seed Data Versioning
+
+`SEED_VERSION` (integer at top of `store.js`) controls demo data. When modifying seed data or the data model shape, bump it — `seedDemoData()` checks against `ims_seed_ver` and does a full `_clearAll()` + re-seed if stale.
+
+## Ownership Model
+
+Products, stock, locations, recipes, and khata entries are scoped by `ownerId`. Orders have both `buyerId` and `sellerId`. Always filter by the current user's ID (`Auth.getUser().id`).
+
+## Order Status Workflow
+
+`pending` → `approved` → `shipped` → `delivered` (or `cancelled` at any step).
+On delivery: buyer's stock is automatically incremented, seller's stock decremented, a Khata credit entry is created.
+
+## GST & Pricing
+
+Products carry `gstRate` (percentage), `hsnCode`, `costPrice`, `price` (selling), `mrp`, `wholesalePrice`. Selling price must not exceed MRP. GST is calculated as `lineTotal * (gstRate / 100)`. Invoices split into CGST + SGST (each = GST / 2).
