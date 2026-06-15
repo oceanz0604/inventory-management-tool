@@ -1,13 +1,10 @@
 const App = (() => {
   let currentView = 'dashboard';
 
+  let _bootedUid = null;
+
   function init() {
     _initTheme();
-    if (Auth.isAuthenticated()) {
-      _showApp();
-    } else {
-      _showAuth();
-    }
     _bindAuthEvents();
     _bindNavEvents();
     _bindModalClose();
@@ -15,6 +12,45 @@ const App = (() => {
     _bindSidebarToggle();
     _bindCategoryEvents();
     _bindBottomNav();
+    _boot();
+  }
+
+  // Drive the session from Firebase Auth state (handles reload + persisted login).
+  function _boot() {
+    if (window.Firebase && Firebase.isEnabled()) {
+      Firebase.onAuth((fbUser) => {
+        if (fbUser) {
+          _enterApp();
+        } else {
+          _bootedUid = null;
+          Store.clearCurrentUser();
+          _showAuth();
+        }
+      });
+    } else {
+      _showAuth();
+      _showAuthError('Backend unavailable. Please check your connection and reload.');
+    }
+  }
+
+  async function _enterApp() {
+    let profile;
+    try {
+      profile = await Auth.ensureSession();
+    } catch (e) {
+      _showAuthError('Could not load your profile. Please try again.');
+      return;
+    }
+    if (!profile) { _showAuth(); return; }
+    if (_bootedUid === profile.id) return; // already inside for this user
+
+    if (profile.role === 'superadmin') {
+      try { await Store.seedCloudIfNeeded(); } catch (e) { console.warn('[seed] skipped:', e && e.message); }
+    }
+    await Store.sync(profile);
+    Store.setCurrentUser(profile); // re-affirm session (demo seeding clears local keys)
+    _bootedUid = profile.id;
+    _showApp();
   }
 
   // ========== Theme ==========
@@ -49,7 +85,7 @@ const App = (() => {
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     _refreshUserUI();
-    Store.seedDemoData();
+    _applyRoleGating();
     Locations.init();
     Products.init();
     Inventory.init();
@@ -67,26 +103,49 @@ const App = (() => {
 
   function _refreshUserUI() {
     const user = Auth.getUser();
+    if (!user) return;
     document.getElementById('user-name').textContent = user.name || user.shopName || 'User';
     document.getElementById('user-email').textContent = user.email;
     document.getElementById('user-avatar').textContent = Auth.getInitials(user.name || user.shopName || 'U');
   }
 
+  // Test-data tooling (god-view switch-user) is super-admin only.
+  function _applyRoleGating() {
+    const admin = Auth.isSuperAdmin();
+    document.querySelectorAll('[data-admin-only]').forEach(el => { el.style.display = admin ? '' : 'none'; });
+    const switchBtn = document.getElementById('switch-user-btn');
+    if (switchBtn) switchBtn.style.display = admin ? '' : 'none';
+    const moreSwitch = document.getElementById('more-switch-user');
+    if (moreSwitch) moreSwitch.style.display = admin ? '' : 'none';
+    document.body.classList.toggle('is-superadmin', admin);
+  }
+
   function _bindAuthEvents() {
-    document.getElementById('login-form').addEventListener('submit', (e) => {
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const result = Auth.login(document.getElementById('login-email').value, document.getElementById('login-password').value);
-      if (result.success) _showApp(); else _showAuthError(result.message);
+      _hideAuthError();
+      const btn = e.target.querySelector('button[type="submit"]');
+      const orig = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Signing in…'; }
+      const result = await Auth.login(document.getElementById('login-email').value, document.getElementById('login-password').value);
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
+      // On success, the Firebase auth-state listener enters the app.
+      if (!result.success) _showAuthError(result.message);
     });
 
-    document.getElementById('signup-form').addEventListener('submit', (e) => {
+    document.getElementById('signup-form').addEventListener('submit', async (e) => {
       e.preventDefault();
-      const result = Auth.signup(
+      _hideAuthError();
+      const btn = e.target.querySelector('button[type="submit"]');
+      const orig = btn ? btn.textContent : '';
+      if (btn) { btn.disabled = true; btn.textContent = 'Creating account…'; }
+      const result = await Auth.signup(
         document.getElementById('signup-name').value,
         document.getElementById('signup-email').value,
         document.getElementById('signup-password').value
       );
-      if (result.success) _showApp(); else _showAuthError(result.message);
+      if (btn) { btn.disabled = false; btn.textContent = orig; }
+      if (!result.success) _showAuthError(result.message);
     });
 
     document.querySelectorAll('[data-demo]').forEach(btn => {
@@ -114,8 +173,9 @@ const App = (() => {
     document.getElementById('switch-user-btn').addEventListener('click', _openSwitchUserModal);
   }
 
-  function _doLogout() {
-    Auth.logout();
+  async function _doLogout() {
+    _bootedUid = null;
+    await Auth.logout();
     _showAuth();
     _closeMoreSheet();
     document.getElementById('login-form').reset();
@@ -135,9 +195,10 @@ const App = (() => {
   // ========== Switch User Modal ==========
   function _openSwitchUserModal() {
     _closeMoreSheet();
+    if (!Auth.isSuperAdmin()) return; // god-view tooling is super-admin only
     const current = Auth.getUser();
     const allUsers = Store.getUsers();
-    if (allUsers.length <= 1) { showToast('No other demo users available', 'warning'); return; }
+    if (allUsers.length <= 1) { showToast('No other accounts available', 'warning'); return; }
 
     const icons = { user_a: 'fa-microchip', user_b: 'fa-leaf', user_c: 'fa-heart-pulse', user_d: 'fa-hammer', user_e: 'fa-utensils' };
     const list = document.getElementById('switch-user-list');

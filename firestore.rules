@@ -7,12 +7,19 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     function signedIn() { return request.auth != null; }
-    function isOwner(ownerId) { return signedIn() && request.auth.uid == ownerId; }
+    // Super admin (god view) — identified by email on the auth token.
+    function isAdmin() { return signedIn() && request.auth.token.email == 'yashtodkar2@gmail.com'; }
+    function isOwner(ownerId) { return signedIn() && (request.auth.uid == ownerId || isAdmin()); }
+
+    // The super admin can read/write everything (god view + demo seeding).
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
 
     // User profiles. Never store passwords here — auth is handled by Firebase Auth.
     match /users/{userId} {
       allow read: if signedIn();
-      allow write: if signedIn() && request.auth.uid == userId;
+      allow write: if signedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     // Global category catalog — readable by all signed-in users.
@@ -57,17 +64,14 @@ service cloud.firestore {
       allow update, delete: if signedIn() && (!('ownerId' in resource.data) || isOwner(resource.data.ownerId));
     }
 
-    // Orders link a buyer and a seller; both may read/update, neither may hard-delete.
+    // Orders link a buyer and a seller; both may read/update.
     match /orders/{id} {
       allow read: if signedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId);
-      allow create: if signedIn() && request.auth.uid == request.resource.data.buyerId;
-      allow update: if signedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId);
-      allow delete: if false;
+      allow create: if signedIn() && (request.auth.uid == request.resource.data.buyerId || isAdmin());
+      allow update: if signedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId || isAdmin());
+      allow delete: if isAdmin();
     }
 
-    // Everything else is denied by default.
-    match /{document=**} {
-      allow read, write: if false;
-    }
+    // Anything not matched above is denied by default (no catch-all needed).
   }
 }

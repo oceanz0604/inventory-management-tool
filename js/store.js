@@ -29,6 +29,26 @@ const Store = (() => {
     localStorage.setItem(key, JSON.stringify(value));
   }
 
+  // ---------- Cloud (Firestore) write-through ----------
+  // localStorage stays the synchronous read cache; every mutation also mirrors
+  // the changed document to Firestore (fire-and-forget) when a backend is live.
+  const COLL = {
+    [KEYS.USERS]: 'users', [KEYS.CATEGORIES]: 'categories', [KEYS.LOCATIONS]: 'locations',
+    [KEYS.PRODUCTS]: 'products', [KEYS.STOCK]: 'stock', [KEYS.ORDERS]: 'orders',
+    [KEYS.POS_SALES]: 'pos_sales', [KEYS.RECIPES]: 'recipes', [KEYS.KHATA]: 'khata',
+  };
+  function _cloudOn() { return typeof window !== 'undefined' && window.Firebase && Firebase.isEnabled(); }
+  function _cloudSave(collection, doc) {
+    if (_cloudOn() && doc) Firebase.save(collection, doc).catch(e => console.warn('[sync] save ' + collection, e && e.message));
+  }
+  function _cloudRemove(collection, id) {
+    if (_cloudOn() && id) Firebase.remove(collection, id).catch(e => console.warn('[sync] remove ' + collection, e && e.message));
+  }
+  function _ownerOfLocation(locationId) {
+    const loc = getLocationById(locationId);
+    return loc ? loc.ownerId : null;
+  }
+
   function generateId() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   }
@@ -41,7 +61,11 @@ const Store = (() => {
 
   // ========== Users ==========
   function getUsers() { return _get(KEYS.USERS) || []; }
-  function addUser(user) { const u = getUsers(); u.push(user); _set(KEYS.USERS, u); }
+  function addUser(user) { const u = getUsers(); u.push(user); _set(KEYS.USERS, u); _cloudSave('users', user); }
+  function upsertUserLocal(user) {
+    const u = getUsers().filter(x => x.id !== user.id);
+    u.push(user); _set(KEYS.USERS, u);
+  }
   function findUserByEmail(email) { return getUsers().find(u => u.email.toLowerCase() === email.toLowerCase()); }
   function getUserById(id) { return getUsers().find(u => u.id === id); }
   function getCurrentUser() { return _get(KEYS.CURRENT_USER); }
@@ -50,20 +74,31 @@ const Store = (() => {
 
   // ========== Categories ==========
   function getCategories() { return _get(KEYS.CATEGORIES) || []; }
-  function addCategory(cat) { const c = getCategories(); c.push(cat); _set(KEYS.CATEGORIES, c); return cat; }
-  function updateCategory(id, updates) { _set(KEYS.CATEGORIES, getCategories().map(c => c.id === id ? { ...c, ...updates } : c)); }
-  function deleteCategory(id) { _set(KEYS.CATEGORIES, getCategories().filter(c => c.id !== id)); }
+  function addCategory(cat) { const c = getCategories(); c.push(cat); _set(KEYS.CATEGORIES, c); _cloudSave('categories', cat); return cat; }
+  function updateCategory(id, updates) {
+    let merged = null;
+    _set(KEYS.CATEGORIES, getCategories().map(c => c.id === id ? (merged = { ...c, ...updates }) : c));
+    _cloudSave('categories', merged);
+  }
+  function deleteCategory(id) { _set(KEYS.CATEGORIES, getCategories().filter(c => c.id !== id)); _cloudRemove('categories', id); }
   function getCategoryById(id) { return getCategories().find(c => c.id === id); }
 
   // ========== Locations ==========
   function getLocations() { return _get(KEYS.LOCATIONS) || []; }
   function getLocationsByOwner(ownerId) { return getLocations().filter(l => l.ownerId === ownerId); }
   function getLocationById(id) { return getLocations().find(l => l.id === id); }
-  function addLocation(loc) { const locs = getLocations(); locs.push(loc); _set(KEYS.LOCATIONS, locs); return loc; }
-  function updateLocation(id, updates) { _set(KEYS.LOCATIONS, getLocations().map(l => l.id === id ? { ...l, ...updates } : l)); }
+  function addLocation(loc) { const locs = getLocations(); locs.push(loc); _set(KEYS.LOCATIONS, locs); _cloudSave('locations', loc); return loc; }
+  function updateLocation(id, updates) {
+    let merged = null;
+    _set(KEYS.LOCATIONS, getLocations().map(l => l.id === id ? (merged = { ...l, ...updates }) : l));
+    _cloudSave('locations', merged);
+  }
   function deleteLocation(id) {
+    const removedStock = getStock().filter(s => s.locationId === id);
     _set(KEYS.LOCATIONS, getLocations().filter(l => l.id !== id));
     _set(KEYS.STOCK, getStock().filter(s => s.locationId !== id));
+    _cloudRemove('locations', id);
+    removedStock.forEach(s => _cloudRemove('stock', s.id));
   }
   function getDefaultLocation(ownerId) {
     const locs = getLocationsByOwner(ownerId);
@@ -75,11 +110,18 @@ const Store = (() => {
   function getProductsByOwner(ownerId) { return getProducts().filter(p => p.ownerId === ownerId); }
   function getPublishedProducts(ownerId) { return getProducts().filter(p => p.ownerId === ownerId && p.isPublished); }
   function getProductById(id) { return getProducts().find(p => p.id === id); }
-  function addProduct(prod) { const p = getProducts(); p.push(prod); _set(KEYS.PRODUCTS, p); return prod; }
-  function updateProduct(id, updates) { _set(KEYS.PRODUCTS, getProducts().map(p => p.id === id ? { ...p, ...updates } : p)); }
+  function addProduct(prod) { const p = getProducts(); p.push(prod); _set(KEYS.PRODUCTS, p); _cloudSave('products', prod); return prod; }
+  function updateProduct(id, updates) {
+    let merged = null;
+    _set(KEYS.PRODUCTS, getProducts().map(p => p.id === id ? (merged = { ...p, ...updates }) : p));
+    _cloudSave('products', merged);
+  }
   function deleteProduct(id) {
+    const removedStock = getStock().filter(s => s.productId === id);
     _set(KEYS.PRODUCTS, getProducts().filter(p => p.id !== id));
     _set(KEYS.STOCK, getStock().filter(s => s.productId !== id));
+    _cloudRemove('products', id);
+    removedStock.forEach(s => _cloudRemove('stock', s.id));
   }
 
   // ========== Stock (product x location) ==========
@@ -95,25 +137,35 @@ const Store = (() => {
   function setStock(productId, locationId, quantity, minStock, extra) {
     const all = getStock();
     const idx = all.findIndex(s => s.productId === productId && s.locationId === locationId);
+    let rec;
     if (idx >= 0) {
-      all[idx].quantity = quantity;
-      if (minStock !== undefined) all[idx].minStock = minStock;
-      if (extra) Object.assign(all[idx], extra);
+      rec = all[idx];
+      rec.quantity = quantity;
+      if (minStock !== undefined) rec.minStock = minStock;
+      if (extra) Object.assign(rec, extra);
+      if (!rec.ownerId) rec.ownerId = _ownerOfLocation(locationId);
     } else {
-      all.push({ id: generateId(), productId, locationId, quantity, minStock: minStock || 0, ...(extra || {}) });
+      rec = { id: generateId(), ownerId: _ownerOfLocation(locationId), productId, locationId, quantity, minStock: minStock || 0, ...(extra || {}) };
+      all.push(rec);
     }
     _set(KEYS.STOCK, all);
+    _cloudSave('stock', rec);
   }
 
   function adjustStock(productId, locationId, delta) {
     const all = getStock();
     const idx = all.findIndex(s => s.productId === productId && s.locationId === locationId);
+    let rec = null;
     if (idx >= 0) {
-      all[idx].quantity = Math.max(0, all[idx].quantity + delta);
+      rec = all[idx];
+      rec.quantity = Math.max(0, rec.quantity + delta);
+      if (!rec.ownerId) rec.ownerId = _ownerOfLocation(locationId);
     } else if (delta > 0) {
-      all.push({ id: generateId(), productId, locationId, quantity: delta, minStock: 0 });
+      rec = { id: generateId(), ownerId: _ownerOfLocation(locationId), productId, locationId, quantity: delta, minStock: 0 };
+      all.push(rec);
     }
     _set(KEYS.STOCK, all);
+    if (rec) _cloudSave('stock', rec);
   }
 
   function getTotalStockForProduct(productId) {
@@ -156,6 +208,7 @@ const Store = (() => {
     const orders = getOrders();
     orders.push(order);
     _set(KEYS.ORDERS, orders);
+    _cloudSave('orders', order);
     return order;
   }
 
@@ -188,6 +241,7 @@ const Store = (() => {
     }
 
     _set(KEYS.ORDERS, orders);
+    _cloudSave('orders', orders[idx]);
     return orders[idx];
   }
 
@@ -218,6 +272,7 @@ const Store = (() => {
     const all = _get(KEYS.POS_SALES) || [];
     all.push(sale);
     _set(KEYS.POS_SALES, all);
+    _cloudSave('pos_sales', sale);
     return sale;
   }
 
@@ -229,9 +284,13 @@ const Store = (() => {
   // ========== Recipes (BOM) ==========
   function getRecipes(ownerId) { return (_get(KEYS.RECIPES) || []).filter(r => r.ownerId === ownerId); }
   function getRecipeById(id) { return (_get(KEYS.RECIPES) || []).find(r => r.id === id); }
-  function addRecipe(recipe) { const all = _get(KEYS.RECIPES) || []; all.push(recipe); _set(KEYS.RECIPES, all); return recipe; }
-  function updateRecipe(id, updates) { _set(KEYS.RECIPES, (_get(KEYS.RECIPES) || []).map(r => r.id === id ? { ...r, ...updates } : r)); }
-  function deleteRecipe(id) { _set(KEYS.RECIPES, (_get(KEYS.RECIPES) || []).filter(r => r.id !== id)); }
+  function addRecipe(recipe) { const all = _get(KEYS.RECIPES) || []; all.push(recipe); _set(KEYS.RECIPES, all); _cloudSave('recipes', recipe); return recipe; }
+  function updateRecipe(id, updates) {
+    let merged = null;
+    _set(KEYS.RECIPES, (_get(KEYS.RECIPES) || []).map(r => r.id === id ? (merged = { ...r, ...updates }) : r));
+    _cloudSave('recipes', merged);
+  }
+  function deleteRecipe(id) { _set(KEYS.RECIPES, (_get(KEYS.RECIPES) || []).filter(r => r.id !== id)); _cloudRemove('recipes', id); }
 
   function produceRecipe(recipeId, locationId, qty) {
     const recipe = getRecipeById(recipeId);
@@ -277,6 +336,7 @@ const Store = (() => {
     const all = _get(KEYS.KHATA) || [];
     all.push(entry);
     _set(KEYS.KHATA, all);
+    _cloudSave('khata', entry);
     return entry;
   }
 
@@ -344,9 +404,99 @@ const Store = (() => {
     return getCart().items.reduce((s, i) => s + i.qty, 0);
   }
 
+  // ========== Cloud hydration (Firestore -> local cache) ==========
+  function _maxSeq(arr, field, prefix) {
+    return (arr || []).reduce((m, x) => {
+      const n = parseInt(String(x[field] || '').replace(prefix, ''), 10);
+      return isNaN(n) ? m : Math.max(m, n);
+    }, 0);
+  }
+  function _recomputeSequences() {
+    const os = _maxSeq(getOrders(), 'orderNumber', 'ORD-'); if (os) _set(KEYS.ORDER_SEQ, os);
+    const ps = _maxSeq(_get(KEYS.POS_SALES), 'receiptNumber', 'RCT-'); if (ps) _set(KEYS.POS_SEQ, ps);
+    const ks = _maxSeq(_get(KEYS.KHATA), 'entryNumber', 'KH-'); if (ks) _set(KEYS.KHATA_SEQ, ks);
+  }
+
+  // Pull the data this user is allowed to see into the local read cache.
+  // Super admin gets a full god-view; normal users get their own data plus
+  // the published marketplace catalog and the parties they trade with.
+  async function sync(user) {
+    if (!_cloudOn() || !user) return;
+    const isAdmin = user.role === 'superadmin';
+    try {
+      if (isAdmin) {
+        const [users, cats, locs, prods, stock, orders, pos, recipes, khata] = await Promise.all([
+          Firebase.list('users'), Firebase.list('categories'), Firebase.list('locations'),
+          Firebase.list('products'), Firebase.list('stock'), Firebase.list('orders'),
+          Firebase.list('pos_sales'), Firebase.list('recipes'), Firebase.list('khata'),
+        ]);
+        _set(KEYS.USERS, users); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
+        _set(KEYS.PRODUCTS, prods); _set(KEYS.STOCK, stock); _set(KEYS.ORDERS, orders);
+        _set(KEYS.POS_SALES, pos); _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata);
+      } else {
+        const uid = user.id;
+        const [users, cats, locs, ownProds, pubProds, stock, ordBuy, ordSell, pos, recipes, khata] = await Promise.all([
+          Firebase.list('users'),
+          Firebase.list('categories'),
+          Firebase.listByOwner('locations', uid),
+          Firebase.listByOwner('products', uid),
+          Firebase.listWhere('products', 'isPublished', '==', true),
+          Firebase.listByOwner('stock', uid),
+          Firebase.listWhere('orders', 'buyerId', '==', uid),
+          Firebase.listWhere('orders', 'sellerId', '==', uid),
+          Firebase.listByOwner('pos_sales', uid),
+          Firebase.listByOwner('recipes', uid),
+          Firebase.listByOwner('khata', uid),
+        ]);
+        // Shield regular users from seeded test data (demo shops + their catalog).
+        const prodMap = {}; ownProds.concat(pubProds.filter(p => !p.isDemo)).forEach(p => { prodMap[p.id] = p; });
+        const ordMap = {}; ordBuy.concat(ordSell).forEach(o => { ordMap[o.id] = o; });
+        const realUsers = users.filter(u => !u.isDemo || u.id === uid);
+        _set(KEYS.USERS, realUsers); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
+        _set(KEYS.PRODUCTS, Object.values(prodMap)); _set(KEYS.STOCK, stock);
+        _set(KEYS.ORDERS, Object.values(ordMap)); _set(KEYS.POS_SALES, pos);
+        _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata);
+      }
+      _recomputeSequences();
+    } catch (e) {
+      console.error('[sync] hydration failed:', e && e.message);
+    }
+  }
+
+  function _clearLocalData() {
+    [KEYS.CATEGORIES, KEYS.LOCATIONS, KEYS.PRODUCTS, KEYS.STOCK, KEYS.ORDERS,
+     KEYS.POS_SALES, KEYS.RECIPES, KEYS.KHATA, KEYS.USERS, KEYS.CART].forEach(k => localStorage.removeItem(k));
+  }
+
   // ========== Seed Demo Data ==========
   function _clearAll() {
     Object.values(KEYS).forEach(k => localStorage.removeItem(k));
+  }
+
+  // Push the demo dataset to Firestore once (super-admin only). Builds the demo
+  // data locally (which sync() will overwrite right after) and batch-writes it.
+  async function seedCloudIfNeeded() {
+    if (!_cloudOn()) return;
+    let meta = null;
+    try { meta = await Firebase.getDoc('meta', 'seed'); } catch (e) { meta = null; }
+    if (meta && meta.version === SEED_VERSION) return;
+    _set(KEYS.SEED_VER, null);
+    seedDemoData();
+    const locOwner = {}; getLocations().forEach(l => { locOwner[l.id] = l.ownerId; });
+    // Tag every seeded doc with isDemo so regular users can be shielded from test data.
+    const demo = (arr) => (arr || []).map(x => ({ ...x, isDemo: true }));
+    const stock = getStock().map(s => ({ ...s, ownerId: s.ownerId || locOwner[s.locationId] || null, isDemo: true }));
+    const users = getUsers().map(u => { const { password, ...rest } = u; return { ...rest, isDemo: true }; });
+    await Firebase.saveMany('categories', getCategories()); // categories are a shared global catalog
+    await Firebase.saveMany('users', users);
+    await Firebase.saveMany('locations', demo(getLocations()));
+    await Firebase.saveMany('products', demo(getProducts()));
+    await Firebase.saveMany('stock', stock);
+    await Firebase.saveMany('orders', demo(getOrders()));
+    await Firebase.saveMany('recipes', demo(_get(KEYS.RECIPES) || []));
+    await Firebase.saveMany('khata', demo(_get(KEYS.KHATA) || []));
+    await Firebase.saveMany('pos_sales', demo(_get(KEYS.POS_SALES) || []));
+    try { await Firebase.getDb().collection('meta').doc('seed').set({ version: SEED_VERSION, seededAt: new Date().toISOString() }); } catch (e) { /* ignore */ }
   }
 
   function seedDemoData() {
@@ -563,7 +713,7 @@ const Store = (() => {
 
   return {
     generateId,
-    getUsers, addUser, findUserByEmail, getUserById,
+    getUsers, addUser, upsertUserLocal, findUserByEmail, getUserById,
     getCurrentUser, setCurrentUser, clearCurrentUser,
     getCategories, addCategory, updateCategory, deleteCategory, getCategoryById,
     getLocations, getLocationsByOwner, getLocationById, addLocation, updateLocation, deleteLocation, getDefaultLocation,
@@ -575,6 +725,6 @@ const Store = (() => {
     getKhataEntries, getKhataByParty, addKhataEntry, getKhataBalance, getKhataParties,
     getRevenueData,
     getCart, setCart, clearCart, addToCart, updateCartItemQty, getCartItemCount,
-    seedDemoData,
+    seedDemoData, seedCloudIfNeeded, sync, _clearLocalData,
   };
 })();

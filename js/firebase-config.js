@@ -29,6 +29,9 @@ const FIREBASE_CONFIG = {
   appId: "1:112471709088:web:7612735ad1804a235300c5"
 };
 
+// The single super-admin account (god view + test-data tooling).
+const SUPER_ADMIN_EMAIL = 'yashtodkar2@gmail.com';
+
 const Firebase = (() => {
   let app = null, auth = null, db = null, enabled = false;
 
@@ -51,6 +54,10 @@ const Firebase = (() => {
       app = firebase.apps && firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
       auth = firebase.auth();
       db = firebase.firestore();
+      // Offline persistence keeps the app usable on flaky mobile connections.
+      try {
+        db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+      } catch (e) { /* not supported in this browser — ignore */ }
       enabled = true;
       console.info('[Firebase] Initialized for project:', FIREBASE_CONFIG.projectId);
     } catch (e) {
@@ -64,36 +71,68 @@ const Firebase = (() => {
   function getAuth() { return auth; }
   function getDb() { return db; }
 
-  /* ----------------------------------------------------------
-     Example Firestore helpers (wire these into store.js/auth.js
-     when you're ready to sync data to the cloud). All collections
-     are expected to be owner-scoped via an `ownerId` field that
-     equals the signed-in user's uid (see firestore.rules).
-     ---------------------------------------------------------- */
+  /* ---------------- Auth helpers (email/password) ---------------- */
+  function signIn(email, password) { return auth.signInWithEmailAndPassword(email, password); }
+  function signUp(email, password) { return auth.createUserWithEmailAndPassword(email, password); }
+  function signOut() { return auth.signOut(); }
+  function currentUser() { return auth ? auth.currentUser : null; }
+  function onAuth(cb) { return auth ? auth.onAuthStateChanged(cb) : (cb(null), function () {}); }
 
-  // Upsert a document:  await Firebase.save('products', product)
+  /* ---------------- Firestore helpers ---------------- */
+
+  // Upsert a single document.  await Firebase.save('products', product)
   function save(collection, doc) {
-    if (!enabled) return Promise.resolve(null);
+    if (!enabled || !doc) return Promise.resolve(null);
     const id = doc.id || db.collection(collection).doc().id;
     return db.collection(collection).doc(id).set({ ...doc, id }, { merge: true }).then(() => id);
   }
 
-  // Read all docs owned by a user:  await Firebase.listByOwner('products', uid)
-  function listByOwner(collection, ownerId) {
+  // Upsert many documents in batches (Firestore caps a batch at 500 writes).
+  function saveMany(collection, docs) {
+    if (!enabled || !docs || !docs.length) return Promise.resolve();
+    const chunks = [];
+    for (let i = 0; i < docs.length; i += 450) chunks.push(docs.slice(i, i + 450));
+    return chunks.reduce((p, chunk) => p.then(() => {
+      const batch = db.batch();
+      chunk.forEach(d => {
+        const id = d.id || db.collection(collection).doc().id;
+        batch.set(db.collection(collection).doc(id), { ...d, id }, { merge: true });
+      });
+      return batch.commit();
+    }), Promise.resolve());
+  }
+
+  function list(collection) {
     if (!enabled) return Promise.resolve([]);
-    return db.collection(collection).where('ownerId', '==', ownerId).get()
-      .then(snap => snap.docs.map(d => d.data()));
+    return db.collection(collection).get().then(snap => snap.docs.map(d => d.data()));
+  }
+
+  function listWhere(collection, field, op, value) {
+    if (!enabled) return Promise.resolve([]);
+    return db.collection(collection).where(field, op, value).get().then(snap => snap.docs.map(d => d.data()));
+  }
+
+  function listByOwner(collection, ownerId) { return listWhere(collection, 'ownerId', '==', ownerId); }
+
+  function getDoc(collection, id) {
+    if (!enabled) return Promise.resolve(null);
+    return db.collection(collection).doc(id).get().then(d => d.exists ? d.data() : null);
   }
 
   function remove(collection, id) {
-    if (!enabled) return Promise.resolve();
+    if (!enabled || !id) return Promise.resolve();
     return db.collection(collection).doc(id).delete();
   }
 
-  return { init, isEnabled, getAuth, getDb, save, listByOwner, remove, config: FIREBASE_CONFIG };
+  return {
+    init, isEnabled, getAuth, getDb, config: FIREBASE_CONFIG,
+    signIn, signUp, signOut, currentUser, onAuth,
+    save, saveMany, list, listWhere, listByOwner, getDoc, remove,
+  };
 })();
 
 if (typeof window !== 'undefined') {
   window.Firebase = Firebase;
+  window.SUPER_ADMIN_EMAIL = SUPER_ADMIN_EMAIL;
   Firebase.init();
 }

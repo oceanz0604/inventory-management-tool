@@ -1,88 +1,111 @@
 const Auth = (() => {
-  function _hashPassword(password) {
-    let hash = 0;
-    for (let i = 0; i < password.length; i++) {
-      const char = password.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash;
-    }
-    return 'h_' + Math.abs(hash).toString(36);
-  }
+  const SUPER = (typeof window !== 'undefined' && window.SUPER_ADMIN_EMAIL ? window.SUPER_ADMIN_EMAIL : 'yashtodkar2@gmail.com').toLowerCase();
+  let _pendingName = null; // carries the signup display name into ensureSession()
 
-  function signup(name, email, password) {
-    if (Store.findUserByEmail(email)) {
-      return { success: false, message: 'An account with this email already exists.' };
-    }
-    const user = {
-      id: Store.generateId(),
-      name: name.trim(),
-      email: email.trim().toLowerCase(),
-      password: _hashPassword(password),
-      shopName: name.trim(),
-      createdAt: new Date().toISOString(),
-    };
-    Store.addUser(user);
-
-    const defaultLoc = {
-      id: Store.generateId(),
-      ownerId: user.id,
-      name: 'Main Warehouse',
-      address: '',
-      isDefault: true,
-    };
-    Store.addLocation(defaultLoc);
-
-    const { password: _, ...safeUser } = user;
-    Store.setCurrentUser(safeUser);
-    Store.seedDemoData();
-    return { success: true, user: safeUser };
-  }
-
-  function login(email, password) {
-    const user = Store.findUserByEmail(email);
-    if (!user || user.password !== _hashPassword(password)) {
-      return { success: false, message: 'Invalid email or password.' };
-    }
-    const { password: _, ...safeUser } = user;
-    Store.setCurrentUser(safeUser);
-    return { success: true, user: safeUser };
-  }
-
-  function demoLogin(userId) {
-    Store.seedDemoData();
-    const targetId = userId || 'user_a';
-    const user = Store.getUserById(targetId);
-    if (!user) return { success: false, message: 'Demo user not found.' };
-    const { password: _, ...safeUser } = user;
-    Store.setCurrentUser(safeUser);
-    return { success: true, user: safeUser };
-  }
-
-  function switchUser(userId) {
-    const user = Store.getUserById(userId);
-    if (!user) return { success: false, message: 'User not found.' };
-    Store.clearCart();
-    const { password: _, ...safeUser } = user;
-    Store.setCurrentUser(safeUser);
-    return { success: true, user: safeUser };
-  }
-
-  function logout() {
-    Store.clearCurrentUser();
-    Store.clearCart();
-  }
-
-  function isAuthenticated() {
-    return Store.getCurrentUser() !== null;
-  }
-
-  function getUser() {
-    return Store.getCurrentUser();
-  }
+  function _useCloud() { return typeof window !== 'undefined' && window.Firebase && Firebase.isEnabled(); }
+  function _roleFor(email) { return email && email.toLowerCase() === SUPER ? 'superadmin' : 'user'; }
 
   function getInitials(name) {
-    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    return (name || 'U').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
   }
 
-  return { signup, login, demoLogin, switchUser, logout, isAuthenticated, getUser, getInitials };
+  // Make sure a Firestore profile exists for the signed-in Firebase user.
+  async function _ensureProfile(fbUser, nameHint) {
+    const uid = fbUser.uid;
+    const email = (fbUser.email || '').toLowerCase();
+    const role = _roleFor(email);
+    const isAdmin = role === 'superadmin';
+    let profile = null;
+    try { profile = await Firebase.getDoc('users', uid); } catch (e) { profile = null; }
+
+    if (!profile) {
+      const fallbackName = isAdmin ? 'admin' : (nameHint || fbUser.displayName || (email.split('@')[0]) || 'My Shop');
+      profile = {
+        id: uid,
+        name: fallbackName,
+        email: email,
+        shopName: fallbackName,
+        role: role,
+        createdAt: new Date().toISOString(),
+      };
+      try { await Firebase.save('users', profile); } catch (e) { /* ignore */ }
+      // Give a brand-new normal user a default location to work with.
+      if (!isAdmin) {
+        try {
+          const existing = await Firebase.listByOwner('locations', uid);
+          if (!existing || existing.length === 0) {
+            await Firebase.save('locations', { id: Store.generateId(), ownerId: uid, name: 'Main Warehouse', address: '', isDefault: true });
+          }
+        } catch (e) { /* ignore */ }
+      }
+    } else if (profile.role !== role) {
+      // Keep role aligned with the configured super-admin email.
+      profile.role = role;
+      try { await Firebase.save('users', profile); } catch (e) { /* ignore */ }
+    }
+    return profile;
+  }
+
+  // Build the local session from the currently signed-in Firebase user.
+  async function ensureSession() {
+    if (!_useCloud()) return null;
+    const fb = Firebase.currentUser();
+    if (!fb) return null;
+    const profile = await _ensureProfile(fb, _pendingName);
+    _pendingName = null;
+    Store.setCurrentUser(profile);
+    return profile;
+  }
+
+  async function login(email, password) {
+    if (!_useCloud()) return { success: false, message: 'Backend unavailable. Check your connection and try again.' };
+    try {
+      await Firebase.signIn((email || '').trim(), password);
+      return { success: true };
+    } catch (e) { return { success: false, message: _friendly(e) }; }
+  }
+
+  async function signup(name, email, password) {
+    if (!_useCloud()) return { success: false, message: 'Backend unavailable. Check your connection and try again.' };
+    try {
+      _pendingName = (name || '').trim();
+      await Firebase.signUp((email || '').trim(), password);
+      return { success: true };
+    } catch (e) { _pendingName = null; return { success: false, message: _friendly(e) }; }
+  }
+
+  async function logout() {
+    try { if (_useCloud()) await Firebase.signOut(); } catch (e) { /* ignore */ }
+    Store.clearCurrentUser();
+    Store.clearCart();
+    Store._clearLocalData();
+  }
+
+  function isAuthenticated() { return Store.getCurrentUser() !== null; }
+  function getUser() { return Store.getCurrentUser(); }
+  function isSuperAdmin() { const u = getUser(); return !!u && u.role === 'superadmin'; }
+
+  // God-view: super admin "acts as" another owner. Local only — no re-auth.
+  // All of that owner's data is already in the local cache (admin loads everything).
+  function switchUser(userId) {
+    const u = Store.getUserById(userId);
+    if (!u) return { success: false, message: 'User not found.' };
+    Store.clearCart();
+    Store.setCurrentUser(u);
+    return { success: true, user: u };
+  }
+  function demoLogin(userId) { return switchUser(userId || 'user_a'); }
+
+  function _friendly(e) {
+    const c = (e && e.code) || '';
+    if (/wrong-password|user-not-found|invalid-credential|invalid-login/.test(c)) return 'Invalid email or password.';
+    if (/email-already-in-use/.test(c)) return 'An account with this email already exists.';
+    if (/weak-password/.test(c)) return 'Password should be at least 6 characters.';
+    if (/invalid-email/.test(c)) return 'Please enter a valid email address.';
+    if (/too-many-requests/.test(c)) return 'Too many attempts. Please try again later.';
+    if (/network-request-failed/.test(c)) return 'Network error. Check your connection.';
+    return (e && e.message) || 'Authentication failed.';
+  }
+
+  return { ensureSession, login, signup, logout, demoLogin, switchUser, isAuthenticated, getUser, getInitials, isSuperAdmin };
 })();
