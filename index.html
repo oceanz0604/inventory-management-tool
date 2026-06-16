@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <meta name="theme-color" content="#0d9488" media="(prefers-color-scheme: light)">
-  <meta name="theme-color" content="#060f13" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f5f6f8" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0c0f" media="(prefers-color-scheme: dark)">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -181,24 +181,56 @@
 
     <!-- ===== Dashboard View ===== -->
     <section id="view-dashboard" class="view active">
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-box"></i></div>
-          <div class="stat-info"><span class="stat-value" id="stat-total-products">0</span><span class="stat-label">Products</span></div></div>
-        <div class="stat-card"><div class="stat-icon green"><i class="fas fa-cubes"></i></div>
-          <div class="stat-info"><span class="stat-value" id="stat-total-stock">0</span><span class="stat-label">Total Stock</span></div></div>
-        <div class="stat-card"><div class="stat-icon purple"><i class="fas fa-file-invoice-dollar"></i></div>
-          <div class="stat-info"><span class="stat-value" id="stat-pending-orders">0</span><span class="stat-label">Pending Orders</span></div></div>
-        <div class="stat-card"><div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
-          <div class="stat-info"><span class="stat-value" id="stat-low-stock">0</span><span class="stat-label">Low Stock</span></div></div>
+      <div class="dash-hero">
+        <div class="dash-hero-text">
+          <span class="dash-hero-eyebrow"><i class="fas fa-bolt"></i> <span id="dash-date"></span></span>
+          <h2 id="dash-greeting">Welcome back</h2>
+          <p id="dash-subtitle">Here's a quick look at your business today.</p>
+        </div>
+        <div class="dash-quick" id="dash-quick"></div>
       </div>
+
+      <div class="stats-grid" id="dash-stats">
+        <button class="stat-card" data-go="products"><div class="stat-icon blue"><i class="fas fa-box"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-total-products">0</span><span class="stat-label">Products</span></div>
+          <i class="fas fa-chevron-right stat-go"></i></button>
+        <button class="stat-card" data-go="inventory"><div class="stat-icon amber"><i class="fas fa-sack-dollar"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-stock-value">₹0</span><span class="stat-label">Stock Value</span></div>
+          <i class="fas fa-chevron-right stat-go"></i></button>
+        <button class="stat-card" data-go="pos"><div class="stat-icon green"><i class="fas fa-indian-rupee-sign"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-sales-today">₹0</span><span class="stat-label" id="stat-sales-today-sub">Sales today</span></div>
+          <i class="fas fa-chevron-right stat-go"></i></button>
+        <button class="stat-card" data-go="orders"><div class="stat-icon purple"><i class="fas fa-file-invoice-dollar"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-pending-orders">0</span><span class="stat-label">Pending Orders</span></div>
+          <i class="fas fa-chevron-right stat-go"></i></button>
+        <button class="stat-card" data-go="inventory"><div class="stat-icon cyan"><i class="fas fa-cubes"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-total-stock">0</span><span class="stat-label">Units in Stock</span></div>
+          <i class="fas fa-chevron-right stat-go"></i></button>
+        <button class="stat-card" data-go="inventory"><div class="stat-icon red"><i class="fas fa-triangle-exclamation"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-low-stock">0</span><span class="stat-label">Low Stock</span></div>
+          <i class="fas fa-chevron-right stat-go"></i></button>
+      </div>
+
       <div class="charts-grid">
+        <div class="card"><div class="card-header"><h3>Revenue · last 7 days</h3><span class="card-tag" id="rev-7d-total">₹0</span></div>
+          <div class="card-body chart-container"><canvas id="chart-revenue"></canvas></div></div>
         <div class="card"><div class="card-header"><h3>Stock by Location</h3></div>
           <div class="card-body chart-container"><canvas id="chart-location"></canvas></div></div>
-        <div class="card"><div class="card-header"><h3>Inventory Value by Category</h3></div>
-          <div class="card-body chart-container"><canvas id="chart-value"></canvas></div></div>
       </div>
+
+      <div class="dash-cols">
+        <div class="card">
+          <div class="card-header"><h3>Top Products by Value</h3></div>
+          <div class="card-body" id="dash-top-products"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Recent Activity</h3></div>
+          <div class="card-body" id="dash-activity"></div>
+        </div>
+      </div>
+
       <div class="card">
-        <div class="card-header"><h3>Low Stock Items</h3></div>
+        <div class="card-header"><h3>Low Stock Items</h3><button class="btn btn-secondary btn-sm" data-go="inventory" id="dash-restock-btn"><i class="fas fa-arrow-right-long"></i> Manage stock</button></div>
         <div class="card-body">
           <div class="table-wrap">
             <table class="data-table"><thead><tr>
