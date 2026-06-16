@@ -21,6 +21,7 @@ const Auth = (() => {
     let company = null;
     try { company = await Firebase.findCompanyByCode(c); } catch (e) { company = null; }
     if (!company) return { success: false, message: 'No company found for that code.' };
+    if (company.status === 'suspended') return { success: false, message: 'This company account is suspended. Please contact support.' };
     try { localStorage.setItem('ims_chosen_company', JSON.stringify({ id: company.id, code: company.code, name: company.name })); } catch (e) { /* ignore */ }
     return { success: true, company };
   }

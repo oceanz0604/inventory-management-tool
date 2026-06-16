@@ -7,48 +7,40 @@
   <title>झटपट — Admin Console</title>
   <link rel="icon" href="icons/icon.svg">
   <link rel="stylesheet" href="css/style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Tiro+Devanagari+Marathi:ital@0;1&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Tiro+Devanagari+Marathi:ital@0;1&display=swap" rel="stylesheet">
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
     .admin-body { min-height:100vh; background:var(--bg); color:var(--text); }
-    .admin-topbar { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.5rem; background:var(--bg-card); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:10; padding-top:calc(1rem + env(safe-area-inset-top)); }
-    .admin-brand { display:flex; align-items:center; gap:.6rem; font-weight:700; }
-    .admin-brand .logo { width:34px; height:34px; border-radius:10px; display:grid; place-items:center; background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#2a1c04; }
-    .admin-brand .tag { font-size:.65rem; text-transform:uppercase; letter-spacing:.1em; color:var(--text-light); }
-    .admin-wrap { max-width:1100px; margin:0 auto; padding:1.5rem; }
-    .admin-stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:1rem; margin-bottom:1.5rem; }
-    .admin-stat { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; padding:1.1rem 1.25rem; }
-    .admin-stat .n { font-size:1.9rem; font-weight:700; }
-    .admin-stat .l { color:var(--text-light); font-size:.8rem; text-transform:uppercase; letter-spacing:.05em; }
-    .admin-stat .i { float:right; font-size:1.1rem; color:var(--primary); opacity:.8; }
-    .admin-card { background:var(--bg-card); border:1px solid var(--border); border-radius:16px; overflow:hidden; }
-    .admin-card-head { display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid var(--border); gap:.5rem; flex-wrap:wrap; }
-    .admin-card-head h2 { font-size:1.05rem; }
-    .admin-table { width:100%; border-collapse:collapse; }
-    .admin-table th, .admin-table td { text-align:left; padding:.8rem 1.25rem; border-bottom:1px solid var(--border); font-size:.88rem; white-space:nowrap; }
-    .admin-table th { color:var(--text-light); font-weight:600; font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; }
-    .admin-table tr:last-child td { border-bottom:none; }
-    .code-chip { font-family:monospace; background:var(--primary-soft); color:var(--primary); padding:.15rem .5rem; border-radius:7px; font-size:.82rem; }
     .admin-login-screen { min-height:100vh; display:grid; place-items:center; padding:1.5rem; background:radial-gradient(120% 90% at 50% 0%,#1c1606,#0b0c0f 70%); }
     .admin-login-card { width:100%; max-width:380px; background:rgba(255,255,255,.06); backdrop-filter:blur(20px); border:1px solid rgba(255,255,255,.12); border-radius:20px; padding:2rem; }
     .admin-login-card .auth-logo { width:52px; height:52px; border-radius:14px; display:grid; place-items:center; font-size:1.4rem; background:linear-gradient(135deg,#fbbf24,#f59e0b); color:#2a1c04; margin:0 auto 1rem; }
     .admin-login-card h1 { text-align:center; color:#fff; font-size:1.3rem; margin-bottom:.25rem; }
     .admin-login-card p.sub { text-align:center; color:rgba(255,255,255,.6); font-size:.85rem; margin-bottom:1.5rem; }
-    .empty-row td { text-align:center; color:var(--text-light); padding:2rem; white-space:normal; }
 
-    /* Mobile: turn each wide table row into a stacked card (no horizontal scroll). */
-    @media (max-width:640px) {
-      .admin-wrap { padding:1rem; }
+    .admin-table { width:100%; }
+    .admin-table td .code-chip { font-family:monospace; background:var(--primary-soft); color:var(--primary); padding:.15rem .5rem; border-radius:7px; font-size:.82rem; }
+    .admin-empty-row td { text-align:center; color:var(--text-light); padding:2.5rem 1rem; }
+    .mini-stat { display:flex; flex-direction:column; gap:.15rem; }
+    .mini-stat .n { font-size:1.3rem; font-weight:800; letter-spacing:-.02em; }
+    .mini-stat .l { font-size:.72rem; color:var(--text-secondary); text-transform:uppercase; letter-spacing:.05em; }
+    .detail-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:1rem; margin-bottom:1.25rem; }
+    .detail-grid .card { padding:.9rem 1rem; }
+
+    /* Mobile: turn the wide companies table into stacked cards (no h-scroll). */
+    @media (max-width:760px) {
+      .admin-table { min-width:0; }
       .admin-table thead { position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); }
       .admin-table, .admin-table tbody, .admin-table tr, .admin-table td { display:block; width:100%; }
-      .admin-table tr { border:1px solid var(--border); border-radius:14px; margin:.7rem 1rem; padding:.35rem 0; background:var(--bg); }
+      .admin-table tr { border:1px solid var(--border); border-radius:14px; margin:.7rem; padding:.35rem 0; background:var(--bg-2); }
       .admin-table td { display:flex; align-items:center; justify-content:space-between; gap:1rem; border:none; padding:.55rem 1rem; white-space:normal; text-align:right; }
-      .admin-table td::before { content:attr(data-label); color:var(--text-light); font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; font-weight:600; flex:0 0 auto; }
-      .admin-table td strong { text-align:right; }
-      .admin-table tr.empty-row { display:block; }
-      .admin-table tr.empty-row td { justify-content:center; }
-      .admin-table tr.empty-row td::before { content:none; }
+      .admin-table td::before { content:attr(data-label); color:var(--text-light); font-size:.72rem; text-transform:uppercase; letter-spacing:.05em; font-weight:700; flex:0 0 auto; }
+      .admin-table tr.admin-empty-row { display:block; }
+      .admin-table tr.admin-empty-row td { justify-content:center; }
+      .admin-table tr.admin-empty-row td::before { content:none; }
+      .detail-grid { grid-template-columns:1fr 1fr; }
     }
+    @media (max-width:480px) { .hide-xs { display:none; } }
   </style>
 </head>
 <body class="admin-body">
@@ -77,91 +69,180 @@
     </form>
   </div>
 
-  <!-- ===== Admin dashboard ===== -->
-  <div id="admin-app" class="hidden">
-    <div class="admin-topbar">
-      <div class="admin-brand">
-        <span class="logo"><i class="fas fa-bolt"></i></span>
-        <div><div>झटपट</div><div class="tag">Admin Console</div></div>
-      </div>
-      <div style="display:flex; align-items:center; gap:.75rem;">
-        <span id="admin-who" style="color:var(--text-light); font-size:.85rem;"></span>
-        <button id="admin-logout" class="btn btn-secondary btn-sm"><i class="fas fa-right-from-bracket"></i> Sign out</button>
-      </div>
-    </div>
-
-    <div class="admin-wrap">
-      <div class="admin-stats" id="admin-stats"></div>
-
-      <div class="admin-card" style="margin-bottom:1.5rem;">
-        <div class="admin-card-head">
-          <h2>Client User Guides</h2>
+  <!-- ===== Admin app shell ===== -->
+  <div id="admin-app" class="app-layout hidden">
+    <aside class="sidebar" id="admin-sidebar">
+      <div class="sidebar-brand"><i class="fas fa-bolt"></i> <span>झटपट</span></div>
+      <div class="sidebar-section-label">Admin Console</div>
+      <nav class="sidebar-nav">
+        <a class="nav-item active" data-view="overview"><i class="fas fa-chart-pie"></i> Overview</a>
+        <a class="nav-item" data-view="customers"><i class="fas fa-building"></i> Customers</a>
+        <a class="nav-item" data-view="guides"><i class="fas fa-book-open"></i> User Guides</a>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="user-info">
+          <div class="user-avatar" id="admin-avatar"><i class="fas fa-shield-halved"></i></div>
+          <div class="user-details"><span class="user-name">Super Admin</span><span class="user-email" id="admin-who"></span></div>
         </div>
-        <div style="padding:1.1rem 1.25rem;">
-          <p style="color:var(--text-light); font-size:.9rem; margin:0 0 1rem;">Share these guides with your clients so they can learn how to use the app. Open to read, or use the in-page button to print / save as PDF.</p>
-          <div style="display:flex; gap:.6rem; flex-wrap:wrap;">
-            <a class="btn btn-primary btn-sm" href="guide-en.html" target="_blank" rel="noopener"><i class="fas fa-book-open"></i> Guide (English)</a>
-            <a class="btn btn-primary btn-sm" href="guide-mr.html" target="_blank" rel="noopener"><i class="fas fa-book-open"></i> मार्गदर्शक (मराठी)</a>
-            <a class="btn btn-secondary btn-sm" href="guide-en.html?print=1" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Print EN</a>
-            <a class="btn btn-secondary btn-sm" href="guide-mr.html?print=1" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Print MR</a>
+        <div class="sidebar-footer-actions">
+          <button class="btn-icon" id="admin-theme" title="Toggle theme"><i class="fas fa-moon"></i></button>
+          <button class="btn-icon" id="admin-logout" title="Sign out"><i class="fas fa-right-from-bracket"></i></button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div class="topbar-title"><h2 id="admin-title">Overview</h2></div>
+        <div class="topbar-actions">
+          <button class="btn-icon" id="admin-refresh" title="Refresh"><i class="fas fa-rotate"></i></button>
+          <button class="btn btn-primary btn-sm" id="admin-add"><i class="fas fa-plus"></i> <span class="hide-xs">Add customer</span></button>
+        </div>
+      </header>
+
+      <!-- Overview -->
+      <section id="av-overview" class="view active">
+        <div class="stats-grid" id="admin-stats"></div>
+        <div class="charts-grid">
+          <div class="card"><div class="card-header"><h3>New customers · last 6 months</h3></div>
+            <div class="card-body chart-container"><canvas id="ac-growth"></canvas></div></div>
+          <div class="card"><div class="card-header"><h3>Orders by status</h3></div>
+            <div class="card-body chart-container"><canvas id="ac-orders"></canvas></div></div>
+        </div>
+        <div class="charts-grid">
+          <div class="card"><div class="card-header"><h3>Products by type</h3></div>
+            <div class="card-body chart-container"><canvas id="ac-types"></canvas></div></div>
+          <div class="card"><div class="card-header"><h3>Top customers by products</h3></div>
+            <div class="card-body chart-container"><canvas id="ac-top"></canvas></div></div>
+        </div>
+      </section>
+
+      <!-- Customers -->
+      <section id="av-customers" class="view hidden">
+        <div class="card">
+          <div class="card-header">
+            <h3>Customers (Companies)</h3>
+            <div class="search-bar" style="max-width:280px;"><i class="fas fa-search"></i>
+              <input type="search" id="cust-search" placeholder="Search companies / code..."></div>
+          </div>
+          <div class="card-body" style="padding:0;">
+            <div class="table-wrap">
+              <table class="data-table admin-table">
+                <thead><tr>
+                  <th>Company</th><th>Code</th><th>Owner</th><th>Team</th><th>Products</th><th>Orders</th><th>Status</th><th>Created</th><th style="text-align:right;">Actions</th>
+                </tr></thead>
+                <tbody id="admin-companies"></tbody>
+              </table>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <div class="admin-card">
-        <div class="admin-card-head">
-          <h2>Customers (Companies)</h2>
-          <div style="display:flex; gap:.5rem;">
-            <button id="admin-add" class="btn btn-primary btn-sm"><i class="fas fa-plus"></i> Add customer</button>
+      <!-- Guides -->
+      <section id="av-guides" class="view hidden">
+        <div class="card">
+          <div class="card-header"><h3>Client User Guides</h3></div>
+          <div class="card-body">
+            <p style="color:var(--text-secondary); font-size:.9rem; margin:0 0 1rem;">Share these with your clients. Open to read, or use Print to save as PDF.</p>
+            <div style="display:flex; gap:.6rem; flex-wrap:wrap;">
+              <a class="btn btn-primary btn-sm" href="guide-en.html" target="_blank" rel="noopener"><i class="fas fa-book-open"></i> Guide (English)</a>
+              <a class="btn btn-primary btn-sm" href="guide-mr.html" target="_blank" rel="noopener"><i class="fas fa-book-open"></i> मार्गदर्शक (मराठी)</a>
+              <a class="btn btn-secondary btn-sm" href="guide-en.html?print=1" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Print EN</a>
+              <a class="btn btn-secondary btn-sm" href="guide-mr.html?print=1" target="_blank" rel="noopener"><i class="fas fa-file-pdf"></i> Print MR</a>
+            </div>
           </div>
         </div>
-        <div style="overflow-x:auto;">
-          <table class="admin-table">
-            <thead><tr><th>Company</th><th>Code</th><th>Owner login</th><th>Team</th><th>Products</th><th>Created</th></tr></thead>
-            <tbody id="admin-companies"></tbody>
-          </table>
-        </div>
-      </div>
-    </div>
+      </section>
+    </main>
+
+    <nav class="bottom-nav" id="admin-bottom-nav">
+      <button class="bnav-item active" data-view="overview"><i class="fas fa-chart-pie"></i><span>Overview</span></button>
+      <button class="bnav-item" data-view="customers"><i class="fas fa-building"></i><span>Customers</span></button>
+      <button class="bnav-item" data-view="guides"><i class="fas fa-book-open"></i><span>Guides</span></button>
+    </nav>
   </div>
 
-  <!-- ===== Add customer modal ===== -->
-  <div id="add-customer-modal" class="modal hidden">
-    <div class="modal-overlay" data-close-modal></div>
-    <div class="modal-content" style="max-width:460px;">
+  <!-- ===== Add / Edit customer modal ===== -->
+  <div id="customer-modal" class="modal hidden">
+    <div class="modal-overlay" data-close="customer-modal"></div>
+    <div class="modal-content modal-sm">
       <div class="modal-header">
-        <h2>Add new customer</h2>
-        <button class="modal-close" data-close-modal>&times;</button>
+        <h2 id="customer-modal-title">Add new customer</h2>
+        <button class="modal-close" data-close="customer-modal">&times;</button>
       </div>
-      <form id="add-customer-form" class="modal-body">
+      <form id="customer-form" class="modal-body">
+        <input type="hidden" id="cust-id">
         <div class="form-group">
           <label for="cust-company">Company name</label>
           <input type="text" id="cust-company" placeholder="Roma Store" required>
         </div>
         <div class="form-group">
-          <label for="cust-code">Company code <span style="color:var(--text-muted);font-weight:400;">(workers log in with this)</span></label>
+          <label for="cust-code">Company code <span style="color:var(--text-light);font-weight:400;">(workers log in with this)</span></label>
           <input type="text" id="cust-code" placeholder="romastore" autocapitalize="none" spellcheck="false" required>
           <small class="form-hint">Lowercase letters/numbers only. Must be unique.</small>
         </div>
-        <div class="form-group">
-          <label for="cust-owner">Owner name</label>
-          <input type="text" id="cust-owner" placeholder="Roma" required>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="cust-owner">Owner name</label>
+            <input type="text" id="cust-owner" placeholder="Roma" required>
+          </div>
+          <div class="form-group">
+            <label for="cust-username">Owner username</label>
+            <input type="text" id="cust-username" placeholder="roma" autocapitalize="none" spellcheck="false" required>
+          </div>
         </div>
         <div class="form-group">
-          <label for="cust-username">Owner username</label>
-          <input type="text" id="cust-username" placeholder="roma" autocapitalize="none" spellcheck="false" required>
-          <small class="form-hint">Owner signs in with the company code + this username.</small>
+          <label for="cust-password" id="cust-password-label">Owner password</label>
+          <input type="password" id="cust-password" placeholder="At least 4 characters" minlength="4">
+          <small class="form-hint" id="cust-password-hint">Owner signs in with the company code + username + this password.</small>
         </div>
-        <div class="form-group">
-          <label for="cust-password">Owner password</label>
-          <input type="password" id="cust-password" placeholder="At least 4 characters" required minlength="4">
+        <div class="form-group" id="cust-status-group" style="display:none;">
+          <label for="cust-status">Account status</label>
+          <select id="cust-status" class="select-input">
+            <option value="active">Active</option>
+            <option value="suspended">Suspended (blocks login)</option>
+          </select>
         </div>
-        <div id="add-customer-error" class="auth-error hidden" style="color:var(--danger);"></div>
+        <div id="customer-error" class="auth-error hidden" style="color:var(--danger);"></div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" data-close-modal>Cancel</button>
-          <button type="submit" class="btn btn-primary">Create customer</button>
+          <button type="button" class="btn btn-secondary" data-close="customer-modal">Cancel</button>
+          <button type="submit" class="btn btn-primary" id="customer-submit">Create customer</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- ===== Customer details modal ===== -->
+  <div id="details-modal" class="modal hidden">
+    <div class="modal-overlay" data-close="details-modal"></div>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="details-title">Customer</h2>
+        <button class="modal-close" data-close="details-modal">&times;</button>
+      </div>
+      <div class="modal-body" id="details-body"></div>
+    </div>
+  </div>
+
+  <!-- ===== Delete confirm modal ===== -->
+  <div id="delete-modal" class="modal hidden">
+    <div class="modal-overlay" data-close="delete-modal"></div>
+    <div class="modal-content modal-sm">
+      <div class="modal-header">
+        <h2>Delete customer</h2>
+        <button class="modal-close" data-close="delete-modal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p style="color:var(--text-secondary); font-size:.9rem;">This permanently removes <strong id="delete-name"></strong> and <strong>all of its data</strong> (team, products, locations, stock, batches, orders, parties, khata, sales). This cannot be undone.</p>
+        <div class="form-group" style="margin-top:1rem;">
+          <label for="delete-confirm">Type the company code <code id="delete-code-hint" style="background:var(--bg-2);padding:1px 6px;border-radius:5px;"></code> to confirm</label>
+          <input type="text" id="delete-confirm" autocapitalize="none" spellcheck="false" placeholder="company code">
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-close="delete-modal">Cancel</button>
+          <button type="button" class="btn btn-danger" id="delete-confirm-btn" disabled><i class="fas fa-trash-can"></i> Delete everything</button>
+        </div>
+      </div>
     </div>
   </div>
 
