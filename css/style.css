@@ -11,6 +11,20 @@
 * { scrollbar-width:none; -ms-overflow-style:none; }
 *::-webkit-scrollbar { width:0; height:0; display:none; }
 
+/* Boot splash — covers the screen until session state is resolved. */
+.boot-splash { position:fixed; inset:0; z-index:99999; display:grid; place-items:center;
+  background:linear-gradient(135deg,#0a0b14 0%,#171a2e 100%); color:#fff; }
+.boot-splash.hidden { display:none; }
+.boot-splash-inner { display:flex; flex-direction:column; align-items:center; gap:1rem; }
+.boot-logo { width:64px; height:64px; border-radius:18px; display:grid; place-items:center; font-size:1.8rem;
+  background:linear-gradient(135deg,#7c6cff,#5b4af0); color:#fff; box-shadow:0 12px 30px rgba(91,74,240,.45);
+  animation:bootPulse 1.4s ease-in-out infinite; }
+.boot-name { font-family:'Tiro Devanagari Marathi',serif; font-size:1.6rem; letter-spacing:.02em; }
+.boot-spinner { width:26px; height:26px; border-radius:50%; border:3px solid rgba(255,255,255,.18);
+  border-top-color:#8b7dff; animation:bootSpin .8s linear infinite; margin-top:.25rem; }
+@keyframes bootSpin { to { transform:rotate(360deg); } }
+@keyframes bootPulse { 0%,100% { transform:scale(1); } 50% { transform:scale(1.07); } }
+
 /* Disable zoom on mobile: kill double-tap-to-zoom (keeps scrolling) and
    stop iOS auto text-size inflation. Pinch-zoom is blocked via the viewport
    meta + a small gesture guard in app.js. */

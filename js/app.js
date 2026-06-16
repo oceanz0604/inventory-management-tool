@@ -51,10 +51,14 @@ const App = (() => {
 
     Auth.clearChosenCompany();
     if (_bootedUid === profile.id) return; // already inside for this user
-    try { await Store.sync(profile); } catch (e) { /* keep going with cached data */ }
-    Store.setCurrentUser(profile); // re-affirm session
     _bootedUid = profile.id;
+    // Render immediately from the local cache so returning users never see the
+    // login screen flash; refresh the data from Firestore in the background.
     _showApp();
+    try { await Store.sync(profile); } catch (e) { /* offline: cached data stays */ }
+    Store.setCurrentUser(profile); // re-affirm session
+    _navigate(currentView);        // re-render the current view with synced data
+    Shop.refreshBadges();
   }
 
   // ========== Theme ==========
@@ -80,13 +84,20 @@ const App = (() => {
   }
 
   // ========== Auth ==========
+  function _hideBootSplash() {
+    const s = document.getElementById('boot-splash');
+    if (s) s.classList.add('hidden');
+  }
+
   function _showAuth() {
+    _hideBootSplash();
     document.getElementById('auth-screen').classList.remove('hidden');
     document.getElementById('app').classList.add('hidden');
     _showCompanyStage();
   }
 
   function _showApp() {
+    _hideBootSplash();
     document.getElementById('auth-screen').classList.add('hidden');
     document.getElementById('app').classList.remove('hidden');
     _refreshUserUI();

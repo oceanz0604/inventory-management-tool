@@ -21,8 +21,19 @@
 </head>
 <body>
 
+<!-- ==================== Boot Splash ==================== -->
+<!-- Shown on load until we know whether a session exists, so returning users
+     never see the login form flash before being taken to the app. -->
+<div id="boot-splash" class="boot-splash">
+  <div class="boot-splash-inner">
+    <div class="boot-logo"><i class="fas fa-bolt"></i></div>
+    <div class="boot-name">झटपट</div>
+    <div class="boot-spinner"></div>
+  </div>
+</div>
+
 <!-- ==================== Auth Screen ==================== -->
-<div id="auth-screen" class="auth-screen">
+<div id="auth-screen" class="auth-screen hidden">
   <div class="auth-container">
     <div class="auth-brand">
       <div class="auth-logo"><i class="fas fa-bolt"></i></div>

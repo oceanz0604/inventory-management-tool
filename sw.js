@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zatpat-v14';
+const CACHE_NAME = 'zatpat-v15';
 const STATIC_URLS = [
   './',
   './index.html',
