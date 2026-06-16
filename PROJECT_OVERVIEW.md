@@ -71,7 +71,7 @@ inventory-management-tool/
 ## Entrypoints & Flow
 
 1. **Run:** Open `index.html` (client app) or `admin.html` (super-admin console). Backend is Firebase (Auth + Firestore) with a localStorage write-through cache.
-2. **Client auth (code-first):** Stage 1 asks for a **company code** (Okta-style); stage 2 collects email/password for that company. After Firebase sign-in the chosen company is verified against the profile's `companyId`. There is **no signup and no demo data** — companies are onboarded by the admin.
+2. **Client auth (code-first):** Stage 1 asks for a **company code**; stage 2 collects **username + password**, matched client-side against that company's users in Firestore (passwords are salted+hashed, never plaintext). Company users do not use Firebase Auth. There is **no signup and no demo data** — companies/logins are created by the admin.
 3. **Admin auth:** `admin.html` is a separate endpoint where the single super-admin signs in with Firebase Auth to view stats, add customers (companies + owner accounts), and clean up data.
 4. **App init:** `app.js` initializes all modules and routes to a role-appropriate default view. Theme (light/dark) is stored in `ims_theme`. Super-admin sessions are redirected from the client app to `admin.html`.
 

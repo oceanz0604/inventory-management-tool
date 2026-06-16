@@ -7,6 +7,10 @@
 /* ========== Reset & Base ========== */
 *,*::before,*::after { margin:0; padding:0; box-sizing:border-box; }
 
+/* Hide scrollbars everywhere (scrolling still works) — keeps the UI clean. */
+* { scrollbar-width:none; -ms-overflow-style:none; }
+*::-webkit-scrollbar { width:0; height:0; display:none; }
+
 /* Disable zoom on mobile: kill double-tap-to-zoom (keeps scrolling) and
    stop iOS auto text-size inflation. Pinch-zoom is blocked via the viewport
    meta + a small gesture guard in app.js. */
@@ -244,6 +248,13 @@ input,select,textarea { font-family:inherit; font-size:.95rem; max-width:100%; b
 .auth-admin-hint { text-align:center; margin-top:1.4rem; font-size:.8rem; }
 .auth-admin-hint a { color:rgba(255,255,255,.55); }
 .auth-admin-hint a:hover { color:#fff; text-decoration:underline; }
+
+/* Bottom-bar customize options */
+.bottomnav-options { display:grid; grid-template-columns:1fr 1fr; gap:.6rem; margin-top:.5rem; }
+.bottomnav-opt { display:flex; align-items:center; gap:.6rem; padding:.7rem .8rem; border:1.5px solid var(--border); border-radius:12px; cursor:pointer; font-size:.9rem; transition:all var(--transition); }
+.bottomnav-opt:has(input:checked) { border-color:var(--primary); background:var(--primary-soft); }
+.bottomnav-opt input { accent-color:var(--primary); width:16px; height:16px; }
+.bottomnav-opt i { color:var(--primary); width:18px; text-align:center; }
 
 /* Switch-user list (shared) */
 .switch-user-list { display:flex; flex-direction:column; gap:.6rem; }

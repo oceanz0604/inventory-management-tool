@@ -68,7 +68,7 @@ const Store = (() => {
     u.push(user); _set(KEYS.USERS, u);
   }
   function removeUserLocal(id) { _set(KEYS.USERS, getUsers().filter(x => x.id !== id)); }
-  function findUserByEmail(email) { return getUsers().find(u => u.email.toLowerCase() === email.toLowerCase()); }
+  function findUserByEmail(email) { return getUsers().find(u => (u.email || '').toLowerCase() === (email || '').toLowerCase()); }
   function getUserById(id) { return getUsers().find(u => u.id === id); }
   function getCurrentUser() { return _get(KEYS.CURRENT_USER); }
   function setCurrentUser(user) { _set(KEYS.CURRENT_USER, user); }
@@ -564,6 +564,9 @@ const Store = (() => {
   // Pull the data this user is allowed to see into the local read cache.
   // Super admin gets a full god-view; normal users get their own data plus
   // the published marketplace catalog and the parties they trade with.
+  // Never keep password material in the local read cache.
+  function _stripUserSecrets(arr) { return (arr || []).map(u => { const { passwordHash, salt, ...rest } = u; return rest; }); }
+
   async function sync(user) {
     if (!_cloudOn() || !user) return;
     const isAdmin = user.role === 'superadmin';
@@ -574,7 +577,7 @@ const Store = (() => {
           Firebase.list('products'), Firebase.list('stock'), Firebase.list('orders'),
           Firebase.list('pos_sales'), Firebase.list('recipes'), Firebase.list('khata'), Firebase.list('parties'), Firebase.list('companies'),
         ]);
-        _set(KEYS.USERS, users); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
+        _set(KEYS.USERS, _stripUserSecrets(users)); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
         _set(KEYS.PRODUCTS, prods); _set(KEYS.STOCK, stock); _set(KEYS.ORDERS, orders);
         _set(KEYS.POS_SALES, pos); _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata); _set(KEYS.PARTIES, parties); _set(KEYS.COMPANIES, companies);
       } else {
@@ -596,7 +599,7 @@ const Store = (() => {
         ]);
         const prodMap = {}; ownProds.concat(pubProds).forEach(p => { prodMap[p.id] = p; });
         const ordMap = {}; ordBuy.concat(ordSell).forEach(o => { ordMap[o.id] = o; });
-        _set(KEYS.USERS, users); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
+        _set(KEYS.USERS, _stripUserSecrets(users)); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
         _set(KEYS.PRODUCTS, Object.values(prodMap)); _set(KEYS.STOCK, stock);
         _set(KEYS.ORDERS, Object.values(ordMap)); _set(KEYS.POS_SALES, pos);
         _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata); _set(KEYS.PARTIES, parties);

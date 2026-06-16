@@ -23,14 +23,24 @@ alwaysApply: false
 
 Sequence counters: `ims_order_seq`, `ims_pos_seq`, `ims_khata_seq`.
 
-## Multi-Tenancy (Companies)
+## Multi-Tenancy (Companies) + Auth
 
 Each client is a **company** (tenant). A company doc lives in the `companies`
-collection (`id == ownerId == companyId`) and carries a human-friendly `code`
-used by the Okta-style code-first login. Owners are auto-provisioned a company +
-code on first login (`Auth._ensureCompany`); the super-admin can also create
-companies via the Admin Console (`admin.html`). There is **no demo/seed data** —
-it was removed. Real data only.
+collection (`id == ownerId == companyId`) and carries a human-friendly `code`.
+
+Authentication is **company-code + username + password**, matched CLIENT-SIDE:
+- Company users (owner + office/staff/marketing) are documents in `users` with
+  `username`, `salt`, `passwordHash` (SHA-256, never plaintext), `role`,
+  `companyId`. They do NOT use Firebase Auth. `js/auth.js` resolves the company
+  by code, then verifies the password via `js/creds.js`.
+- Only the **super admin** uses Firebase Auth (admin console at `admin.html`),
+  where companies + owner logins are created/reset.
+- Because company users are unauthenticated, the app's Firestore collections are
+  open in `firestore.rules` (the login is a client-side gate). Local caches strip
+  `salt`/`passwordHash`. There is **no demo/seed data** — real data only.
+
+Optional company settings live on the company doc, e.g. `bottomNav` (array of
+view ids the owner picked for the mobile bottom bar).
 
 ## Ownership Model
 

@@ -22,7 +22,7 @@ const Team = (() => {
     const all = Auth.getWorkers();
     let workers = all;
     const search = (document.getElementById('team-search').value || '').toLowerCase().trim();
-    if (search) workers = workers.filter(w => (w.name || '').toLowerCase().includes(search) || (w.email || '').toLowerCase().includes(search));
+    if (search) workers = workers.filter(w => (w.name || '').toLowerCase().includes(search) || (w.username || '').toLowerCase().includes(search));
 
     if (all.length === 0) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
@@ -35,7 +35,7 @@ const Team = (() => {
     workers.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
     tbody.innerHTML = workers.map(w => '<tr>' +
       '<td><strong>' + _esc(w.name || '—') + '</strong></td>' +
-      '<td>' + _esc(w.email) + '</td>' +
+      '<td>@' + _esc(w.username || '') + '</td>' +
       '<td><span class="role-pill role-' + w.role + '">' + (ROLE_LABEL[w.role] || w.role) + '</span></td>' +
       '<td><div class="action-btns"><button class="btn-icon delete" title="Remove" onclick="Team.confirmDelete(\'' + w.id + '\')"><i class="fas fa-user-minus"></i></button></div></td>' +
       '</tr>').join('');
@@ -50,13 +50,13 @@ const Team = (() => {
   async function _handleSubmit(e) {
     e.preventDefault();
     const name = document.getElementById('worker-name').value.trim();
-    const email = document.getElementById('worker-email').value.trim();
+    const username = document.getElementById('worker-username').value.trim();
     const password = document.getElementById('worker-password').value;
     const role = document.getElementById('worker-role').value;
     const btn = document.getElementById('worker-submit');
     const orig = btn.textContent;
     btn.disabled = true; btn.textContent = 'Creating…';
-    const res = await Auth.createWorker(name, email, password, role);
+    const res = await Auth.createWorker(name, username, password, role);
     btn.disabled = false; btn.textContent = orig;
     if (res.success) {
       document.getElementById('worker-modal').classList.add('hidden');
@@ -70,7 +70,7 @@ const Team = (() => {
   function confirmDelete(uid) {
     const w = Store.getUserById(uid);
     if (!w) return;
-    document.getElementById('delete-message').textContent = 'Remove ' + (w.name || w.email) + ' from your team? They will lose access to the app.';
+    document.getElementById('delete-message').textContent = 'Remove ' + (w.name || w.username) + ' from your team? They will lose access to the app.';
     document.getElementById('delete-modal').classList.remove('hidden');
     const btn = document.getElementById('confirm-delete-btn');
     const clone = btn.cloneNode(true);

@@ -6,12 +6,10 @@
 const Admin = (() => {
   const SUPER = (typeof window !== 'undefined' && window.SUPER_ADMIN_EMAIL ? window.SUPER_ADMIN_EMAIL : '').toLowerCase();
   const WORKER_ROLES = ['office', 'staff', 'marketing'];
-  // Known seeded demo category ids (categories were a shared catalog, untagged).
-  const DEMO_CAT_IDS = ['cat_elec', 'cat_furn', 'cat_supp', 'cat_clth', 'cat_food', 'cat_health', 'cat_tools'];
-  const DEMO_COLLECTIONS = ['users', 'locations', 'products', 'stock', 'orders', 'recipes', 'khata', 'pos_sales'];
 
   function $(id) { return document.getElementById(id); }
   function _esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+  function _genId() { return 'co_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
   function init() {
     if (!window.Firebase || !Firebase.isEnabled()) {
@@ -22,9 +20,10 @@ const Admin = (() => {
     $('admin-login-form').addEventListener('submit', _onLogin);
     $('admin-logout').addEventListener('click', _onLogout);
     $('admin-add').addEventListener('click', _openAdd);
-    $('admin-cleanup').addEventListener('click', _cleanupDemo);
     $('add-customer-form').addEventListener('submit', _onAddCustomer);
-    document.querySelectorAll('[data-close-modal]').forEach(el => el.addEventListener('click', _closeAdd));
+    $('set-login-form').addEventListener('submit', _onSetLogin);
+    document.querySelectorAll('#add-customer-modal [data-close-modal]').forEach(el => el.addEventListener('click', _closeAdd));
+    document.querySelectorAll('#set-login-modal [data-close-modal]').forEach(el => el.addEventListener('click', () => $('set-login-modal').classList.add('hidden')));
 
     Firebase.onAuth((fb) => {
       if (fb) _afterAuth(fb);
@@ -86,7 +85,7 @@ const Admin = (() => {
     const usersById = {}; users.forEach(u => { usersById[u.id] = u; });
     const tbody = $('admin-companies');
     if (!companies.length) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No customers yet. Click “Add customer” to onboard your first company.</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No customers yet. Click “Add customer” to onboard your first company.</td></tr>';
       return;
     }
     companies.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
@@ -95,15 +94,18 @@ const Admin = (() => {
       const team = users.filter(u => u.companyId === c.id && WORKER_ROLES.indexOf(u.role) >= 0).length;
       const prods = products.filter(p => p.ownerId === c.id).length;
       const created = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—';
+      const login = owner.username ? '@' + _esc(owner.username) : '<span style="color:var(--danger)">not set</span>';
       return `<tr>
-        <td><strong>${_esc(c.name)}</strong></td>
-        <td><span class="code-chip">${_esc(c.code)}</span></td>
-        <td>${_esc(owner.email || '—')}</td>
-        <td>${team}</td>
-        <td>${prods}</td>
-        <td>${_esc(created)}</td>
+        <td data-label="Company"><strong>${_esc(c.name)}</strong></td>
+        <td data-label="Code"><span class="code-chip">${_esc(c.code)}</span></td>
+        <td data-label="Owner login">${login}</td>
+        <td data-label="Team">${team}</td>
+        <td data-label="Products">${prods}</td>
+        <td data-label="Created">${_esc(created)}</td>
+        <td data-label="Actions"><button class="btn btn-secondary btn-sm" data-setlogin="${_esc(c.id)}">Set login</button></td>
       </tr>`;
     }).join('');
+    tbody.querySelectorAll('[data-setlogin]').forEach(btn => btn.addEventListener('click', () => _openSetLogin(btn.dataset.setlogin)));
   }
 
   /* ---------------- Add customer ---------------- */
@@ -116,59 +118,85 @@ const Admin = (() => {
     const name = $('cust-company').value.trim();
     const code = $('cust-code').value.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
     const ownerName = $('cust-owner').value.trim();
-    const email = $('cust-email').value.trim().toLowerCase();
+    const username = $('cust-username').value.trim().toLowerCase();
     const password = $('cust-password').value;
 
     if (!code) { _err('add-customer-error', 'Company code must contain letters or numbers.'); return; }
+    if (!username) { _err('add-customer-error', 'Owner username is required.'); return; }
     const btn = e.target.querySelector('button[type="submit"]');
     const orig = btn.textContent; btn.disabled = true; btn.textContent = 'Creating…';
     try {
       const existing = await Firebase.findCompanyByCode(code);
       if (existing) { _err('add-customer-error', 'That company code is already taken.'); return; }
 
-      // Create the owner's Auth account without disturbing the admin session.
-      const uid = await Firebase.createAuthAccount(email, password);
-
+      // company id == owner id == companyId (consistent with the rest of the app).
+      const cid = _genId();
+      const cred = await Creds.make(password);
       const ownerProfile = {
-        id: uid, name: ownerName, email: email, shopName: name,
-        role: 'owner', companyId: uid, companyCode: code, createdAt: new Date().toISOString(),
+        id: cid, name: ownerName, username: username, shopName: name,
+        role: 'owner', companyId: cid, salt: cred.salt, passwordHash: cred.passwordHash,
+        createdAt: new Date().toISOString(),
       };
       await Firebase.save('users', ownerProfile);
-      await Firebase.save('companies', { id: uid, ownerId: uid, name: name, code: code, createdAt: new Date().toISOString() });
-      // Give the new owner a default location to start with.
-      await Firebase.save('locations', { id: 'loc_' + uid.slice(0, 8) + Date.now().toString(36), ownerId: uid, name: 'Main Warehouse', address: '', isDefault: true });
+      await Firebase.save('companies', { id: cid, ownerId: cid, name: name, code: code, createdAt: new Date().toISOString() });
+      await Firebase.save('locations', { id: 'loc_' + cid + Date.now().toString(36), ownerId: cid, name: 'Main Warehouse', address: '', isDefault: true });
 
       _closeAdd();
-      _toast('Customer "' + name + '" created (code: ' + code + ')', 'success');
+      _toast('Customer "' + name + '" created (code: ' + code + ', login: @' + username + ')', 'success');
       _loadStats();
     } catch (err) {
       _err('add-customer-error', _friendly(err));
     } finally { btn.disabled = false; btn.textContent = orig; }
   }
 
-  /* ---------------- Demo cleanup ---------------- */
-  async function _cleanupDemo() {
-    if (!confirm('Permanently delete all demo/seed data from Firestore? This cannot be undone.')) return;
-    const btn = $('admin-cleanup');
-    const orig = btn.innerHTML; btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Cleaning…';
-    let total = 0;
+  /* ---------------- Set / reset owner login (migration) ---------------- */
+  let _setLoginCompany = null;
+  async function _openSetLogin(cid) {
+    _hide('set-login-error');
+    $('set-login-form').reset();
+    $('set-login-cid').value = cid;
+    let company = null, owner = null;
     try {
-      for (const coll of DEMO_COLLECTIONS) {
-        const docs = await Firebase.list(coll);
-        const ids = docs.filter(d => d.isDemo === true).map(d => d.id);
-        if (ids.length) { await Firebase.removeMany(coll, ids); total += ids.length; }
-      }
-      // Seeded categories were a shared catalog (untagged) — remove by known ids.
-      const cats = await Firebase.list('categories');
-      const catIds = cats.filter(c => DEMO_CAT_IDS.indexOf(c.id) >= 0).map(c => c.id);
-      if (catIds.length) { await Firebase.removeMany('categories', catIds); total += catIds.length; }
-      try { await Firebase.remove('meta', 'seed'); } catch (e) { /* ignore */ }
+      company = await Firebase.getDoc('companies', cid);
+      const users = await Firebase.listWhere('users', 'companyId', '==', cid);
+      owner = users.find(u => u.role === 'owner' || u.role === 'user') || users[0] || null;
+    } catch (e) { /* ignore */ }
+    _setLoginCompany = company;
+    $('set-login-company').textContent = company ? ('Company: ' + company.name + '  (code: ' + company.code + ')') : '';
+    if (owner && owner.username) $('set-login-username').value = owner.username;
+    $('set-login-modal').classList.remove('hidden');
+  }
 
-      _toast('Removed ' + total + ' demo records.', 'success');
+  async function _onSetLogin(e) {
+    e.preventDefault();
+    _hide('set-login-error');
+    const cid = $('set-login-cid').value;
+    const username = $('set-login-username').value.trim().toLowerCase();
+    const password = $('set-login-password').value;
+    if (!username) { _err('set-login-error', 'Username is required.'); return; }
+    const btn = e.target.querySelector('button[type="submit"]');
+    const orig = btn.textContent; btn.disabled = true; btn.textContent = 'Saving…';
+    try {
+      const users = await Firebase.listWhere('users', 'companyId', '==', cid);
+      let owner = users.find(u => u.role === 'owner' || u.role === 'user');
+      const cred = await Creds.make(password);
+      if (owner) {
+        owner.username = username; owner.salt = cred.salt; owner.passwordHash = cred.passwordHash; owner.role = owner.role || 'owner';
+        await Firebase.save('users', owner);
+      } else {
+        // No owner profile yet — create one keyed to the company id.
+        const company = _setLoginCompany || (await Firebase.getDoc('companies', cid));
+        await Firebase.save('users', {
+          id: cid, name: (company && company.name) || username, username: username, shopName: (company && company.name) || '',
+          role: 'owner', companyId: cid, salt: cred.salt, passwordHash: cred.passwordHash, createdAt: new Date().toISOString(),
+        });
+      }
+      $('set-login-modal').classList.add('hidden');
+      _toast('Owner login set (@' + username + ')', 'success');
       _loadStats();
     } catch (err) {
-      _toast('Cleanup failed: ' + (err && err.message), 'error');
-    } finally { btn.disabled = false; btn.innerHTML = orig; }
+      _err('set-login-error', _friendly(err));
+    } finally { btn.disabled = false; btn.textContent = orig; }
   }
 
   /* ---------------- UI helpers ---------------- */

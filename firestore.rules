@@ -1,105 +1,37 @@
 rules_version = '2';
 
 // Security rules for ZatPat IMS Firestore data.
-// Collections mirror the localStorage entities (see .cursor/rules/ims-data-model.mdc).
-// Owner-scoped docs carry an `ownerId` that must equal the signed-in user's uid.
+//
+// AUTH MODEL (important): Company users (owners + office/staff/marketing) sign in
+// with a username + password that is stored in the `users` collection and matched
+// CLIENT-SIDE (see js/auth.js + js/creds.js). They do NOT use Firebase Auth, so
+// their requests are UNAUTHENTICATED. As a result the company data collections are
+// open for read/write — the login screen is a client-side gate, not a server-side
+// guarantee. Only the super admin (admin.html) uses Firebase Auth.
+//
+// Passwords are never stored in plaintext (per-user salt + SHA-256), but note that
+// the salted hashes live in `users` and are world-readable under this model.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function signedIn() { return request.auth != null; }
-    // Super admin (god view) — identified by email on the auth token.
-    function isAdmin() { return signedIn() && request.auth.token.email == 'yashtodkar2@gmail.com'; }
-
-    // The caller's company id: workers carry a `companyId` on their profile that
-    // points at their owner; owners' companyId equals their own uid. Falls back
-    // to the uid for callers without a profile yet.
-    function callerCompany() {
-      return (exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId != null)
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.companyId
-        : request.auth.uid;
-    }
-    // A doc belongs to the caller's company (or the caller is the super admin).
-    function belongs(ownerId) { return signedIn() && (ownerId == callerCompany() || isAdmin()); }
-
-    // The super admin can read/write everything (god view + demo seeding).
-    match /{document=**} {
-      allow read, write: if isAdmin();
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == 'yashtodkar2@gmail.com';
     }
 
-    // User profiles. Never store passwords here — auth is handled by Firebase Auth.
-    // An owner may create/update worker profiles whose companyId is their own uid.
-    match /users/{userId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn() && (request.auth.uid == userId || isAdmin() || request.resource.data.companyId == request.auth.uid);
-      allow delete: if signedIn() && (isAdmin() || resource.data.companyId == request.auth.uid);
-    }
+    // Company-scoped collections used by the client app (unauthenticated).
+    match /companies/{id}  { allow read, write: if true; }
+    match /users/{id}      { allow read, write: if true; }
+    match /categories/{id} { allow read, write: if true; }
+    match /locations/{id}  { allow read, write: if true; }
+    match /products/{id}   { allow read, write: if true; }
+    match /stock/{id}      { allow read, write: if true; }
+    match /orders/{id}     { allow read, write: if true; }
+    match /recipes/{id}    { allow read, write: if true; }
+    match /pos_sales/{id}  { allow read, write: if true; }
+    match /khata/{id}      { allow read, write: if true; }
+    match /parties/{id}    { allow read, write: if true; }
 
-    // Global category catalog — readable by all signed-in users.
-    match /categories/{id} {
-      allow read, write: if signedIn();
-    }
-
-    match /locations/{id} {
-      allow read: if signedIn();
-      allow create: if belongs(request.resource.data.ownerId);
-      allow update, delete: if belongs(resource.data.ownerId);
-    }
-
-    // Published products are visible to everyone (B2B marketplace); drafts are company-only.
-    match /products/{id} {
-      allow read: if signedIn() && (resource.data.isPublished == true || belongs(resource.data.ownerId));
-      allow create: if belongs(request.resource.data.ownerId);
-      allow update, delete: if belongs(resource.data.ownerId);
-    }
-
-    match /recipes/{id} {
-      allow read, update, delete: if belongs(resource.data.ownerId);
-      allow create: if belongs(request.resource.data.ownerId);
-    }
-
-    match /pos_sales/{id} {
-      allow read, update, delete: if belongs(resource.data.ownerId);
-      allow create: if belongs(request.resource.data.ownerId);
-    }
-
-    match /khata/{id} {
-      allow read, update, delete: if belongs(resource.data.ownerId);
-      allow create: if belongs(request.resource.data.ownerId);
-    }
-
-    // Custom off-platform parties (customers / sellers), company-scoped.
-    match /parties/{id} {
-      allow read, update, delete: if belongs(resource.data.ownerId);
-      allow create: if belongs(request.resource.data.ownerId);
-    }
-
-    // Stock carries a denormalized `ownerId` for company-scoped access.
-    match /stock/{id} {
-      allow read: if signedIn();
-      allow create: if belongs(request.resource.data.ownerId);
-      allow update, delete: if belongs(resource.data.ownerId);
-    }
-
-    // Orders: platform (buyer+seller uids), manual purchases (buyer=company,
-    // seller=custom party) and field sales (seller=company, marketing-placed).
-    // Any member of the buyer's or seller's company may read/update.
-    match /orders/{id} {
-      allow read: if belongs(resource.data.buyerId) || belongs(resource.data.sellerId);
-      allow create: if belongs(request.resource.data.buyerId) || belongs(request.resource.data.sellerId);
-      allow update: if belongs(resource.data.buyerId) || belongs(resource.data.sellerId);
-      allow delete: if isAdmin();
-    }
-
-    // Companies (tenants). Public read so the code-first login screen can resolve
-    // a company BEFORE the user authenticates (docs hold only name/code/ownerId —
-    // no sensitive data). Admin manages them; an owner may self-provision their own.
-    match /companies/{id} {
-      allow read: if true;
-      allow create, update: if isAdmin() || (signedIn() && request.resource.data.ownerId == request.auth.uid);
-      allow delete: if isAdmin();
-    }
-
-    // Anything not matched above is denied by default (no catch-all needed).
+    // Anything else (e.g. internal/meta docs): super admin only.
+    match /{document=**} { allow read, write: if isAdmin(); }
   }
 }

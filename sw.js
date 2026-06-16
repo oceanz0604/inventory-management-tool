@@ -1,10 +1,11 @@
-const CACHE_NAME = 'zatpat-v11';
+const CACHE_NAME = 'zatpat-v13';
 const STATIC_URLS = [
   './',
   './index.html',
   './admin.html',
   './css/style.css',
   './js/firebase-config.js',
+  './js/creds.js',
   './js/store.js',
   './js/auth.js',
   './js/locations.js',

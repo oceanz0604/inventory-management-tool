@@ -41,7 +41,6 @@
         </div>
       </div>
       <button type="submit" class="btn btn-primary btn-full">Continue</button>
-      <button type="button" id="no-code-link" class="auth-link-btn">I don't have a company code</button>
     </form>
 
     <!-- Stage 2: credentials for the chosen company -->
@@ -49,15 +48,15 @@
       <h2 id="login-heading">Welcome back</h2>
       <p class="auth-subtitle" id="login-subtitle">Sign in to your account</p>
       <div class="form-group">
-        <label for="login-email">Email</label>
-        <div class="input-icon"><i class="fas fa-envelope"></i>
-          <input type="email" id="login-email" placeholder="you@example.com" required>
+        <label for="login-username">Username</label>
+        <div class="input-icon"><i class="fas fa-user"></i>
+          <input type="text" id="login-username" placeholder="your username" autocomplete="username" autocapitalize="none" spellcheck="false" required>
         </div>
       </div>
       <div class="form-group">
         <label for="login-password">Password</label>
         <div class="input-icon"><i class="fas fa-lock"></i>
-          <input type="password" id="login-password" placeholder="Enter your password" required>
+          <input type="password" id="login-password" placeholder="Enter your password" autocomplete="current-password" required>
         </div>
       </div>
       <button type="submit" class="btn btn-primary btn-full">Sign In</button>
@@ -65,7 +64,6 @@
     </form>
 
     <div id="auth-error" class="auth-error hidden"></div>
-    <p class="auth-admin-hint"><a href="admin.html">Administrator sign in</a></p>
   </div>
 </div>
 
@@ -558,7 +556,7 @@
       <div class="card" style="margin-top:1rem"><div class="card-body">
         <div class="table-wrap">
           <table class="data-table"><thead><tr>
-            <th>Name</th><th>Email</th><th>Role</th><th>Actions</th>
+            <th>Name</th><th>Username</th><th>Role</th><th>Actions</th>
           </tr></thead><tbody id="team-table-body"></tbody></table>
         </div>
         <div class="empty-state hidden" id="no-team"><i class="fas fa-users-gear"></i><p>No workers yet — add marketing, office, or staff users.</p>
@@ -606,8 +604,26 @@
     <button class="more-sheet-item" data-view="team"><i class="fas fa-users-gear"></i><span>Team</span></button>
   </div>
   <div class="more-sheet-footer">
-    <button class="btn btn-secondary btn-full" id="more-switch-user"><i class="fas fa-people-arrows"></i> Switch User</button>
+    <button class="btn btn-secondary btn-full" id="more-customize-nav"><i class="fas fa-sliders"></i> Customize bottom bar</button>
+    <button class="btn btn-secondary btn-full" id="more-switch-user" style="margin-top:.5rem"><i class="fas fa-people-arrows"></i> Switch User</button>
     <button class="btn btn-secondary btn-full" id="more-logout" style="margin-top:.5rem"><i class="fas fa-right-from-bracket"></i> Logout</button>
+  </div>
+</div>
+
+<!-- Bottom Nav Customize Modal -->
+<div class="modal hidden" id="bottomnav-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-sm">
+    <div class="modal-header"><h3>Customize bottom bar</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <div class="modal-body">
+      <p class="form-hint">Pick up to 4 shortcuts for the mobile bottom bar. Everything else stays under “More”.</p>
+      <div id="bottomnav-options" class="bottomnav-options"></div>
+    </div>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+      <button type="button" class="btn btn-primary" id="bottomnav-save">Save</button>
+    </div>
   </div>
 </div>
 
@@ -950,10 +966,11 @@
       <div class="modal-body">
         <div class="form-group"><label for="worker-name">Name *</label>
           <input type="text" id="worker-name" placeholder="e.g. Ramesh" required></div>
-        <div class="form-group"><label for="worker-email">Email *</label>
-          <input type="email" id="worker-email" placeholder="worker@example.com" required></div>
+        <div class="form-group"><label for="worker-username">Username *</label>
+          <input type="text" id="worker-username" placeholder="e.g. ramesh" autocapitalize="none" spellcheck="false" required>
+          <small class="form-hint">They sign in with the company code + this username.</small></div>
         <div class="form-group"><label for="worker-password">Password *</label>
-          <input type="password" id="worker-password" placeholder="Min 6 characters" minlength="6" required></div>
+          <input type="password" id="worker-password" placeholder="Min 4 characters" minlength="4" required></div>
         <div class="form-group"><label for="worker-role">Role *</label>
           <select id="worker-role" class="select-input">
             <option value="office">Office worker — manage data &amp; orders</option>
@@ -1090,6 +1107,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="js/firebase-config.js"></script>
+<script src="js/creds.js"></script>
 
 <script src="js/store.js"></script>
 <script src="js/auth.js"></script>
