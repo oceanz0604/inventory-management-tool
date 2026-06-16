@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>झटपट (ZatPat) — User Guide</title>
+  <link rel="icon" href="icons/icon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Tiro+Devanagari+Marathi&display=swap" rel="stylesheet">
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+  <style>
+    :root { --p:#5b4af0; --p2:#7c6cff; --ink:#1a1c2e; --muted:#5b6075; --line:#e3e5ef; --soft:#f4f3ff; }
+    * { box-sizing:border-box; }
+    body { margin:0; font-family:'Inter',system-ui,sans-serif; color:var(--ink); background:#eceef6; line-height:1.6; }
+    .marathi { font-family:'Tiro Devanagari Marathi',serif; }
+    .page { max-width:820px; margin:0 auto; background:#fff; }
+    .toolbar { position:sticky; top:0; z-index:20; display:flex; gap:.6rem; justify-content:flex-end; align-items:center;
+      padding:.8rem 1.2rem; background:#fff; border-bottom:1px solid var(--line); max-width:820px; margin:0 auto; }
+    .toolbar .spacer { margin-right:auto; font-size:.85rem; color:var(--muted); }
+    .btn { border:none; border-radius:10px; padding:.6rem 1rem; font-size:.9rem; font-weight:600; cursor:pointer;
+      display:inline-flex; align-items:center; gap:.45rem; text-decoration:none; }
+    .btn-primary { background:linear-gradient(135deg,var(--p2),var(--p)); color:#fff; }
+    .btn-ghost { background:var(--soft); color:var(--p); }
+    .content { padding:0 2.4rem 3rem; }
+    .cover { text-align:center; padding:3rem 2.4rem 2.2rem; background:linear-gradient(135deg,#0a0b14,#21254a); color:#fff; }
+    .cover .logo { width:74px; height:74px; border-radius:20px; display:grid; place-items:center; font-size:2rem; margin:0 auto 1rem;
+      background:linear-gradient(135deg,var(--p2),var(--p)); box-shadow:0 14px 34px rgba(91,74,240,.5); }
+    .cover h1 { font-size:2.4rem; margin:.2rem 0; }
+    .cover .sub { opacity:.8; font-size:1.05rem; }
+    .cover .tag { display:inline-block; margin-top:1rem; font-size:.8rem; letter-spacing:.12em; text-transform:uppercase;
+      border:1px solid rgba(255,255,255,.25); border-radius:999px; padding:.3rem .9rem; opacity:.85; }
+    h2 { font-size:1.45rem; margin:2.4rem 0 .4rem; padding-bottom:.4rem; border-bottom:2px solid var(--soft); display:flex; align-items:center; gap:.6rem; }
+    h2 .num { width:30px; height:30px; flex:0 0 auto; border-radius:9px; background:var(--soft); color:var(--p); display:grid; place-items:center; font-size:.95rem; }
+    h3 { font-size:1.08rem; margin:1.4rem 0 .3rem; }
+    p { margin:.5rem 0; }
+    ul, ol { margin:.4rem 0 .6rem; padding-left:1.3rem; }
+    li { margin:.25rem 0; }
+    .lead { font-size:1.05rem; color:var(--muted); }
+    .role-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:.8rem; margin:.8rem 0; }
+    .role { border:1px solid var(--line); border-radius:14px; padding:.9rem 1rem; }
+    .role .r-h { font-weight:700; display:flex; align-items:center; gap:.5rem; }
+    .role .r-h i { color:var(--p); }
+    .role small { color:var(--muted); }
+    .steps { counter-reset:s; list-style:none; padding-left:0; }
+    .steps li { position:relative; padding:.15rem 0 .15rem 2.2rem; }
+    .steps li::before { counter-increment:s; content:counter(s); position:absolute; left:0; top:.1rem; width:1.5rem; height:1.5rem;
+      background:var(--p); color:#fff; border-radius:50%; display:grid; place-items:center; font-size:.8rem; font-weight:700; }
+    .note { background:var(--soft); border-left:4px solid var(--p); border-radius:0 10px 10px 0; padding:.7rem 1rem; margin:.9rem 0; font-size:.95rem; }
+    .note b { color:var(--p); }
+    .kbd { background:#eef0f8; border:1px solid var(--line); border-radius:6px; padding:.05rem .4rem; font-family:monospace; font-size:.85rem; }
+    .toc { background:var(--soft); border-radius:14px; padding:1rem 1.4rem; margin:1.6rem 0; }
+    .toc h3 { margin:.2rem 0 .5rem; }
+    .toc ol { columns:2; }
+    .toc a { color:var(--p); text-decoration:none; }
+    .foot { text-align:center; color:var(--muted); font-size:.85rem; padding:2rem 1rem 0; border-top:1px solid var(--line); margin-top:2.5rem; }
+    @media (max-width:560px){ .role-grid{grid-template-columns:1fr;} .toc ol{columns:1;} .content{padding:0 1.3rem 2rem;} }
+    @media print {
+      body { background:#fff; }
+      .toolbar { display:none !important; }
+      .cover { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .role .r-h i, .steps li::before, h2 .num { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      h2 { break-after:avoid; }
+      .role, .note { break-inside:avoid; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="toolbar">
+  <span class="spacer"><i class="fas fa-book-open"></i> ZatPat User Guide — English</span>
+  <a class="btn btn-ghost" href="guide-mr.html"><i class="fas fa-language"></i> मराठी</a>
+  <button class="btn btn-primary" onclick="window.print()"><i class="fas fa-print"></i> Print / Save as PDF</button>
+</div>
+
+<div class="page">
+  <div class="cover">
+    <div class="logo"><i class="fas fa-bolt"></i></div>
+    <h1 class="marathi">झटपट</h1>
+    <div class="sub">ZatPat — Inventory, Billing &amp; Orders, made simple</div>
+    <div class="tag">Complete User Guide</div>
+  </div>
+
+  <div class="content">
+    <p class="lead">Welcome to <b>झटपट (ZatPat)</b> — an all-in-one tool to manage your stock, billing (POS), purchases, sales, credit (khata) and your team. This guide walks you through everything, step by step.</p>
+
+    <div class="toc">
+      <h3>What's inside</h3>
+      <ol>
+        <li><a href="#login">Logging in</a></li>
+        <li><a href="#roles">Who can do what (roles)</a></li>
+        <li><a href="#start">Getting started wizard</a></li>
+        <li><a href="#dashboard">Dashboard</a></li>
+        <li><a href="#locations">Locations</a></li>
+        <li><a href="#products">Products &amp; Categories</a></li>
+        <li><a href="#inventory">Inventory (stock)</a></li>
+        <li><a href="#pos">POS counter (billing)</a></li>
+        <li><a href="#orders">Orders &amp; purchases</a></li>
+        <li><a href="#parties">Customers / Sellers</a></li>
+        <li><a href="#field">Field orders (marketing)</a></li>
+        <li><a href="#khata">Khata (credit ledger)</a></li>
+        <li><a href="#recipes">Recipes / BOM</a></li>
+        <li><a href="#shop">Shop (marketplace)</a></li>
+        <li><a href="#reports">Reports</a></li>
+        <li><a href="#team">Team management</a></li>
+        <li><a href="#tips">Tips, theme &amp; install</a></li>
+      </ol>
+    </div>
+
+    <h2 id="login"><span class="num">1</span> Logging in</h2>
+    <p>Opening the app shows the login screen. Signing in has three quick steps:</p>
+    <ol class="steps">
+      <li>Enter your <b>Company Code</b> (given to you when your account was created) and tap <b>Continue</b>.</li>
+      <li>Type your <b>Username</b>.</li>
+      <li>Type your <b>Password</b> and tap <b>Sign In</b>.</li>
+    </ol>
+    <div class="note"><b>Stay logged in:</b> Once you sign in, the app remembers you. The next time you open it, it goes straight to your screen — no need to log in again unless you sign out.</div>
+
+    <h2 id="roles"><span class="num">2</span> Who can do what (roles)</h2>
+    <p>Every login has a role. The role decides which screens and buttons are visible.</p>
+    <div class="role-grid">
+      <div class="role"><div class="r-h"><i class="fas fa-crown"></i> Owner</div><small>Full access — everything below: products, stock, billing, orders, reports, khata, customers, and managing the team.</small></div>
+      <div class="role"><div class="r-h"><i class="fas fa-briefcase"></i> Office</div><small>Day-to-day management: products, stock, orders, purchases, customers/sellers, khata, reports. Cannot manage the team.</small></div>
+      <div class="role"><div class="r-h"><i class="fas fa-cash-register"></i> Staff</div><small>Sees only the <b>POS counter</b> for fast billing at the shop.</small></div>
+      <div class="role"><div class="r-h"><i class="fas fa-route"></i> Marketing</div><small>Sees only <b>Field Orders</b> — to collect orders from shops while out in the market.</small></div>
+    </div>
+
+    <h2 id="start"><span class="num">3</span> Getting started wizard</h2>
+    <p>The first time an <b>owner</b> logs in, a short setup wizard appears. It helps you add your basics so the app is ready to use:</p>
+    <ol class="steps">
+      <li><b>Welcome</b> — a quick introduction.</li>
+      <li><b>Locations</b> — add your shop / godown / outlets.</li>
+      <li><b>Products</b> — add the items you sell or make.</li>
+      <li><b>Inventory</b> — set the opening stock for each product.</li>
+      <li><b>Recipes</b> — (optional) if you manufacture, define what goes into a finished item.</li>
+      <li><b>Finish</b> — you're ready!</li>
+    </ol>
+    <div class="note"><b>You can pause anytime:</b> The wizard remembers where you stopped. Close the app and come back later — it resumes from the same step. You can add as many items as you like on each step, or <b>Skip</b> a step and add things later from the menu.</div>
+
+    <h2 id="dashboard"><span class="num">4</span> Dashboard</h2>
+    <p>The home screen gives you a quick health check of your business: total products, current stock value, recent sales, low-stock alerts and charts. Use it as your daily starting point.</p>
+
+    <h2 id="locations"><span class="num">5</span> Locations</h2>
+    <p>Locations are your physical places — a shop, a warehouse, an outlet. Stock is tracked separately for each location.</p>
+    <ul>
+      <li>Tap <b>Add Location</b>, give it a name (e.g. "Main Shop"), and save.</li>
+      <li>You can have as many locations as you need.</li>
+    </ul>
+
+    <h2 id="products"><span class="num">6</span> Products &amp; Categories</h2>
+    <p>Products are the items you buy, make or sell. Categories help you group them (e.g. "Snacks", "Drinks").</p>
+    <ol class="steps">
+      <li>Open <b>Categories</b> and add a few groups (optional but handy).</li>
+      <li>Open <b>Products</b> → <b>Add Product</b>. Enter name, category, selling price, and unit.</li>
+      <li>Save. The product now appears in inventory, POS and orders.</li>
+    </ol>
+
+    <h2 id="inventory"><span class="num">7</span> Inventory (stock)</h2>
+    <p>The inventory screen is a grid of <b>products × locations</b>. Each cell is how much of that product you have at that location.</p>
+    <ul>
+      <li>Tap a cell to set or adjust the quantity.</li>
+      <li>Stock goes <b>down automatically</b> when you sell at the POS or fulfil an order, and <b>up</b> when you receive a purchase.</li>
+    </ul>
+
+    <h2 id="pos"><span class="num">8</span> POS counter (billing)</h2>
+    <p>The POS (Point of Sale) is for fast counter billing. This is the main screen for <b>Staff</b>.</p>
+    <ol class="steps">
+      <li>Tap products to add them to the bill (tap again to increase quantity).</li>
+      <li>Review the items and total.</li>
+      <li>Choose payment and tap <b>Complete Sale</b>.</li>
+    </ol>
+    <p>Each completed sale reduces stock and is recorded for reports.</p>
+
+    <h2 id="orders"><span class="num">9</span> Orders &amp; purchases</h2>
+    <p>The Orders screen tracks both <b>sales orders</b> (going out) and <b>purchase orders</b> (coming in).</p>
+    <h3>Manual purchase</h3>
+    <p>When you buy stock from a seller who is <b>not</b> on the marketplace, use <b>New Manual Purchase</b>:</p>
+    <ol class="steps">
+      <li>Pick the seller (a custom Seller you added — see section 10).</li>
+      <li>Add the products and quantities you bought, with prices.</li>
+      <li>Save. When you <b>receive</b> the order, stock increases automatically.</li>
+    </ol>
+    <h3>Accept, fulfil &amp; settle</h3>
+    <p>Incoming orders can be <b>accepted</b>, <b>fulfilled</b> (delivered), and <b>settled</b> (paid). If an order is delivered but not paid, it is automatically added to the Khata as credit and stays open until cleared.</p>
+
+    <h2 id="parties"><span class="num">10</span> Customers / Sellers</h2>
+    <p>Here you keep your own list of <b>Customers</b> and <b>Sellers</b> who are not on the platform — just a name and location. This lets you:</p>
+    <ul>
+      <li>Record purchases from sellers who don't use the app.</li>
+      <li>Choose a customer when a marketing person places a field order.</li>
+    </ul>
+
+    <h2 id="field"><span class="num">11</span> Field orders (marketing)</h2>
+    <p>A marketing person roams the market and collects orders from shops. Instead of bringing paper back to the office, they place the order directly in the app:</p>
+    <ol class="steps">
+      <li>Select the <b>Customer</b> (or add a new one on the spot with <b>Add customer</b>).</li>
+      <li>Add the products and quantities the shop ordered.</li>
+      <li>Submit. The order instantly reaches the office.</li>
+    </ol>
+    <p>Back at the office, the <b>Office</b> or <b>Owner</b> sees the order, accepts it, and delivers. If stock is short, the office can cancel it. If payment isn't received, it goes into the Khata as credit and the order stays open.</p>
+
+    <h2 id="khata"><span class="num">12</span> Khata (credit ledger)</h2>
+    <p>The Khata is your digital udhaar (credit) book. It shows who owes you money and how much. Unpaid orders appear here automatically. Record payments as customers clear their balance.</p>
+
+    <h2 id="recipes"><span class="num">13</span> Recipes / BOM</h2>
+    <p>If you <b>manufacture</b> goods, a recipe (Bill of Materials) defines which raw materials make one finished product. This helps track what's consumed when you produce items.</p>
+
+    <h2 id="shop"><span class="num">14</span> Shop (marketplace)</h2>
+    <p>The Shop is a B2B marketplace to browse products from other suppliers on the platform and add them to a cart for purchase orders. For sellers who aren't on the platform, use a Manual Purchase (section 9) instead.</p>
+
+    <h2 id="reports"><span class="num">15</span> Reports</h2>
+    <p>Reports turn your data into charts and summaries — sales trends, top products, stock value and more — so you can make better decisions.</p>
+
+    <h2 id="team"><span class="num">16</span> Team management</h2>
+    <p>Owners can add team members and choose their role. Open <b>Team</b> → <b>Add member</b>:</p>
+    <ol class="steps">
+      <li>Enter the member's <b>name</b> and a <b>username</b>.</li>
+      <li>Choose a role: Office, Staff, or Marketing.</li>
+      <li>Set a password and save. They log in with your company code + their username + password.</li>
+    </ol>
+    <div class="note"><b>Usernames are unique within your company.</b> Two members can't share the same username.</div>
+
+    <h2 id="tips"><span class="num">17</span> Tips, theme &amp; install</h2>
+    <ul>
+      <li><b>Dark / light theme:</b> tap the moon/sun icon to switch.</li>
+      <li><b>Bottom bar shortcuts (owners):</b> you can choose which 4 buttons appear on the mobile bottom bar from <b>More → Customize bottom bar</b> — e.g. a manufacturer can keep Orders and Field instead of POS.</li>
+      <li><b>Install on your phone:</b> open the site in your browser and use "Add to Home Screen" to use it like an app, even offline.</li>
+      <li><b>Sign out:</b> use the menu to sign out when you're done on a shared device.</li>
+    </ul>
+
+    <div class="foot">
+      <p class="marathi" style="font-size:1.1rem;">झटपट</p>
+      <p>Need help? Contact your administrator. &middot; This guide can be printed or saved as PDF using the button at the top.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // When opened with ?print=1 (from the admin console), jump straight to print.
+  if (new URLSearchParams(location.search).get('print') === '1') {
+    window.addEventListener('load', () => setTimeout(() => window.print(), 400));
+  }
+</script>
+</body>
+</html>
