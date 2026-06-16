@@ -10,20 +10,20 @@
   <style>
     :root { --p:#b45309; --p2:#f59e0b; --ink:#14161c; --muted:#5b626f; --line:#e7e9ee; --soft:#fdecca; }
     * { box-sizing:border-box; }
-    body { margin:0; font-family:'Tiro Devanagari Marathi','Inter',serif; color:var(--ink); background:#eceef6; line-height:1.8; }
+    body { margin:0; font-family:'Tiro Devanagari Marathi','Inter',serif; color:var(--ink); background:#eceef2; line-height:1.8; }
     .en { font-family:'Inter',system-ui,sans-serif; }
-    .page { max-width:820px; margin:0 auto; background:#fff; }
+    .page { max-width:840px; margin:0 auto; background:#fff; }
     .toolbar { position:sticky; top:0; z-index:20; display:flex; gap:.6rem; justify-content:flex-end; align-items:center;
-      padding:.8rem 1.2rem; background:#fff; border-bottom:1px solid var(--line); max-width:820px; margin:0 auto; }
+      padding:.8rem 1.2rem; background:#fff; border-bottom:1px solid var(--line); max-width:840px; margin:0 auto; }
     .toolbar .spacer { margin-right:auto; font-size:.9rem; color:var(--muted); }
     .btn { border:none; border-radius:10px; padding:.6rem 1rem; font-size:.95rem; font-weight:600; cursor:pointer;
       display:inline-flex; align-items:center; gap:.45rem; text-decoration:none; font-family:'Tiro Devanagari Marathi',serif; }
-    .btn-primary { background:linear-gradient(135deg,var(--p2),var(--p)); color:#fff; }
+    .btn-primary { background:linear-gradient(135deg,var(--p2),var(--p)); color:#2a1c04; }
     .btn-ghost { background:var(--soft); color:var(--p); }
     .content { padding:0 2.4rem 3rem; }
-    .cover { text-align:center; padding:3rem 2.4rem 2.2rem; background:linear-gradient(135deg,#0a0b14,#21254a); color:#fff; }
+    .cover { text-align:center; padding:3rem 2.4rem 2.2rem; background:radial-gradient(120% 120% at 50% 0%,#1c1606,#0b0c0f 72%); color:#fff; }
     .cover .logo { width:74px; height:74px; border-radius:20px; display:grid; place-items:center; font-size:2rem; margin:0 auto 1rem;
-      background:linear-gradient(135deg,var(--p2),var(--p)); box-shadow:0 14px 34px rgba(91,74,240,.5); }
+      background:linear-gradient(135deg,var(--p2),var(--p)); color:#2a1c04; box-shadow:0 14px 34px rgba(245,158,11,.5); }
     .cover h1 { font-size:2.6rem; margin:.2rem 0; }
     .cover .sub { opacity:.85; font-size:1.1rem; }
     .cover .tag { display:inline-block; margin-top:1rem; font-size:.85rem; letter-spacing:.05em;
@@ -50,15 +50,50 @@
     .toc h3 { margin:.2rem 0 .5rem; }
     .toc ol { columns:2; }
     .toc a { color:var(--p); text-decoration:none; }
+
+    /* ---- GRAPHICS (same as English guide) ---- */
+    .quickband { background:var(--soft); border-radius:18px; padding:1.2rem; margin:1.2rem 0; }
+    .quickpic { display:grid; grid-template-columns:repeat(3,1fr); gap:1rem; }
+    .qp { background:#fff; border:1px solid #f0d79a; border-radius:16px; padding:1rem .6rem; text-align:center; position:relative; }
+    .qp .ic { width:62px; height:62px; margin:0 auto .55rem; border-radius:50%; background:linear-gradient(135deg,var(--p2),var(--p)); color:#2a1c04; display:grid; place-items:center; font-size:1.7rem; }
+    .qp .n { position:absolute; top:8px; right:8px; width:28px; height:28px; border-radius:50%; background:var(--ink); color:#fff; font-size:.95rem; display:grid; place-items:center; font-weight:800; }
+    .qp .t { font-weight:800; font-size:1.05rem; }
+    .qp small { color:var(--muted); display:block; line-height:1.5; margin-top:.15rem; }
+    .flow { display:flex; flex-wrap:wrap; align-items:center; gap:.4rem; margin:1rem 0; }
+    .flow .node { flex:1 1 120px; border:1px solid var(--line); border-radius:13px; padding:.7rem .5rem; text-align:center; background:#fff; min-width:110px; }
+    .flow .node i { color:var(--p); font-size:1.25rem; display:block; margin-bottom:.3rem; }
+    .flow .node b { font-size:.98rem; }
+    .flow .node small { display:block; color:var(--muted); font-size:.82rem; }
+    .flow .arr { flex:0 0 auto; color:var(--p2); font-size:1.1rem; }
+    .flow .node.ok { border-color:#bfe6cf; background:#eafaf1; }
+    .flow .node.ok i { color:#16a34a; }
+    .flow .node.warn { border-color:#f3d99a; background:#fff8e8; }
+    .ptypes { display:grid; grid-template-columns:repeat(3,1fr); gap:.8rem; margin:.9rem 0; }
+    .pcard { border:1px solid var(--line); border-radius:14px; padding:1rem; }
+    .pcard .ic { width:46px; height:46px; border-radius:12px; display:grid; place-items:center; font-size:1.3rem; margin-bottom:.5rem; }
+    .pcard.raw .ic { background:#e6f7fb; color:#0891b2; }
+    .pcard.simple .ic { background:#eef4ff; color:#3b82f6; }
+    .pcard.complex .ic { background:var(--soft); color:var(--p); }
+    .pcard b { display:block; }
+    .pcard small { color:var(--muted); }
+    .barchart { display:flex; align-items:flex-end; gap:.5rem; height:130px; padding:1rem; border:1px solid var(--line); border-radius:14px; margin:.8rem 0; }
+    .barchart .bar { flex:1; background:linear-gradient(180deg,var(--p2),var(--p)); border-radius:7px 7px 0 0; min-height:8px; }
+    .lots { display:grid; grid-template-columns:repeat(3,1fr); gap:.7rem; margin:.8rem 0; }
+    .lot { border:1px dashed var(--p2); border-radius:12px; padding:.7rem; background:#fffdf5; font-size:.92rem; }
+    .lot .lb { font-weight:700; color:var(--p); }
+
     .foot { text-align:center; color:var(--muted); font-size:.95rem; padding:2rem 1rem 0; border-top:1px solid var(--line); margin-top:2.5rem; }
-    @media (max-width:560px){ .role-grid{grid-template-columns:1fr;} .toc ol{columns:1;} .content{padding:0 1.3rem 2rem;} }
+    @media (max-width:560px){
+      .role-grid,.ptypes,.quickpic,.lots{grid-template-columns:1fr;}
+      .toc ol{columns:1;} .content{padding:0 1.3rem 2rem;}
+    }
     @media print {
       body { background:#fff; }
       .toolbar { display:none !important; }
-      .cover { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
-      .role .r-h i, .steps li::before, h2 .num { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .cover,.qp .ic,.pcard .ic,.barchart .bar,.flow .node.ok,.flow .node.warn,.quickband,.lot,
+      .role .r-h i, .steps li::before, h2 .num, .qp .n { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
       h2 { break-after:avoid; }
-      .role, .note { break-inside:avoid; }
+      .role, .note, .qp, .pcard, .flow, .barchart, .lots { break-inside:avoid; }
     }
   </style>
 </head>
@@ -79,24 +114,40 @@
   </div>
 
   <div class="content">
-    <p class="lead"><b>झटपट</b> मध्ये आपले स्वागत आहे — आपला माल (स्टॉक), बिलिंग (POS), खरेदी, विक्री, उधारी (खाते) आणि आपली टीम सांभाळण्यासाठीचे एकत्रित साधन. हे मार्गदर्शक प्रत्येक गोष्ट टप्प्याटप्प्याने समजावून सांगते.</p>
+    <p class="lead"><b>झटपट</b> मध्ये आपले स्वागत आहे — आपला माल (स्टॉक), बिलिंग (POS), खरेदी, विक्री, उधारी (खाते) आणि आपली टीम सांभाळण्यासाठीचे एकत्रित साधन. हे मार्गदर्शक प्रत्येक गोष्ट चित्रांसह, टप्प्याटप्प्याने समजावते.</p>
+
+    <!-- ============ चित्र-रूपी पटकन सुरुवात ============ -->
+    <h2 id="quick"><span class="num"><i class="fas fa-bolt"></i></span> झटपट सुरुवात — फक्त चित्रांप्रमाणे करा</h2>
+    <p class="lead">नवीन आहात? या ६ गोष्टी क्रमाने करा. प्रत्येक चित्र म्हणजे एक काम.</p>
+    <div class="quickband">
+      <div class="quickpic">
+        <div class="qp"><span class="n">१</span><div class="ic"><i class="fas fa-key"></i></div><div class="t">लॉगिन करा</div><small>कंपनी कोड → युजरनेम → पासवर्ड</small></div>
+        <div class="qp"><span class="n">२</span><div class="ic"><i class="fas fa-store"></i></div><div class="t">दुकान जोडा</div><small>आपले दुकान / गोडाऊन (ठिकाण)</small></div>
+        <div class="qp"><span class="n">३</span><div class="ic"><i class="fas fa-box"></i></div><div class="t">वस्तू जोडा</div><small>विकायच्या वस्तू (प्रॉडक्ट्स) जोडा</small></div>
+        <div class="qp"><span class="n">४</span><div class="ic"><i class="fas fa-layer-group"></i></div><div class="t">स्टॉक भरा</div><small>किती खरेदी केले + किंमत टाका</small></div>
+        <div class="qp"><span class="n">५</span><div class="ic"><i class="fas fa-cash-register"></i></div><div class="t">विक्री करा</div><small>वस्तूंवर टॅप, पैसे घ्या (POS)</small></div>
+        <div class="qp"><span class="n">६</span><div class="ic"><i class="fas fa-chart-line"></i></div><div class="t">कमाई पाहा</div><small>डॅशबोर्डवर विक्री व स्टॉक दिसतो</small></div>
+      </div>
+    </div>
+    <div class="note"><b>टीप:</b> मालक म्हणून पहिल्यांदा लॉगिन केल्यावर एक मदतनीस (<b>सुरुवातीचा सेटअप</b> विझार्ड) हेच टप्पे एक एक करून दाखवतो. फक्त <b>Next</b> दाबत राहा.</div>
 
     <div class="toc">
       <h3>या मार्गदर्शकात काय आहे</h3>
       <ol>
+        <li><a href="#quick">झटपट सुरुवात (चित्रे)</a></li>
         <li><a href="#login">लॉगिन कसे करावे</a></li>
         <li><a href="#roles">कोण काय करू शकतो (भूमिका)</a></li>
         <li><a href="#start">सुरुवातीचा सेटअप</a></li>
         <li><a href="#dashboard">डॅशबोर्ड</a></li>
         <li><a href="#locations">ठिकाणे (Locations)</a></li>
-        <li><a href="#products">प्रॉडक्ट्स आणि कॅटेगरी</a></li>
-        <li><a href="#inventory">इन्व्हेंटरी (स्टॉक)</a></li>
+        <li><a href="#products">प्रॉडक्टचे प्रकार व प्रॉडक्ट जोडणे</a></li>
+        <li><a href="#inventory">इन्व्हेंटरी: बॅच व लॉट</a></li>
+        <li><a href="#produce">उत्पादन (बनवलेली प्रॉडक्ट्स)</a></li>
         <li><a href="#pos">POS काउंटर (बिलिंग)</a></li>
         <li><a href="#orders">ऑर्डर्स आणि खरेदी</a></li>
         <li><a href="#parties">ग्राहक / विक्रेते</a></li>
         <li><a href="#field">फील्ड ऑर्डर्स (मार्केटिंग)</a></li>
         <li><a href="#khata">खाते (उधारी वही)</a></li>
-        <li><a href="#recipes">रेसिपी / BOM</a></li>
         <li><a href="#shop">शॉप (मार्केटप्लेस)</a></li>
         <li><a href="#reports">रिपोर्ट्स</a></li>
         <li><a href="#team">टीम व्यवस्थापन</a></li>
@@ -106,36 +157,48 @@
 
     <h2 id="login"><span class="num">१</span> लॉगिन कसे करावे</h2>
     <p>अॅप उघडल्यावर लॉगिन स्क्रीन दिसते. लॉगिन तीन सोप्या टप्प्यांत होते:</p>
-    <ol class="steps">
-      <li>आपला <b>कंपनी कोड</b> टाका (खाते तयार करताना दिलेला) आणि <b>Continue</b> दाबा.</li>
-      <li>आपले <b>युजरनेम</b> टाका.</li>
-      <li>आपला <b>पासवर्ड</b> टाका आणि <b>Sign In</b> दाबा.</li>
-    </ol>
-    <div class="note"><b>लॉगिन टिकून राहते:</b> एकदा लॉगिन केल्यावर अॅप आपल्याला लक्षात ठेवते. पुढच्या वेळी अॅप उघडल्यावर थेट आपल्या स्क्रीनवर जाते — साइन आउट केल्याशिवाय पुन्हा लॉगिन करावे लागत नाही.</div>
+    <div class="flow">
+      <div class="node"><i class="fas fa-building"></i><b>कंपनी कोड</b><small>मग Continue दाबा</small></div>
+      <span class="arr"><i class="fas fa-arrow-left"></i></span>
+      <div class="node"><i class="fas fa-user"></i><b>युजरनेम</b><small>आपले नाव</small></div>
+      <span class="arr"><i class="fas fa-arrow-left"></i></span>
+      <div class="node"><i class="fas fa-lock"></i><b>पासवर्ड</b><small>मग Sign In</small></div>
+    </div>
+    <div class="note"><b>लॉगिन टिकून राहते:</b> एकदा लॉगिन केल्यावर अॅप आपल्याला लक्षात ठेवते. पुढच्या वेळी थेट आपल्या स्क्रीनवर जाते — साइन आउट केल्याशिवाय पुन्हा लॉगिन करावे लागत नाही.</div>
 
     <h2 id="roles"><span class="num">२</span> कोण काय करू शकतो (भूमिका)</h2>
     <p>प्रत्येक लॉगिनला एक भूमिका (role) असते. भूमिकेनुसार कोणत्या स्क्रीन व बटणे दिसतील हे ठरते.</p>
     <div class="role-grid">
-      <div class="role"><div class="r-h"><i class="fas fa-crown"></i> मालक (Owner)</div><small>संपूर्ण अॅक्सेस — खालील सर्व: प्रॉडक्ट्स, स्टॉक, बिलिंग, ऑर्डर्स, रिपोर्ट्स, खाते, ग्राहक आणि टीम व्यवस्थापन.</small></div>
+      <div class="role"><div class="r-h"><i class="fas fa-crown"></i> मालक (Owner)</div><small>संपूर्ण अॅक्सेस — प्रॉडक्ट्स, स्टॉक, बिलिंग, ऑर्डर्स, रिपोर्ट्स, खाते, ग्राहक आणि टीम व्यवस्थापन.</small></div>
       <div class="role"><div class="r-h"><i class="fas fa-briefcase"></i> ऑफिस (Office)</div><small>रोजचे व्यवस्थापन: प्रॉडक्ट्स, स्टॉक, ऑर्डर्स, खरेदी, ग्राहक/विक्रेते, खाते, रिपोर्ट्स. टीम व्यवस्थापन करता येत नाही.</small></div>
       <div class="role"><div class="r-h"><i class="fas fa-cash-register"></i> स्टाफ (Staff)</div><small>फक्त <b>POS काउंटर</b> दिसते — दुकानात झटपट बिलिंगसाठी.</small></div>
       <div class="role"><div class="r-h"><i class="fas fa-route"></i> मार्केटिंग</div><small>फक्त <b>फील्ड ऑर्डर्स</b> दिसते — बाजारात फिरून दुकानांकडून ऑर्डर्स घेण्यासाठी.</small></div>
     </div>
 
     <h2 id="start"><span class="num">३</span> सुरुवातीचा सेटअप</h2>
-    <p><b>मालक</b> पहिल्यांदा लॉगिन करतो तेव्हा एक छोटा सेटअप विझार्ड दिसतो. तो आपली मूलभूत माहिती भरून अॅप वापरासाठी तयार करतो:</p>
+    <p><b>मालक</b> पहिल्यांदा लॉगिन करतो तेव्हा एक छोटा सेटअप विझार्ड मूलभूत माहिती भरून घेतो:</p>
     <ol class="steps">
       <li><b>स्वागत</b> — थोडक्यात ओळख.</li>
       <li><b>ठिकाणे</b> — आपले दुकान / गोडाऊन / आउटलेट्स जोडा.</li>
-      <li><b>प्रॉडक्ट्स</b> — आपण विकता किंवा बनवता ते सामान जोडा.</li>
-      <li><b>इन्व्हेंटरी</b> — प्रत्येक प्रॉडक्टचा सुरुवातीचा स्टॉक भरा.</li>
-      <li><b>रेसिपी</b> — (ऐच्छिक) उत्पादन करत असाल तर एका तयार वस्तूत काय लागते ते सांगा.</li>
+      <li><b>प्रॉडक्ट्स</b> — विकता किंवा बनवता ते सामान जोडा (प्रकार निवडा — विभाग ६ पहा).</li>
+      <li><b>इन्व्हेंटरी</b> — सुरुवातीचा स्टॉक खरेदी म्हणून भरा (किंमत व लागल्यास एक्स्पायरी तारखेसह).</li>
       <li><b>पूर्ण</b> — तयार आहात!</li>
     </ol>
-    <div class="note"><b>केव्हाही थांबू शकता:</b> आपण कुठे थांबलात ते विझार्ड लक्षात ठेवतो. अॅप बंद करून नंतर परत आल्यावर त्याच टप्प्यापासून सुरू होते. प्रत्येक टप्प्यात हवी तेवढी माहिती भरू शकता, किंवा एखादा टप्पा <b>Skip</b> करून नंतर मेन्यूमधून जोडू शकता.</div>
+    <div class="note"><b>केव्हाही थांबू शकता:</b> आपण कुठे थांबलात ते विझार्ड लक्षात ठेवतो. नंतर परत आल्यावर त्याच टप्प्यापासून सुरू होते. प्रत्येक टप्प्यात हवी तेवढी माहिती भरा, किंवा <b>Skip</b> करून नंतर मेन्यूमधून जोडा.</div>
 
-    <h2 id="dashboard"><span class="num">४</span> डॅशबोर्ड</h2>
-    <p>मुख्य स्क्रीन आपल्या व्यवसायाची झटपट स्थिती दाखवते: एकूण प्रॉडक्ट्स, सध्याचे स्टॉक मूल्य, अलीकडील विक्री, कमी स्टॉकचे इशारे आणि आलेख. रोजची सुरुवात इथून करा.</p>
+    <h2 id="dashboard"><span class="num">४</span> डॅशबोर्ड (मुख्य स्क्रीन)</h2>
+    <p>मुख्य स्क्रीन ही रोजची तपासणी आहे. वर एक स्वागत-पट्टी असते ज्यात <b>झटपट कृती</b> बटणे (उदा. नवीन विक्री, प्रॉडक्ट जोडा) असतात. खाली टॅप करता येणारी कार्ड्स व आलेख:</p>
+    <ul>
+      <li><b>आकडे कार्ड्स</b> — प्रॉडक्ट्स, स्टॉक मूल्य (₹), आजची विक्री (₹), प्रलंबित ऑर्डर्स, स्टॉकमधील नग, कमी स्टॉक. कोणत्याही कार्डवर टॅप केल्यास त्या स्क्रीनवर जाते.</li>
+      <li><b>कमाई · मागील ७ दिवस</b> — अलीकडील विक्रीचा आलेख.</li>
+      <li><b>ठिकाणनिहाय स्टॉक</b>, <b>मूल्यानुसार टॉप प्रॉडक्ट्स</b> आणि <b>अलीकडील घडामोडी</b> यादी.</li>
+    </ul>
+    <div class="barchart" aria-hidden="true">
+      <div class="bar" style="height:40%"></div><div class="bar" style="height:62%"></div>
+      <div class="bar" style="height:48%"></div><div class="bar" style="height:78%"></div>
+      <div class="bar" style="height:56%"></div><div class="bar" style="height:88%"></div>
+      <div class="bar" style="height:70%"></div>
+    </div>
 
     <h2 id="locations"><span class="num">५</span> ठिकाणे (Locations)</h2>
     <p>ठिकाणे म्हणजे आपली प्रत्यक्ष जागा — दुकान, गोडाऊन, आउटलेट. प्रत्येक ठिकाणाचा स्टॉक स्वतंत्रपणे मोजला जातो.</p>
@@ -144,69 +207,99 @@
       <li>हवी तेवढी ठिकाणे जोडू शकता.</li>
     </ul>
 
-    <h2 id="products"><span class="num">६</span> प्रॉडक्ट्स आणि कॅटेगरी</h2>
-    <p>प्रॉडक्ट्स म्हणजे आपण खरेदी करता, बनवता किंवा विकता त्या वस्तू. कॅटेगरीमुळे त्यांचे गट करता येतात (उदा. "स्नॅक्स", "पेये").</p>
+    <h2 id="products"><span class="num">६</span> प्रॉडक्टचे प्रकार व प्रॉडक्ट जोडणे</h2>
+    <p>आता प्रॉडक्ट्सचे <b>तीन प्रकार</b> आहेत. योग्य प्रकार निवडल्यास खर्च व विक्री अचूक राहते.</p>
+    <div class="ptypes">
+      <div class="pcard raw"><div class="ic"><i class="fas fa-flask"></i></div><b>कच्चा माल</b><small>फक्त घटक म्हणून वापरतात. कधीही विकत/प्रकाशित होत नाही. विक्री किंमत नाही — खर्च प्रत्येक खरेदी बॅचमधून येतो.</small></div>
+      <div class="pcard simple"><div class="ic"><i class="fas fa-box"></i></div><b>साधे (खरेदी-विक्री)</b><small>खरेदी करून जसेच्या तसे विकता. विक्री किंमत असते. खरेदी खर्च बॅचमधून येतो.</small></div>
+      <div class="pcard complex"><div class="ic"><i class="fas fa-blender"></i></div><b>बनवलेले (रेसिपी)</b><small>घटकांच्या रेसिपीतून बनवता. विक्री किंमत असते; बनवण्याचा खर्च उत्पादनाच्या वेळी मोजला जातो.</small></div>
+    </div>
     <ol class="steps">
-      <li><b>Categories</b> उघडून काही गट जोडा (ऐच्छिक पण उपयोगी).</li>
-      <li><b>Products</b> → <b>Add Product</b>. नाव, कॅटेगरी, विक्री किंमत आणि युनिट भरा.</li>
-      <li>सेव्ह करा. आता प्रॉडक्ट इन्व्हेंटरी, POS आणि ऑर्डर्समध्ये दिसेल.</li>
+      <li><b>Products</b> → <b>Add Product</b> उघडून <b>प्रकार</b> निवडा.</li>
+      <li>नाव, युनिट आणि (साधे/बनवलेले साठी) विक्री किंमत भरा.</li>
+      <li><b>बनवलेल्या</b> प्रॉडक्टसाठी त्याची <b>रेसिपी</b> जोडा: प्रत्येक घटक व किती लागतो ते निवडा. बनवण्याचा खर्च आपोआप दिसतो.</li>
+      <li>सेव्ह करा. (कच्चा व साधे प्रॉडक्ट्सचा खर्च पुढे जोडलेल्या स्टॉक बॅचमधून येतो.)</li>
+    </ol>
+    <div class="note"><b>शोध-सुविधा असलेल्या याद्या:</b> प्रत्येक यादीत (कॅटेगरी, प्रॉडक्ट, ग्राहक, विक्रेता…) शोध-बॉक्स आहे. टाइप करताच वस्तू पटकन सापडते — शेकडो प्रॉडक्ट्स झाल्यावर खूप उपयोगी.</div>
+
+    <h2 id="inventory"><span class="num">७</span> इन्व्हेंटरी: बॅच व लॉट</h2>
+    <p>स्टॉक आता <b>बॅच (लॉट)</b> स्वरूपात मोजला जातो. प्रत्येक बॅच लक्षात ठेवते — <b>किती नग</b>, <b>प्रति नग किंमत</b>, <b>एक्स्पायरी तारीख</b> (ऐच्छिक) आणि <b>पुरवठादार</b>. वेगवेगळ्या वेळी वेगळ्या किमतीत खरेदी होते म्हणून हे अधिक अचूक आहे.</p>
+    <div class="lots">
+      <div class="lot"><span class="lb">बॅच A</span><br>५० नग · ₹१८ प्रति<br>एक्स्पायरी: डिसें २०२६</div>
+      <div class="lot"><span class="lb">बॅच B</span><br>३० नग · ₹२० प्रति<br>एक्स्पायरी: ऑग २०२६</div>
+      <div class="lot"><span class="lb">बॅच C</span><br>१०० नग · ₹१७ प्रति<br>एक्स्पायरी नाही</div>
+    </div>
+    <ol class="steps">
+      <li><b>Inventory</b> वर प्रॉडक्टच्या ओळीवर टॅप करून प्रत्येक ठिकाणच्या बॅच पाहा.</li>
+      <li><b>Add stock / batch</b> दाबा, प्रमाण, प्रति नग किंमत, (ऐच्छिक) बॅच नंबर, एक्स्पायरी व पुरवठादार भरा.</li>
+      <li><b>किमान स्टॉक</b> ठरवा म्हणजे माल कमी झाल्यावर अॅप इशारा देईल.</li>
+    </ol>
+    <div class="note"><b>आपोआप व हुशार:</b> विक्री किंवा ऑर्डर पूर्ण करताना अॅप <b>आधी संपणारी (एक्स्पायरी जवळची) बॅच आधी</b> वापरते म्हणजे माल वाया जात नाही — आणि विकलेल्या मालाचा खरा खर्च नोंदवते. हवे तर विशिष्ट बॅच हाताने निवडता येते.</div>
+
+    <h2 id="produce"><span class="num">८</span> उत्पादन (बनवलेली प्रॉडक्ट्स)</h2>
+    <p>उत्पादन आता <b>Products मध्येच</b> आहे — वेगळे "रेसिपी" पान नाही. बनवलेले प्रॉडक्ट तयार करण्यासाठी:</p>
+    <ol class="steps">
+      <li><b>Products</b> → <b>Produce</b> दाबा.</li>
+      <li>बनवलेले प्रॉडक्ट, <b>ठिकाण</b> आणि बनवायचे <b>प्रमाण</b> निवडा.</li>
+      <li>कोणत्या घटक बॅच/लॉट वापरायच्या ते निवडा (किंवा अॅपला आधीच्या आधी वापरू द्या).</li>
+      <li>निश्चित करा. घटक वापरले जातात, नवीन तयार बॅच बनते आणि वापरलेल्या लॉटनुसार त्याचा <b>बनवण्याचा खर्च</b> मोजला जातो.</li>
     </ol>
 
-    <h2 id="inventory"><span class="num">७</span> इन्व्हेंटरी (स्टॉक)</h2>
-    <p>इन्व्हेंटरी स्क्रीन म्हणजे <b>प्रॉडक्ट्स × ठिकाणे</b> असा तक्ता. प्रत्येक खान म्हणजे त्या ठिकाणी त्या प्रॉडक्टचा किती माल आहे.</p>
-    <ul>
-      <li>प्रमाण ठरवण्यासाठी किंवा बदलण्यासाठी खानेवर टॅप करा.</li>
-      <li>POS वर विक्री केल्यावर किंवा ऑर्डर पूर्ण केल्यावर स्टॉक <b>आपोआप कमी</b> होतो, आणि खरेदी मिळाल्यावर <b>वाढतो</b>.</li>
-    </ul>
-
-    <h2 id="pos"><span class="num">८</span> POS काउंटर (बिलिंग)</h2>
-    <p>POS (पॉइंट ऑफ सेल) झटपट काउंटर बिलिंगसाठी आहे. <b>स्टाफ</b> साठी हीच मुख्य स्क्रीन.</p>
+    <h2 id="pos"><span class="num">९</span> POS काउंटर (बिलिंग)</h2>
+    <p>POS (पॉइंट ऑफ सेल) झटपट काउंटर बिलिंगसाठी — <b>स्टाफ</b> ची मुख्य स्क्रीन. इथे फक्त विकता येणारी प्रॉडक्ट्स (साधे व बनवलेले) दिसतात.</p>
     <ol class="steps">
-      <li>बिलात जोडण्यासाठी प्रॉडक्ट्सवर टॅप करा (प्रमाण वाढवण्यासाठी पुन्हा टॅप).</li>
-      <li>वस्तू व एकूण रक्कम तपासा.</li>
+      <li>ठिकाण निवडा, मग बिलात जोडण्यासाठी प्रॉडक्ट्सवर टॅप करा (प्रमाण वाढवण्यासाठी पुन्हा टॅप).</li>
+      <li>एका वस्तूच्या अनेक बॅच असतील, तर कोणत्या लॉटमधून विकायचे ते निवडता येते.</li>
       <li>पेमेंट निवडून <b>Complete Sale</b> दाबा.</li>
     </ol>
-    <p>प्रत्येक पूर्ण झालेल्या विक्रीने स्टॉक कमी होतो आणि रिपोर्टसाठी नोंद होते.</p>
+    <p>प्रत्येक पूर्ण विक्रीने योग्य बॅचचा स्टॉक कमी होतो आणि रिपोर्टसाठी नोंद होते.</p>
 
-    <h2 id="orders"><span class="num">९</span> ऑर्डर्स आणि खरेदी</h2>
+    <h2 id="orders"><span class="num">१०</span> ऑर्डर्स आणि खरेदी</h2>
     <p>ऑर्डर्स स्क्रीन <b>विक्री ऑर्डर्स</b> (बाहेर जाणाऱ्या) आणि <b>खरेदी ऑर्डर्स</b> (आत येणाऱ्या) दोन्ही दाखवते.</p>
+    <h3>ऑर्डरचा प्रवास</h3>
+    <div class="flow">
+      <div class="node"><i class="fas fa-file-circle-plus"></i><b>दिली</b></div>
+      <span class="arr"><i class="fas fa-arrow-left"></i></span>
+      <div class="node"><i class="fas fa-circle-check"></i><b>स्वीकारली</b></div>
+      <span class="arr"><i class="fas fa-arrow-left"></i></span>
+      <div class="node"><i class="fas fa-truck"></i><b>डिलिव्हर</b><small>स्टॉक कमी होतो</small></div>
+      <span class="arr"><i class="fas fa-arrow-left"></i></span>
+      <div class="node ok"><i class="fas fa-indian-rupee-sign"></i><b>पेमेंट → पूर्ण</b></div>
+      <span class="arr"><i class="fas fa-arrow-left"></i></span>
+      <div class="node warn"><i class="fas fa-book"></i><b>पेमेंट नाही → खाते</b><small>उधारी म्हणून ओपन राहते</small></div>
+    </div>
     <h3>मॅन्युअल खरेदी</h3>
     <p>मार्केटप्लेसवर <b>नसलेल्या</b> विक्रेत्याकडून माल खरेदी करताना <b>New Manual Purchase</b> वापरा:</p>
     <ol class="steps">
-      <li>विक्रेता निवडा (आपण जोडलेला कस्टम विक्रेता — विभाग १० पहा).</li>
-      <li>खरेदी केलेल्या वस्तू, प्रमाण व किमती जोडा.</li>
-      <li>सेव्ह करा. ऑर्डर <b>received</b> केल्यावर स्टॉक आपोआप वाढतो.</li>
+      <li>विक्रेता निवडा (आपण जोडलेला कस्टम विक्रेता — विभाग ११ पहा).</li>
+      <li>वस्तू, प्रमाण, किमती आणि (ऐच्छिक) प्रत्येक वस्तूची एक्स्पायरी जोडा.</li>
+      <li>सेव्ह करा. ऑर्डर <b>received</b> केल्यावर त्या किमतीची नवीन स्टॉक <b>बॅच</b> आपोआप तयार होते.</li>
     </ol>
-    <h3>स्वीकारणे, पूर्ण करणे आणि निपटारा</h3>
-    <p>आलेल्या ऑर्डर्स <b>accept</b>, <b>fulfil</b> (डिलिव्हरी) आणि <b>settle</b> (पेमेंट) करता येतात. ऑर्डर डिलिव्हर झाली पण पेमेंट झाले नाही, तर ती आपोआप खात्यात उधारी म्हणून जाते आणि निपटारा होईपर्यंत ओपन राहते.</p>
 
-    <h2 id="parties"><span class="num">१०</span> ग्राहक / विक्रेते</h2>
+    <h2 id="parties"><span class="num">११</span> ग्राहक / विक्रेते</h2>
     <p>इथे प्लॅटफॉर्मवर नसलेल्या आपल्या <b>ग्राहक</b> व <b>विक्रेत्यांची</b> स्वतःची यादी ठेवता येते — फक्त नाव आणि ठिकाण. यामुळे:</p>
     <ul>
       <li>अॅप न वापरणाऱ्या विक्रेत्यांकडील खरेदी नोंदवता येते.</li>
       <li>मार्केटिंगवाला फील्ड ऑर्डर टाकताना ग्राहक निवडता येतो.</li>
     </ul>
 
-    <h2 id="field"><span class="num">११</span> फील्ड ऑर्डर्स (मार्केटिंग)</h2>
+    <h2 id="field"><span class="num">१२</span> फील्ड ऑर्डर्स (मार्केटिंग)</h2>
     <p>मार्केटिंगवाला बाजारात फिरून दुकानांकडून ऑर्डर्स घेतो. कागद ऑफिसला आणण्याऐवजी तो थेट अॅपमध्ये ऑर्डर टाकतो:</p>
     <ol class="steps">
       <li><b>ग्राहक</b> निवडा (किंवा <b>Add customer</b> ने तिथल्या तिथे नवीन जोडा).</li>
-      <li>दुकानाने मागवलेली प्रॉडक्ट्स व प्रमाण जोडा.</li>
+      <li>दुकानाने मागवलेली प्रॉडक्ट्स व प्रमाण जोडा (स्टॉक कमी असला तरी सर्व प्रकाशित वस्तू दिसतात — ही अंतर्गत ऑर्डर आहे).</li>
       <li>सबमिट करा. ऑर्डर लगेच ऑफिसला पोहोचते.</li>
     </ol>
-    <p>ऑफिसमध्ये <b>ऑफिस</b> किंवा <b>मालक</b> ऑर्डर पाहतो, स्वीकारतो आणि डिलिव्हर करतो. स्टॉक कमी असेल तर ऑफिस ती रद्द करू शकते. पेमेंट न मिळाल्यास ती खात्यात उधारी म्हणून जाते व ऑर्डर ओपन राहते.</p>
+    <p>ऑफिसमध्ये <b>ऑफिस</b> किंवा <b>मालक</b> ती पाहतो, स्वीकारतो व डिलिव्हर करतो. स्टॉक कमी असेल तर रद्द करता येते. पेमेंट न मिळाल्यास ती खात्यात उधारी म्हणून जाते व ऑर्डर ओपन राहते.</p>
 
-    <h2 id="khata"><span class="num">१२</span> खाते (उधारी वही)</h2>
+    <h2 id="khata"><span class="num">१३</span> खाते (उधारी वही)</h2>
     <p>खाते म्हणजे आपली डिजिटल उधारी वही. कोणाकडे किती पैसे येणे बाकी आहे ते दाखवते. न भरलेल्या ऑर्डर्स इथे आपोआप येतात. ग्राहक पैसे देतील तसे पेमेंट नोंदवा.</p>
 
-    <h2 id="recipes"><span class="num">१३</span> रेसिपी / BOM</h2>
-    <p>आपण माल <b>तयार</b> करत असाल, तर रेसिपी (बिल ऑफ मटेरियल) मध्ये एका तयार प्रॉडक्टसाठी कोणता कच्चा माल लागतो ते ठरवता येते. उत्पादनात काय वापरले जाते हे यामुळे कळते.</p>
-
     <h2 id="shop"><span class="num">१४</span> शॉप (मार्केटप्लेस)</h2>
-    <p>शॉप हा B2B मार्केटप्लेस आहे — प्लॅटफॉर्मवरील इतर पुरवठादारांची प्रॉडक्ट्स पाहून कार्टमध्ये टाकून खरेदी ऑर्डर देता येते. प्लॅटफॉर्मवर नसलेल्या विक्रेत्यांसाठी मॅन्युअल खरेदी (विभाग ९) वापरा.</p>
+    <p>शॉप हा B2B मार्केटप्लेस आहे — प्लॅटफॉर्मवरील इतर पुरवठादारांची प्रॉडक्ट्स पाहून कार्टमध्ये टाकून खरेदी ऑर्डर देता येते. प्लॅटफॉर्मवर नसलेल्या विक्रेत्यांसाठी मॅन्युअल खरेदी (विभाग १०) वापरा.</p>
 
     <h2 id="reports"><span class="num">१५</span> रिपोर्ट्स</h2>
-    <p>रिपोर्ट्स आपल्या माहितीचे आलेख व सारांश बनवतात — विक्रीचा कल, टॉप प्रॉडक्ट्स, स्टॉक मूल्य आणि बरेच काही — ज्यामुळे चांगले निर्णय घेता येतात.</p>
+    <p>रिपोर्ट्स आपल्या माहितीचे आलेख व सारांश बनवतात — विक्रीचा कल, टॉप प्रॉडक्ट्स, स्टॉक मूल्य, एक्स्पायरी जवळच्या बॅच आणि बरेच काही — ज्यामुळे चांगले निर्णय घेता येतात.</p>
 
     <h2 id="team"><span class="num">१६</span> टीम व्यवस्थापन</h2>
     <p>मालक टीम सदस्य जोडून त्यांची भूमिका निवडू शकतो. <b>Team</b> → <b>Add member</b> उघडा:</p>
@@ -220,7 +313,7 @@
     <h2 id="tips"><span class="num">१७</span> टिप्स, थीम आणि इन्स्टॉल</h2>
     <ul>
       <li><b>डार्क / लाइट थीम:</b> बदलण्यासाठी चंद्र/सूर्य चिन्हावर टॅप करा.</li>
-      <li><b>तळाच्या बारचे शॉर्टकट (मालकांसाठी):</b> मोबाइलच्या तळातील ४ बटणे <b>More → Customize bottom bar</b> मधून निवडता येतात — उदा. उत्पादक POS ऐवजी Orders व Field ठेवू शकतो.</li>
+      <li><b>तळाच्या बारचे शॉर्टकट (मालकांसाठी):</b> मोबाइलच्या तळातील बटणे <b>More → Customize bottom bar</b> मधून निवडता येतात — उदा. उत्पादक POS ऐवजी Orders व Field ठेवू शकतो.</li>
       <li><b>फोनवर इन्स्टॉल करा:</b> ब्राउझरमध्ये साइट उघडून "Add to Home Screen" वापरा — अॅपसारखे, ऑफलाइनसुद्धा चालते.</li>
       <li><b>साइन आउट:</b> सामायिक डिव्हाइसवर काम झाल्यावर मेन्यूमधून साइन आउट करा.</li>
     </ul>
