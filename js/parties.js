@@ -1,6 +1,7 @@
 // Custom off-platform customers / sellers, scoped to the caller's company.
 const Parties = (() => {
   let editingId = null;
+  let _onAdded = null; // one-shot callback when a party is created (e.g. from Field Orders)
 
   function init() {
     const add = document.getElementById('add-party-btn');
@@ -47,12 +48,15 @@ const Parties = (() => {
       '</div></td></tr>').join('');
   }
 
-  function openModal(id) {
+  function openModal(id, opts) {
+    opts = opts || {};
     editingId = id || null;
+    _onAdded = opts.onAdded || null;
     const form = document.getElementById('party-form');
     form.reset();
     document.getElementById('party-id').value = editingId || '';
     document.getElementById('party-modal-title').textContent = editingId ? 'Edit Party' : 'Add Party';
+    if (!editingId && opts.defaultType) document.getElementById('party-type').value = opts.defaultType;
     if (editingId) {
       const p = Store.getPartyById(editingId);
       if (!p) return;
@@ -74,16 +78,18 @@ const Parties = (() => {
     const gstin = document.getElementById('party-gstin').value.trim();
     if (!name) return;
 
+    let created = null;
     if (editingId) {
       Store.updateParty(editingId, { name, type, location, phone, gstin });
       App.showToast('Party updated', 'success');
     } else {
-      Store.addParty({ ownerId: Auth.ownerId(), name, type, location, phone, gstin });
+      created = Store.addParty({ ownerId: Auth.ownerId(), name, type, location, phone, gstin });
       App.showToast('Party added', 'success');
     }
     document.getElementById('party-modal').classList.add('hidden');
     editingId = null;
     render();
+    if (created && _onAdded) { const cb = _onAdded; _onAdded = null; cb(created); }
   }
 
   function confirmDelete(id) {

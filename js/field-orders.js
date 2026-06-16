@@ -10,7 +10,16 @@ const FieldOrders = (() => {
     const submit = document.getElementById('fo-submit');
     if (submit) submit.addEventListener('click', _submit);
     const addCust = document.getElementById('fo-add-customer');
-    if (addCust) addCust.addEventListener('click', () => { if (window.Parties) Parties.openModal(); });
+    if (addCust) addCust.addEventListener('click', () => {
+      if (typeof Parties === 'undefined') return;
+      Parties.openModal(null, {
+        defaultType: 'customer',
+        onAdded: (p) => {
+          _populateCustomers();
+          if (p && p.id) document.getElementById('fo-customer').value = p.id;
+        },
+      });
+    });
   }
 
   function render() {

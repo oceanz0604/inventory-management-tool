@@ -21,9 +21,7 @@ const Admin = (() => {
     $('admin-logout').addEventListener('click', _onLogout);
     $('admin-add').addEventListener('click', _openAdd);
     $('add-customer-form').addEventListener('submit', _onAddCustomer);
-    $('set-login-form').addEventListener('submit', _onSetLogin);
     document.querySelectorAll('#add-customer-modal [data-close-modal]').forEach(el => el.addEventListener('click', _closeAdd));
-    document.querySelectorAll('#set-login-modal [data-close-modal]').forEach(el => el.addEventListener('click', () => $('set-login-modal').classList.add('hidden')));
 
     Firebase.onAuth((fb) => {
       if (fb) _afterAuth(fb);
@@ -85,7 +83,7 @@ const Admin = (() => {
     const usersById = {}; users.forEach(u => { usersById[u.id] = u; });
     const tbody = $('admin-companies');
     if (!companies.length) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No customers yet. Click “Add customer” to onboard your first company.</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No customers yet. Click “Add customer” to onboard your first company.</td></tr>';
       return;
     }
     companies.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
@@ -94,7 +92,7 @@ const Admin = (() => {
       const team = users.filter(u => u.companyId === c.id && WORKER_ROLES.indexOf(u.role) >= 0).length;
       const prods = products.filter(p => p.ownerId === c.id).length;
       const created = c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—';
-      const login = owner.username ? '@' + _esc(owner.username) : '<span style="color:var(--danger)">not set</span>';
+      const login = owner.username ? '@' + _esc(owner.username) : '<span style="color:var(--text-light)">—</span>';
       return `<tr>
         <td data-label="Company"><strong>${_esc(c.name)}</strong></td>
         <td data-label="Code"><span class="code-chip">${_esc(c.code)}</span></td>
@@ -102,10 +100,8 @@ const Admin = (() => {
         <td data-label="Team">${team}</td>
         <td data-label="Products">${prods}</td>
         <td data-label="Created">${_esc(created)}</td>
-        <td data-label="Actions"><button class="btn btn-secondary btn-sm" data-setlogin="${_esc(c.id)}">Set login</button></td>
       </tr>`;
     }).join('');
-    tbody.querySelectorAll('[data-setlogin]').forEach(btn => btn.addEventListener('click', () => _openSetLogin(btn.dataset.setlogin)));
   }
 
   /* ---------------- Add customer ---------------- */
@@ -146,56 +142,6 @@ const Admin = (() => {
       _loadStats();
     } catch (err) {
       _err('add-customer-error', _friendly(err));
-    } finally { btn.disabled = false; btn.textContent = orig; }
-  }
-
-  /* ---------------- Set / reset owner login (migration) ---------------- */
-  let _setLoginCompany = null;
-  async function _openSetLogin(cid) {
-    _hide('set-login-error');
-    $('set-login-form').reset();
-    $('set-login-cid').value = cid;
-    let company = null, owner = null;
-    try {
-      company = await Firebase.getDoc('companies', cid);
-      const users = await Firebase.listWhere('users', 'companyId', '==', cid);
-      owner = users.find(u => u.role === 'owner' || u.role === 'user') || users[0] || null;
-    } catch (e) { /* ignore */ }
-    _setLoginCompany = company;
-    $('set-login-company').textContent = company ? ('Company: ' + company.name + '  (code: ' + company.code + ')') : '';
-    if (owner && owner.username) $('set-login-username').value = owner.username;
-    $('set-login-modal').classList.remove('hidden');
-  }
-
-  async function _onSetLogin(e) {
-    e.preventDefault();
-    _hide('set-login-error');
-    const cid = $('set-login-cid').value;
-    const username = $('set-login-username').value.trim().toLowerCase();
-    const password = $('set-login-password').value;
-    if (!username) { _err('set-login-error', 'Username is required.'); return; }
-    const btn = e.target.querySelector('button[type="submit"]');
-    const orig = btn.textContent; btn.disabled = true; btn.textContent = 'Saving…';
-    try {
-      const users = await Firebase.listWhere('users', 'companyId', '==', cid);
-      let owner = users.find(u => u.role === 'owner' || u.role === 'user');
-      const cred = await Creds.make(password);
-      if (owner) {
-        owner.username = username; owner.salt = cred.salt; owner.passwordHash = cred.passwordHash; owner.role = owner.role || 'owner';
-        await Firebase.save('users', owner);
-      } else {
-        // No owner profile yet — create one keyed to the company id.
-        const company = _setLoginCompany || (await Firebase.getDoc('companies', cid));
-        await Firebase.save('users', {
-          id: cid, name: (company && company.name) || username, username: username, shopName: (company && company.name) || '',
-          role: 'owner', companyId: cid, salt: cred.salt, passwordHash: cred.passwordHash, createdAt: new Date().toISOString(),
-        });
-      }
-      $('set-login-modal').classList.add('hidden');
-      _toast('Owner login set (@' + username + ')', 'success');
-      _loadStats();
-    } catch (err) {
-      _err('set-login-error', _friendly(err));
     } finally { btn.disabled = false; btn.textContent = orig; }
   }
 
