@@ -38,10 +38,11 @@ const FieldOrders = (() => {
     sel.innerHTML = '<option value="">-- Select customer --</option>' + customers.map(c =>
       '<option value="' + c.id + '">' + _esc(c.name) + (c.location ? ' · ' + _esc(c.location) : '') + '</option>').join('');
     if (prev) sel.value = prev;
+    if (typeof SearchableSelect !== 'undefined') SearchableSelect.enhance(sel);
   }
 
   function _publishedProducts() {
-    return Store.getProductsByOwner(Auth.ownerId()).filter(p => p.isPublished);
+    return Store.getPublishedProducts(Auth.ownerId());
   }
 
   function _populateProducts() {
@@ -50,6 +51,7 @@ const FieldOrders = (() => {
     const prods = _publishedProducts();
     sel.innerHTML = '<option value="">-- Select product --</option>' + prods.map(p =>
       '<option value="' + p.id + '">' + _esc(p.name) + ' (\u20B9' + (p.price || 0) + ')</option>').join('');
+    if (typeof SearchableSelect !== 'undefined') SearchableSelect.enhance(sel);
   }
 
   function _onAddProduct(e) {
@@ -63,6 +65,7 @@ const FieldOrders = (() => {
       _renderItems();
     }
     e.target.value = '';
+    if (typeof SearchableSelect !== 'undefined') SearchableSelect.refresh(e.target);
   }
 
   function _renderItems() {

@@ -25,6 +25,7 @@ service cloud.firestore {
     match /locations/{id}  { allow read, write: if true; }
     match /products/{id}   { allow read, write: if true; }
     match /stock/{id}      { allow read, write: if true; }
+    match /batches/{id}    { allow read, write: if true; }
     match /orders/{id}     { allow read, write: if true; }
     match /recipes/{id}    { allow read, write: if true; }
     match /pos_sales/{id}  { allow read, write: if true; }

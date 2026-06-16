@@ -26,12 +26,20 @@ const Orders = (() => {
     const mpSubmit = document.getElementById('mp-submit');
     if (mpSubmit) mpSubmit.addEventListener('click', _mpSubmit);
     const mpAddSeller = document.getElementById('mp-add-seller');
-    if (mpAddSeller) mpAddSeller.addEventListener('click', () => { if (window.Parties) Parties.openModal(); });
+    if (mpAddSeller) mpAddSeller.addEventListener('click', () => {
+      if (typeof Parties === 'undefined') return;
+      Parties.openModal(null, {
+        defaultType: 'seller',
+        onAdded: (p) => { _populateMpSellers(); if (p && p.id) document.getElementById('mp-seller').value = p.id; SearchableSelect.refresh(document.getElementById('mp-seller')); },
+      });
+    });
     const mpProduct = document.getElementById('mp-product');
     if (mpProduct) mpProduct.addEventListener('change', (e) => {
       const p = Store.getProductById(e.target.value);
       if (p) document.getElementById('mp-cost').value = p.costPrice || 0;
     });
+    const fulfillLoc = document.getElementById('fulfill-location');
+    if (fulfillLoc) fulfillLoc.addEventListener('change', _renderFulfillLots);
   }
 
   function render() {
@@ -321,14 +329,38 @@ const Orders = (() => {
     const locs = Store.getLocationsByOwner(Auth.ownerId());
     locSel.innerHTML = locs.map(l => '<option value="' + l.id + '"' + (l.isDefault ? ' selected' : '') + '>' + _esc(l.name) + '</option>').join('');
     document.getElementById('fulfill-amount').value = order.total.toFixed(2);
+    SearchableSelect.enhanceAll(document.getElementById('fulfill-modal'));
+    _renderFulfillLots();
     document.getElementById('fulfill-modal').classList.remove('hidden');
+  }
+
+  function _renderFulfillLots() {
+    const box = document.getElementById('fulfill-lots');
+    if (!box) return;
+    const order = Store.getOrderById(document.getElementById('fulfill-order-id').value);
+    const locId = document.getElementById('fulfill-location').value;
+    if (!order || !locId) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="section-divider"><span>Lots to deliver</span></div>' + order.items.map(i => {
+      const lots = Store.availableLots(i.productId, locId);
+      const have = lots.reduce((s, l) => s + l.qty, 0);
+      const shortClass = have < i.qty ? ' style="color:var(--danger)"' : '';
+      const opts = lots.length
+        ? lots.map(l => '<option value="' + l.id + '">' + _esc(l.batchNumber || 'Lot') + ' \u00b7 ' + l.qty + ' left \u00b7 \u20B9' + (l.unitCost || 0).toFixed(2) + (l.expiryDate ? ' \u00b7 exp ' + new Date(l.expiryDate).toLocaleDateString('en-IN') : '') + '</option>').join('')
+        : '<option value="">No stock</option>';
+      return '<div class="produce-ing-row">' +
+        '<div class="ing-need"><strong>' + _esc(i.name) + '</strong><br><span' + shortClass + '>need ' + i.qty + ' \u00b7 have ' + have + '</span></div>' +
+        '<select class="select-input fulfill-lot" data-pid="' + i.productId + '">' + opts + '</select></div>';
+    }).join('');
+    box.querySelectorAll('.fulfill-lot').forEach(sel => SearchableSelect.enhance(sel));
   }
 
   function _confirmDeliver() {
     const orderId = document.getElementById('fulfill-order-id').value;
     const amount = parseFloat(document.getElementById('fulfill-amount').value) || 0;
     const locId = document.getElementById('fulfill-location').value;
-    const res = Store.fulfillFieldSale(orderId, amount, locId);
+    const lotChoices = {};
+    document.querySelectorAll('#fulfill-lots .fulfill-lot').forEach(sel => { if (sel.value) lotChoices[sel.dataset.pid] = sel.value; });
+    const res = Store.fulfillFieldSale(orderId, amount, locId, lotChoices);
     document.getElementById('fulfill-modal').classList.add('hidden');
     if (res.success) {
       App.showToast('Order delivered. Stock & Khata updated.', 'success');
@@ -341,21 +373,27 @@ const Orders = (() => {
   }
 
   // ---- Manual purchase (off-platform seller) ----
-  function openManualPurchase() {
-    mpItems = [];
+  function _populateMpSellers() {
     const sellerSel = document.getElementById('mp-seller');
     const sellers = Store.getPartiesByType(Auth.ownerId(), 'seller');
     sellerSel.innerHTML = '<option value="">-- Select seller --</option>' + sellers.map(s => '<option value="' + s.id + '">' + _esc(s.name) + '</option>').join('');
+  }
+
+  function openManualPurchase() {
+    mpItems = [];
+    _populateMpSellers();
     const locSel = document.getElementById('mp-location');
     const locs = Store.getLocationsByOwner(Auth.ownerId());
     locSel.innerHTML = locs.map(l => '<option value="' + l.id + '"' + (l.isDefault ? ' selected' : '') + '>' + _esc(l.name) + '</option>').join('');
     const prodSel = document.getElementById('mp-product');
-    const prods = Store.getProductsByOwner(Auth.ownerId());
+    const prods = Store.getProductsByOwner(Auth.ownerId()).filter(p => (p.type || 'simple') !== 'complex');
     prodSel.innerHTML = '<option value="">-- Select --</option>' + prods.map(p => '<option value="' + p.id + '">' + _esc(p.name) + '</option>').join('');
     document.getElementById('mp-cost').value = 0;
     document.getElementById('mp-qty').value = 1;
+    document.getElementById('mp-expiry').value = '';
     document.getElementById('mp-paid').value = 0;
     _renderMpItems();
+    SearchableSelect.enhanceAll(document.getElementById('manual-purchase-modal'));
     document.getElementById('manual-purchase-modal').classList.remove('hidden');
   }
 
@@ -366,8 +404,10 @@ const Orders = (() => {
     if (!p) return;
     const cost = parseFloat(document.getElementById('mp-cost').value) || 0;
     const qty = Math.max(1, parseInt(document.getElementById('mp-qty').value, 10) || 1);
-    mpItems.push({ productId: id, name: p.name, sku: p.sku || '', qty, unitPrice: cost });
+    const expiry = document.getElementById('mp-expiry').value || null;
+    mpItems.push({ productId: id, name: p.name, sku: p.sku || '', qty, unitPrice: cost, expiryDate: expiry });
     document.getElementById('mp-qty').value = 1;
+    document.getElementById('mp-expiry').value = '';
     _renderMpItems();
   }
 
@@ -375,6 +415,7 @@ const Orders = (() => {
     const tbody = document.getElementById('mp-items-body');
     tbody.innerHTML = mpItems.map((i, idx) => '<tr>' +
       '<td>' + _esc(i.name) + '</td><td>\u20B9' + i.unitPrice.toFixed(2) + '</td><td>' + i.qty + '</td>' +
+      '<td>' + (i.expiryDate ? new Date(i.expiryDate).toLocaleDateString('en-IN') : '—') + '</td>' +
       '<td>\u20B9' + (i.unitPrice * i.qty).toFixed(2) + '</td>' +
       '<td><button class="btn-icon delete" data-del="' + idx + '"><i class="fas fa-xmark"></i></button></td></tr>').join('');
     tbody.querySelectorAll('[data-del]').forEach(b => b.addEventListener('click', (e) => {

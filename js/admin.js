@@ -135,7 +135,6 @@ const Admin = (() => {
       };
       await Firebase.save('users', ownerProfile);
       await Firebase.save('companies', { id: cid, ownerId: cid, name: name, code: code, createdAt: new Date().toISOString() });
-      await Firebase.save('locations', { id: 'loc_' + cid + Date.now().toString(36), ownerId: cid, name: 'Main Warehouse', address: '', isDefault: true });
 
       _closeAdd();
       _toast('Customer "' + name + '" created (code: ' + code + ', login: @' + username + ')', 'success');

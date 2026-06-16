@@ -108,7 +108,6 @@ const App = (() => {
     Orders.init();
     Shop.init();
     POS.init();
-    BOM.init();
     KhataModule.init();
     Reports.init();
     Dashboard.init();
@@ -140,8 +139,8 @@ const App = (() => {
 
   // Views each role may reach. Owner/super-admin get everything.
   const ROLE_VIEWS = {
-    owner: ['dashboard', 'locations', 'products', 'inventory', 'pos', 'orders', 'recipes', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties', 'team'],
-    office: ['dashboard', 'locations', 'products', 'inventory', 'orders', 'recipes', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties'],
+    owner: ['dashboard', 'locations', 'products', 'inventory', 'pos', 'orders', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties', 'team'],
+    office: ['dashboard', 'locations', 'products', 'inventory', 'orders', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties'],
     staff: ['pos'],
     marketing: ['field-order'],
   };
@@ -300,7 +299,7 @@ const App = (() => {
   const titles = {
     dashboard: 'Dashboard', locations: 'Locations', products: 'Products',
     inventory: 'Inventory', pos: 'POS Counter', orders: 'Orders',
-    categories: 'Categories', shop: 'Shop', recipes: 'Recipes / BOM',
+    categories: 'Categories', shop: 'Shop',
     reports: 'Reports', khata: 'Khata / Credit',
     'field-order': 'Field Orders', parties: 'Customers / Sellers', team: 'Team'
   };
@@ -329,7 +328,6 @@ const App = (() => {
     if (view === 'orders') Orders.render();
     if (view === 'categories') _renderCategories();
     if (view === 'shop') { Shop.populateFilters(); Shop.renderProducts(); }
-    if (view === 'recipes') BOM.refresh();
     if (view === 'reports') Reports.refresh();
     if (view === 'khata') KhataModule.refresh();
     if (view === 'field-order') FieldOrders.render();
@@ -346,7 +344,6 @@ const App = (() => {
     locations: { icon: 'fa-location-dot', label: 'Locations' },
     pos: { icon: 'fa-cash-register', label: 'POS' },
     orders: { icon: 'fa-file-invoice', label: 'Orders' },
-    recipes: { icon: 'fa-mortar-pestle', label: 'Recipes' },
     categories: { icon: 'fa-tags', label: 'Categories' },
     reports: { icon: 'fa-chart-bar', label: 'Reports' },
     khata: { icon: 'fa-book', label: 'Khata' },

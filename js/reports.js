@@ -123,8 +123,7 @@ const Reports = (() => {
     prods.forEach(p => {
       const cat = Store.getCategoryById(p.categoryId);
       const catName = cat ? cat.name : 'Uncategorized';
-      const totalStock = Store.getTotalStockForProduct(p.id);
-      catValues[catName] = (catValues[catName] || 0) + totalStock * (p.costPrice || 0);
+      catValues[catName] = (catValues[catName] || 0) + Store.getProductStockValue(p.id);
     });
 
     const labels = Object.keys(catValues);
@@ -170,7 +169,7 @@ const Reports = (() => {
       const daysLeft = Math.ceil((new Date(s.expiryDate) - new Date()) / 86400000);
       const color = daysLeft <= 0 ? 'var(--danger)' : daysLeft <= 30 ? 'var(--warning)' : 'var(--text)';
       const badge = daysLeft <= 0 ? '<span class="badge badge-danger">Expired</span>' : daysLeft <= 30 ? '<span class="badge badge-warning">' + daysLeft + 'd</span>' : '<span class="badge badge-info">' + daysLeft + 'd</span>';
-      return '<tr><td>' + (prod ? _esc(prod.name) : '?') + '</td><td>' + (loc ? _esc(loc.name) : '?') + '</td><td><code style="font-size:.75rem">' + _esc(s.batchNumber || '—') + '</code></td><td>' + s.quantity + '</td><td>' + new Date(s.expiryDate).toLocaleDateString('en-IN') + '</td><td style="color:' + color + ';font-weight:600">' + badge + '</td></tr>';
+      return '<tr><td>' + (prod ? _esc(prod.name) : '?') + '</td><td>' + (loc ? _esc(loc.name) : '?') + '</td><td><code style="font-size:.75rem">' + _esc(s.batchNumber || '—') + '</code></td><td>' + s.qty + '</td><td>' + new Date(s.expiryDate).toLocaleDateString('en-IN') + '</td><td style="color:' + color + ';font-weight:600">' + badge + '</td></tr>';
     }).join('');
   }
 

@@ -31,6 +31,7 @@ const Export = (() => {
       const margin = sell > 0 ? ((sell - cost) / sell * 100).toFixed(1) : '0.0';
       return {
         Product: product ? product.name : 'Unknown',
+        Type: product ? ({ raw: 'Raw', simple: 'Simple', complex: 'Complex' }[product.type || 'simple']) : '-',
         SKU: product ? product.sku : '-',
         Category: cat ? cat.name : 'Uncategorized',
         Location: location ? location.name : 'Unknown',
@@ -75,8 +76,8 @@ const Export = (() => {
     const totalProfit = totalSell - totalCost;
     doc.text(`Total Entries: ${data.length}  |  Stock: ${data.reduce((s, r) => s + r.Quantity, 0)}  |  Cost: ₹${totalCost.toFixed(2)}  |  Value: ₹${totalSell.toFixed(2)}  |  Profit: ₹${totalProfit.toFixed(2)}`, 14, 35);
 
-    const headers = ['Product', 'SKU', 'Location', 'Qty', 'Cost', 'Sell', 'Margin', 'Status'];
-    const tableData = data.map(r => [r.Product, r.SKU, r.Location, String(r.Quantity), '₹' + r['Cost Price'], '₹' + r['Sell Price'], r['Margin %'] + '%', r.Status]);
+    const headers = ['Product', 'Type', 'SKU', 'Location', 'Qty', 'Cost', 'Sell', 'Margin', 'Status'];
+    const tableData = data.map(r => [r.Product, r.Type, r.SKU, r.Location, String(r.Quantity), '₹' + r['Cost Price'], '₹' + r['Sell Price'], r['Margin %'] + '%', r.Status]);
 
     doc.autoTable({
       head: [headers], body: tableData, startY: 42,

@@ -301,6 +301,47 @@ input:focus,textarea:focus,.select-input:focus { border-color:var(--primary); bo
 .input-readonly { background:var(--bg-2) !important; color:var(--text-secondary) !important; border-style:dashed !important; cursor:default; font-weight:700; }
 textarea { resize:vertical; }
 .select-input { appearance:none; background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%235b6478' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat:no-repeat; background-position:right .85rem center; padding-right:2.2rem; cursor:pointer; }
+/* Searchable select (combobox) — wraps a native <select>. */
+.ss-wrap { position:relative; width:100%; }
+.ss-native { position:absolute !important; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); border:0; }
+.ss-control { width:100%; display:flex; align-items:center; justify-content:space-between; gap:.5rem; text-align:left;
+  padding:.7rem .95rem; border:1.5px solid var(--border); border-radius:var(--radius); background:var(--bg-input); color:var(--text);
+  cursor:pointer; font:inherit; transition:border-color var(--transition),box-shadow var(--transition); }
+.ss-control:hover:not(.ss-disabled) { border-color:var(--border-strong); }
+.ss-control:focus { outline:none; border-color:var(--primary); box-shadow:var(--ring); }
+.ss-control.ss-disabled { opacity:.6; cursor:not-allowed; }
+.ss-label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ss-label.ss-placeholder { color:var(--text-light); }
+.ss-caret { font-size:.7rem; color:var(--text-light); flex-shrink:0; }
+.ss-panel { position:absolute; z-index:60; top:calc(100% + 4px); left:0; right:0; background:var(--bg-card); border:1.5px solid var(--border);
+  border-radius:var(--radius); box-shadow:var(--shadow-lg); overflow:hidden; }
+.ss-search { position:relative; padding:.5rem; border-bottom:1px solid var(--border); }
+.ss-search i { position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:var(--text-light); font-size:.8rem; pointer-events:none; }
+.ss-search input { width:100%; padding:.5rem .6rem .5rem 2rem; border:1px solid var(--border); border-radius:8px; background:var(--bg-input); color:var(--text); }
+.ss-options { max-height:240px; overflow-y:auto; padding:.3rem; }
+.ss-opt { padding:.55rem .7rem; border-radius:8px; cursor:pointer; font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ss-opt:hover { background:var(--bg-2); }
+.ss-opt.sel { background:var(--primary-soft); color:var(--primary); font-weight:600; }
+.ss-opt.dis { opacity:.45; cursor:not-allowed; }
+.ss-empty { padding:.7rem; text-align:center; color:var(--text-light); font-size:.85rem; }
+.toolbar-filters .ss-wrap { width:auto; min-width:150px; }
+.pos-toolbar .ss-wrap { width:auto; min-width:130px; }
+
+.section-divider { display:flex; align-items:center; gap:.75rem; margin:1rem 0 .75rem; color:var(--text-light); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; }
+.section-divider::after { content:""; flex:1; height:1px; background:var(--border); }
+.type-pill { display:inline-block; padding:.12rem .5rem; border-radius:999px; font-size:.68rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
+.type-pill.raw { background:rgba(245,158,11,.15); color:#b45309; }
+.type-pill.simple { background:rgba(59,130,246,.15); color:#1d4ed8; }
+.type-pill.complex { background:rgba(139,92,246,.16); color:#6d28d9; }
+[data-theme="dark"] .type-pill.raw { color:#fbbf24; }
+[data-theme="dark"] .type-pill.simple { color:#60a5fa; }
+[data-theme="dark"] .type-pill.complex { color:#c4b5fd; }
+.produce-ing-row { display:grid; grid-template-columns:1fr 1.4fr; gap:.5rem; align-items:center; margin-bottom:.5rem; }
+.produce-ing-row .ing-need { font-size:.85rem; color:var(--text-secondary); }
+.pos-bill-lot { margin-top:.3rem; }
+.pos-bill-lot select { width:100%; font-size:.72rem; padding:.25rem .4rem; border:1px solid var(--border); border-radius:6px; background:var(--bg-input); color:var(--text-secondary); }
+.lots-subrow > td { background:var(--bg-2); }
+
 .color-picker { display:flex; align-items:center; gap:.75rem; }
 .color-picker input[type="color"] { width:52px; height:40px; padding:3px; border:1.5px solid var(--border); border-radius:var(--radius); cursor:pointer; background:var(--bg-input); }
 .color-preview { width:26px; height:26px; border-radius:50%; border:2px solid var(--border); }

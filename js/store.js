@@ -16,6 +16,7 @@ const Store = (() => {
     KHATA_SEQ: 'ims_khata_seq',
     PARTIES: 'ims_parties',
     COMPANIES: 'ims_companies',
+    BATCHES: 'ims_batches',
   };
 
   function _get(key) {
@@ -36,7 +37,7 @@ const Store = (() => {
     [KEYS.USERS]: 'users', [KEYS.CATEGORIES]: 'categories', [KEYS.LOCATIONS]: 'locations',
     [KEYS.PRODUCTS]: 'products', [KEYS.STOCK]: 'stock', [KEYS.ORDERS]: 'orders',
     [KEYS.POS_SALES]: 'pos_sales', [KEYS.RECIPES]: 'recipes', [KEYS.KHATA]: 'khata',
-    [KEYS.PARTIES]: 'parties',
+    [KEYS.PARTIES]: 'parties', [KEYS.BATCHES]: 'batches',
   };
   function _cloudOn() { return typeof window !== 'undefined' && window.Firebase && Firebase.isEnabled(); }
   function _cloudSave(collection, doc) {
@@ -97,10 +98,13 @@ const Store = (() => {
   }
   function deleteLocation(id) {
     const removedStock = getStock().filter(s => s.locationId === id);
+    const removedBatches = (_get(KEYS.BATCHES) || []).filter(b => b.locationId === id);
     _set(KEYS.LOCATIONS, getLocations().filter(l => l.id !== id));
     _set(KEYS.STOCK, getStock().filter(s => s.locationId !== id));
+    _set(KEYS.BATCHES, (_get(KEYS.BATCHES) || []).filter(b => b.locationId !== id));
     _cloudRemove('locations', id);
     removedStock.forEach(s => _cloudRemove('stock', s.id));
+    removedBatches.forEach(b => _cloudRemove('batches', b.id));
   }
   function getDefaultLocation(ownerId) {
     const locs = getLocationsByOwner(ownerId);
@@ -108,9 +112,15 @@ const Store = (() => {
   }
 
   // ========== Products ==========
+  // type: 'raw' (ingredient, never sold), 'simple' (trading good), 'complex' (made
+  // from a recipe). Sellable = simple | complex. Raw products are never published.
+  function isSellableType(type) { return type === 'simple' || type === 'complex'; }
   function getProducts() { return _get(KEYS.PRODUCTS) || []; }
   function getProductsByOwner(ownerId) { return getProducts().filter(p => p.ownerId === ownerId); }
-  function getPublishedProducts(ownerId) { return getProducts().filter(p => p.ownerId === ownerId && p.isPublished); }
+  function getProductsByType(ownerId, type) { return getProductsByOwner(ownerId).filter(p => (p.type || 'simple') === type); }
+  function getSellableProducts(ownerId) { return getProductsByOwner(ownerId).filter(p => isSellableType(p.type || 'simple')); }
+  function getIngredientProducts(ownerId) { return getProductsByOwner(ownerId).filter(p => (p.type || 'simple') !== 'complex'); }
+  function getPublishedProducts(ownerId) { return getProducts().filter(p => p.ownerId === ownerId && p.isPublished && isSellableType(p.type || 'simple')); }
   function getProductById(id) { return getProducts().find(p => p.id === id); }
   function addProduct(prod) { const p = getProducts(); p.push(prod); _set(KEYS.PRODUCTS, p); _cloudSave('products', prod); return prod; }
   function updateProduct(id, updates) {
@@ -120,10 +130,13 @@ const Store = (() => {
   }
   function deleteProduct(id) {
     const removedStock = getStock().filter(s => s.productId === id);
+    const removedBatches = (_get(KEYS.BATCHES) || []).filter(b => b.productId === id);
     _set(KEYS.PRODUCTS, getProducts().filter(p => p.id !== id));
     _set(KEYS.STOCK, getStock().filter(s => s.productId !== id));
+    _set(KEYS.BATCHES, (_get(KEYS.BATCHES) || []).filter(b => b.productId !== id));
     _cloudRemove('products', id);
     removedStock.forEach(s => _cloudRemove('stock', s.id));
+    removedBatches.forEach(b => _cloudRemove('batches', b.id));
   }
 
   // ========== Stock (product x location) ==========
@@ -182,10 +195,154 @@ const Store = (() => {
   function getExpiringStock(ownerId, days) {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() + (days || 30));
-    return getStockByOwner(ownerId).filter(s => {
-      if (!s.expiryDate) return false;
-      return new Date(s.expiryDate) <= cutoff;
+    return getBatches(ownerId).filter(b => b.qty > 0 && b.expiryDate && new Date(b.expiryDate) <= cutoff);
+  }
+
+  // ========== Batches / Lots ==========
+  // Purchases (and production) create batches. Each batch carries its own unit
+  // cost + optional shelf life. A product x location stock record caches the sum.
+  function getBatches(ownerId) {
+    const all = _get(KEYS.BATCHES) || [];
+    return ownerId ? all.filter(b => b.ownerId === ownerId) : all;
+  }
+  function getBatchById(id) { return (_get(KEYS.BATCHES) || []).find(b => b.id === id); }
+  function getBatchesByProduct(productId, locationId) {
+    return (_get(KEYS.BATCHES) || []).filter(b => b.productId === productId && (!locationId || b.locationId === locationId));
+  }
+  function _lotOrder(a, b) {
+    const ax = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
+    const bx = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
+    if (ax !== bx) return ax - bx; // earliest expiry first (FEFO)
+    return new Date(a.purchaseDate || a.createdAt) - new Date(b.purchaseDate || b.createdAt);
+  }
+  function availableLots(productId, locationId) {
+    return getBatchesByProduct(productId, locationId).filter(b => b.qty > 0).sort(_lotOrder);
+  }
+  function getBatchQty(productId, locationId) {
+    return getBatchesByProduct(productId, locationId).reduce((s, b) => s + Math.max(0, b.qty), 0);
+  }
+
+  function addBatch(batch) {
+    batch.id = batch.id || generateId();
+    batch.ownerId = batch.ownerId || _ownerOfLocation(batch.locationId);
+    batch.qty = Math.max(0, batch.qty || 0);
+    batch.unitCost = batch.unitCost || 0;
+    batch.origQty = batch.origQty != null ? batch.origQty : batch.qty;
+    batch.createdAt = batch.createdAt || new Date().toISOString();
+    batch.purchaseDate = batch.purchaseDate || batch.createdAt;
+    batch.expiryDate = batch.expiryDate || null;
+    const all = _get(KEYS.BATCHES) || [];
+    all.push(batch);
+    _set(KEYS.BATCHES, all);
+    _cloudSave('batches', batch);
+    _recountStock(batch.productId, batch.locationId);
+    _recalcProductCost(batch.productId);
+    return batch;
+  }
+  function updateBatch(id, updates) {
+    let merged = null;
+    _set(KEYS.BATCHES, (_get(KEYS.BATCHES) || []).map(b => b.id === id ? (merged = { ...b, ...updates }) : b));
+    if (merged) { _cloudSave('batches', merged); _recountStock(merged.productId, merged.locationId); _recalcProductCost(merged.productId); }
+    return merged;
+  }
+  function deleteBatch(id) {
+    const b = getBatchById(id);
+    _set(KEYS.BATCHES, (_get(KEYS.BATCHES) || []).filter(x => x.id !== id));
+    _cloudRemove('batches', id);
+    if (b) { _recountStock(b.productId, b.locationId); _recalcProductCost(b.productId); }
+  }
+
+  // Keep the product x location stock record's quantity in sync with its batches.
+  function _recountStock(productId, locationId) {
+    if (!productId || !locationId) return;
+    const qty = getBatchQty(productId, locationId);
+    const rec = getStockRecord(productId, locationId);
+    setStock(productId, locationId, qty, rec ? rec.minStock : 0);
+  }
+
+  // Auto-pick lots to satisfy a quantity (earliest expiry first), optionally
+  // forcing a preferred batch to the front. Returns picks or null if short.
+  function pickLots(productId, locationId, qty, preferredBatchId) {
+    const lots = availableLots(productId, locationId);
+    if (preferredBatchId) {
+      const i = lots.findIndex(l => l.id === preferredBatchId);
+      if (i > 0) { const [pl] = lots.splice(i, 1); lots.unshift(pl); }
+    }
+    let need = qty; const picks = [];
+    for (const l of lots) { if (need <= 0) break; const take = Math.min(l.qty, need); picks.push({ batchId: l.id, qty: take }); need -= take; }
+    return need > 0.0001 ? null : picks;
+  }
+
+  // Decrement chosen batches; returns total COGS consumed.
+  function consumeLots(picks) {
+    let cost = 0;
+    (picks || []).forEach(pk => {
+      const b = getBatchById(pk.batchId);
+      if (!b) return;
+      const take = Math.max(0, Math.min(b.qty, pk.qty));
+      cost += take * (b.unitCost || 0);
+      updateBatch(b.id, { qty: b.qty - take });
     });
+    return cost;
+  }
+
+  // ---- Product cost (derived) ----
+  // raw/simple: weighted average of remaining batches (fallback to last batch).
+  // complex: making cost from the current recipe + ingredient costs.
+  function calcMakingCost(product) {
+    if (!product || !product.recipe || !product.recipe.ingredients) return product ? (product.costPrice || 0) : 0;
+    let cost = 0;
+    product.recipe.ingredients.forEach(ing => {
+      const ip = getProductById(ing.productId);
+      if (ip) cost += (ip.costPrice || 0) * ing.qty;
+    });
+    const out = product.recipe.outputQty || 1;
+    return out > 0 ? cost / out : cost;
+  }
+  function _recalcProductCost(productId) {
+    const p = getProductById(productId);
+    if (!p) return;
+    let cost;
+    if ((p.type || 'simple') === 'complex') {
+      cost = calcMakingCost(p);
+    } else {
+      const bs = getBatchesByProduct(productId).filter(b => b.qty > 0);
+      const tot = bs.reduce((s, b) => s + b.qty, 0);
+      if (tot > 0) cost = bs.reduce((s, b) => s + b.qty * b.unitCost, 0) / tot;
+      else {
+        const all = getBatchesByProduct(productId).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+        cost = all.length ? all[0].unitCost : (p.costPrice || 0);
+      }
+    }
+    const rounded = Math.round((cost || 0) * 100) / 100;
+    if (rounded !== p.costPrice) updateProduct(productId, { costPrice: rounded });
+  }
+
+  function getProductStockValue(productId) {
+    return getBatchesByProduct(productId).reduce((s, b) => s + Math.max(0, b.qty) * (b.unitCost || 0), 0);
+  }
+
+  // Produce a complex product: consume the chosen ingredient lots, compute the
+  // actual making cost, and create a finished batch at that cost.
+  function produceComplex(productId, locationId, qty, lotChoices) {
+    const p = getProductById(productId);
+    if (!p || (p.type || 'simple') !== 'complex' || !p.recipe) return { success: false, message: 'Not a complex product' };
+    if (!locationId) return { success: false, message: 'Select a location' };
+    qty = Math.max(1, qty || 1);
+    const allPicks = [];
+    for (const ing of p.recipe.ingredients) {
+      const need = ing.qty * qty;
+      const picks = pickLots(ing.productId, locationId, need, (lotChoices || {})[ing.productId]);
+      if (!picks) {
+        const ip = getProductById(ing.productId);
+        return { success: false, message: 'Not enough ' + (ip ? ip.name : 'ingredient') + ' at this location (need ' + need + ')' };
+      }
+      picks.forEach(pk => allPicks.push(pk));
+    }
+    const cost = consumeLots(allPicks);
+    const unit = qty > 0 ? cost / qty : cost;
+    addBatch({ productId, locationId, batchNumber: 'PROD-' + generateId().slice(0, 5).toUpperCase(), unitCost: Math.round(unit * 100) / 100, qty, note: 'Produced ' + qty });
+    return { success: true, cost, unitCost: unit };
   }
 
   // ========== Orders ==========
@@ -227,17 +384,16 @@ const Store = (() => {
       const buyerDefaultLoc = getDefaultLocation(order.buyerId);
       order.items.forEach(item => {
         if (order.fulfillmentLocationId) {
-          adjustStock(item.productId, order.fulfillmentLocationId, -item.qty);
+          const picks = pickLots(item.productId, order.fulfillmentLocationId, item.qty);
+          if (picks) item.costPrice = consumeLots(picks) / Math.max(1, item.qty);
         }
         if (buyerDefaultLoc) {
           let buyerProduct = getProductsByOwner(order.buyerId).find(p => p.name === item.name);
           if (!buyerProduct) {
-            buyerProduct = { id: generateId(), ownerId: order.buyerId, name: item.name, sku: item.sku || 'AUTO-' + generateId().slice(0, 4).toUpperCase(), categoryId: '', costPrice: item.unitPrice, price: item.unitPrice, unit: 'pcs', gstRate: 0, description: 'Auto-created from purchase order ' + order.orderNumber, isPublished: false, createdAt: new Date().toISOString() };
+            buyerProduct = { id: generateId(), ownerId: order.buyerId, name: item.name, type: 'simple', sku: item.sku || 'AUTO-' + generateId().slice(0, 4).toUpperCase(), categoryId: '', costPrice: item.unitPrice, price: item.unitPrice, unit: 'pcs', gstRate: 0, description: 'Auto-created from purchase order ' + order.orderNumber, isPublished: false, createdAt: new Date().toISOString() };
             addProduct(buyerProduct);
-          } else {
-            updateProduct(buyerProduct.id, { costPrice: item.unitPrice });
           }
-          adjustStock(buyerProduct.id, buyerDefaultLoc.id, item.qty);
+          addBatch({ productId: buyerProduct.id, locationId: buyerDefaultLoc.id, unitCost: item.unitPrice, qty: item.qty, batchNumber: 'PO-' + order.orderNumber, note: 'Received ' + order.orderNumber });
         }
       });
     }
@@ -296,11 +452,20 @@ const Store = (() => {
 
   // Deliver a field sale: reduce stock, record payment, post any shortfall to
   // Khata as credit against the customer (they owe the company).
-  function fulfillFieldSale(orderId, amountReceived, locationId) {
+  function fulfillFieldSale(orderId, amountReceived, locationId, lotChoices) {
     const order = getOrderById(orderId);
     if (!order) return { success: false, message: 'Order not found' };
     const loc = locationId || order.fulfillmentLocationId || (getDefaultLocation(order.sellerId) || {}).id;
-    if (loc) order.items.forEach(i => adjustStock(i.productId, loc, -i.qty));
+    if (!loc) return { success: false, message: 'No location selected' };
+    // Verify every line can be satisfied from stock before consuming anything.
+    const plan = [];
+    for (const i of order.items) {
+      const picks = pickLots(i.productId, loc, i.qty, (lotChoices || {})[i.productId]);
+      if (!picks) return { success: false, message: 'Not enough stock of ' + i.name + ' at this location' };
+      plan.push({ item: i, picks });
+    }
+    plan.forEach(p => { p.item.costPrice = consumeLots(p.picks) / Math.max(1, p.item.qty); });
+    _setOrder(orderId, o => { o.items = order.items; });
     const paid = Math.max(0, amountReceived || 0);
     const balance = order.total - paid;
     const updated = _setOrder(orderId, o => {
@@ -324,9 +489,12 @@ const Store = (() => {
     const loc = locationId || order.fulfillmentLocationId || (getDefaultLocation(order.buyerId) || {}).id;
     if (!loc) return { success: false, message: 'No location selected' };
     order.items.forEach(i => {
-      adjustStock(i.productId, loc, i.qty);
-      const prod = getProductById(i.productId);
-      if (prod) updateProduct(prod.id, { costPrice: i.unitPrice });
+      addBatch({
+        productId: i.productId, locationId: loc, unitCost: i.unitPrice, qty: i.qty,
+        expiryDate: i.expiryDate || null, supplierPartyId: order.sellerPartyId || null,
+        batchNumber: i.batchNumber || ('PUR-' + generateId().slice(0, 5).toUpperCase()),
+        note: 'Purchase ' + order.orderNumber,
+      });
     });
     const paid = Math.max(0, amountPaid || 0);
     const balance = order.total - paid;
@@ -369,7 +537,12 @@ const Store = (() => {
       createdAt: new Date().toISOString(),
     };
     sale.total = sale.subtotal + sale.taxAmount;
-    items.forEach(i => adjustStock(i.productId, locationId, -i.qty));
+    // Consume lots (per-line preferred batch if supplied) and record real COGS.
+    items.forEach(i => {
+      const picks = i.lots && i.lots.length ? i.lots : pickLots(i.productId, locationId, i.qty, i.batchId);
+      if (picks) i.costPrice = consumeLots(picks) / Math.max(1, i.qty);
+      delete i.lots; delete i.batchId;
+    });
     const all = _get(KEYS.POS_SALES) || [];
     all.push(sale);
     _set(KEYS.POS_SALES, all);
@@ -572,18 +745,18 @@ const Store = (() => {
     const isAdmin = user.role === 'superadmin';
     try {
       if (isAdmin) {
-        const [users, cats, locs, prods, stock, orders, pos, recipes, khata, parties, companies] = await Promise.all([
+        const [users, cats, locs, prods, stock, orders, pos, recipes, khata, parties, companies, batches] = await Promise.all([
           Firebase.list('users'), Firebase.list('categories'), Firebase.list('locations'),
           Firebase.list('products'), Firebase.list('stock'), Firebase.list('orders'),
-          Firebase.list('pos_sales'), Firebase.list('recipes'), Firebase.list('khata'), Firebase.list('parties'), Firebase.list('companies'),
+          Firebase.list('pos_sales'), Firebase.list('recipes'), Firebase.list('khata'), Firebase.list('parties'), Firebase.list('companies'), Firebase.list('batches'),
         ]);
         _set(KEYS.USERS, _stripUserSecrets(users)); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
         _set(KEYS.PRODUCTS, prods); _set(KEYS.STOCK, stock); _set(KEYS.ORDERS, orders);
-        _set(KEYS.POS_SALES, pos); _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata); _set(KEYS.PARTIES, parties); _set(KEYS.COMPANIES, companies);
+        _set(KEYS.POS_SALES, pos); _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata); _set(KEYS.PARTIES, parties); _set(KEYS.COMPANIES, companies); _set(KEYS.BATCHES, batches);
       } else {
         // Workers scope to their company; owners scope to themselves.
         const scopeId = user.companyId || user.id;
-        const [users, cats, locs, ownProds, pubProds, stock, ordBuy, ordSell, pos, recipes, khata, parties] = await Promise.all([
+        const [users, cats, locs, ownProds, pubProds, stock, ordBuy, ordSell, pos, recipes, khata, parties, batches] = await Promise.all([
           Firebase.list('users'),
           Firebase.list('categories'),
           Firebase.listByOwner('locations', scopeId),
@@ -596,13 +769,14 @@ const Store = (() => {
           Firebase.listByOwner('recipes', scopeId),
           Firebase.listByOwner('khata', scopeId),
           Firebase.listByOwner('parties', scopeId),
+          Firebase.listByOwner('batches', scopeId),
         ]);
         const prodMap = {}; ownProds.concat(pubProds).forEach(p => { prodMap[p.id] = p; });
         const ordMap = {}; ordBuy.concat(ordSell).forEach(o => { ordMap[o.id] = o; });
         _set(KEYS.USERS, _stripUserSecrets(users)); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
         _set(KEYS.PRODUCTS, Object.values(prodMap)); _set(KEYS.STOCK, stock);
         _set(KEYS.ORDERS, Object.values(ordMap)); _set(KEYS.POS_SALES, pos);
-        _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata); _set(KEYS.PARTIES, parties);
+        _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata); _set(KEYS.PARTIES, parties); _set(KEYS.BATCHES, batches);
         let company = null;
         try { company = await Firebase.getDoc('companies', scopeId); } catch (e) { company = null; }
         _set(KEYS.COMPANIES, company ? [company] : []);
@@ -615,7 +789,7 @@ const Store = (() => {
 
   function _clearLocalData() {
     [KEYS.CATEGORIES, KEYS.LOCATIONS, KEYS.PRODUCTS, KEYS.STOCK, KEYS.ORDERS,
-     KEYS.POS_SALES, KEYS.RECIPES, KEYS.KHATA, KEYS.PARTIES, KEYS.COMPANIES, KEYS.USERS, KEYS.CART].forEach(k => localStorage.removeItem(k));
+     KEYS.POS_SALES, KEYS.RECIPES, KEYS.KHATA, KEYS.PARTIES, KEYS.COMPANIES, KEYS.BATCHES, KEYS.USERS, KEYS.CART].forEach(k => localStorage.removeItem(k));
   }
 
 
@@ -625,8 +799,9 @@ const Store = (() => {
     getCurrentUser, setCurrentUser, clearCurrentUser,
     getCategories, addCategory, updateCategory, deleteCategory, getCategoryById,
     getLocations, getLocationsByOwner, getLocationById, addLocation, updateLocation, deleteLocation, getDefaultLocation,
-    getProducts, getProductsByOwner, getPublishedProducts, getProductById, addProduct, updateProduct, deleteProduct,
+    getProducts, getProductsByOwner, getProductsByType, getSellableProducts, getIngredientProducts, getPublishedProducts, getProductById, addProduct, updateProduct, deleteProduct, isSellableType,
     getStock, getStockByOwner, getStockByLocation, getStockByProduct, getStockRecord, setStock, adjustStock, getTotalStockForProduct, getLowStockItems, getExpiringStock,
+    getBatches, getBatchById, getBatchesByProduct, availableLots, getBatchQty, addBatch, updateBatch, deleteBatch, pickLots, consumeLots, calcMakingCost, getProductStockValue, produceComplex,
     getOrders, getOrderById, getSalesOrders, getPurchaseOrders, createOrder, updateOrderStatus,
     createManualPurchase, createFieldSale, acceptOrder, cancelOrder, fulfillFieldSale, receiveManualPurchase, settleOrder,
     getParties, getPartiesByType, getPartyById, addParty, updateParty, deleteParty,

@@ -108,9 +108,6 @@
       <a href="#" class="nav-item" data-view="orders">
         <i class="fas fa-file-invoice"></i><span>Orders</span>
       </a>
-      <a href="#" class="nav-item" data-view="recipes">
-        <i class="fas fa-mortar-pestle"></i><span>Recipes / BOM</span>
-      </a>
       <a href="#" class="nav-item" data-view="categories">
         <i class="fas fa-tags"></i><span>Categories</span>
       </a>
@@ -239,6 +236,7 @@
           </select>
         </div>
         <div class="toolbar-actions">
+          <button class="btn btn-secondary" id="produce-btn"><i class="fas fa-industry"></i> Produce</button>
           <button class="btn btn-primary" id="add-product-btn"><i class="fas fa-plus"></i> Add Product</button>
         </div>
       </div>
@@ -246,12 +244,12 @@
         <div class="table-wrap">
           <table class="data-table"><thead><tr>
             <th class="sortable" data-sort="name">Name <i class="fas fa-sort"></i></th>
+            <th>Type</th>
             <th>SKU</th>
             <th>Category</th>
             <th>Unit</th>
             <th class="sortable" data-sort="costPrice">Cost <i class="fas fa-sort"></i></th>
             <th class="sortable" data-sort="price">Sell <i class="fas fa-sort"></i></th>
-            <th>MRP</th>
             <th>GST</th>
             <th>Margin</th>
             <th>Stock</th>
@@ -284,25 +282,24 @@
               <button class="export-option" data-format="pdf"><i class="fas fa-file-pdf"></i> Export PDF</button>
             </div>
           </div>
-          <button class="btn btn-primary" id="add-stock-btn"><i class="fas fa-plus"></i> Add Stock Entry</button>
+          <button class="btn btn-primary" id="add-stock-btn"><i class="fas fa-plus"></i> Add Batch</button>
         </div>
       </div>
       <div class="card"><div class="card-body">
         <div class="table-wrap">
           <table class="data-table"><thead><tr>
+            <th style="width:36px"></th>
             <th class="sortable" data-sort="product">Product <i class="fas fa-sort"></i></th>
-            <th>SKU</th>
+            <th>Type</th>
             <th>Location</th>
             <th class="sortable" data-sort="quantity">Qty <i class="fas fa-sort"></i></th>
-            <th>Min Stock</th>
-            <th>Batch</th>
-            <th>Expiry</th>
+            <th>Min</th>
             <th>Status</th>
             <th>Actions</th>
           </tr></thead><tbody id="inventory-table-body"></tbody></table>
         </div>
-        <div class="empty-state hidden" id="no-inventory"><i class="fas fa-warehouse"></i><p>No stock entries yet</p>
-          <button class="btn btn-primary" id="add-first-stock-btn">Add Stock Entry</button></div>
+        <div class="empty-state hidden" id="no-inventory"><i class="fas fa-warehouse"></i><p>No stock yet. Add a purchase batch to get started.</p>
+          <button class="btn btn-primary" id="add-first-stock-btn">Add Batch</button></div>
       </div></div>
     </section>
 
@@ -368,21 +365,6 @@
           <div class="pos-today-summary" id="pos-today-summary"></div>
         </div>
       </div>
-    </section>
-
-    <!-- ===== Recipes / BOM View ===== -->
-    <section id="view-recipes" class="view hidden">
-      <div class="view-toolbar">
-        <div class="search-bar"><i class="fas fa-search"></i>
-          <input type="text" id="recipe-search" placeholder="Search recipes..."></div>
-        <div class="toolbar-actions">
-          <button class="btn btn-secondary" id="produce-btn"><i class="fas fa-industry"></i> Produce</button>
-          <button class="btn btn-primary" id="add-recipe-btn"><i class="fas fa-plus"></i> Add Recipe</button>
-        </div>
-      </div>
-      <div class="recipes-grid" id="recipes-grid"></div>
-      <div class="empty-state hidden" id="no-recipes"><i class="fas fa-mortar-pestle"></i><p>No recipes yet. Create one to track production costs.</p>
-        <button class="btn btn-primary" id="add-first-recipe-btn">Create Your First Recipe</button></div>
     </section>
 
     <!-- ===== Categories View ===== -->
@@ -605,7 +587,6 @@
   <div class="more-sheet-grid">
     <button class="more-sheet-item" data-view="locations"><i class="fas fa-location-dot"></i><span>Locations</span></button>
     <button class="more-sheet-item" data-view="inventory"><i class="fas fa-warehouse"></i><span>Inventory</span></button>
-    <button class="more-sheet-item" data-view="recipes"><i class="fas fa-mortar-pestle"></i><span>Recipes</span></button>
     <button class="more-sheet-item" data-view="categories"><i class="fas fa-tags"></i><span>Categories</span></button>
     <button class="more-sheet-item" data-view="reports"><i class="fas fa-chart-bar"></i><span>Reports</span></button>
     <button class="more-sheet-item" data-view="khata"><i class="fas fa-book"></i><span>Khata</span></button>
@@ -690,6 +671,14 @@
       <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
     <form id="product-form">
       <div class="modal-body">
+        <div class="form-group"><label for="product-type">Product Type *</label>
+          <select id="product-type" class="select-input" required>
+            <option value="simple">Simple / Trading good (buy &amp; resell)</option>
+            <option value="raw">Raw material / Ingredient (not for sale)</option>
+            <option value="complex">Complex / Manufactured (made from a recipe)</option>
+          </select>
+          <small class="form-hint" id="product-type-hint"></small>
+        </div>
         <div class="form-row">
           <div class="form-group"><label for="product-name">Name *</label>
             <input type="text" id="product-name" required></div>
@@ -714,18 +703,39 @@
               <option value="m">Metre (m)</option>
             </select></div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label for="product-cost-price">Cost Price (₹)</label>
-            <input type="number" id="product-cost-price" step="0.01" min="0" value="0"></div>
-          <div class="form-group"><label for="product-price">Selling Price (₹) *</label>
-            <input type="number" id="product-price" step="0.01" min="0" value="0" required></div>
+
+        <!-- Recipe builder (complex products only) -->
+        <div id="product-recipe-section" class="hidden">
+          <div class="section-divider"><span>Recipe / Bill of Materials</span></div>
+          <div class="form-row">
+            <div class="form-group"><label for="product-recipe-outqty">Output qty per batch *</label>
+              <input type="number" id="product-recipe-outqty" min="1" value="1"></div>
+            <div class="form-group"><label>Making cost / unit</label>
+              <input type="text" id="product-makingcost" class="input-readonly" readonly tabindex="-1" value="\u20B90.00"></div>
+          </div>
+          <div class="form-group"><label>Ingredients</label>
+            <div id="product-ingredients"></div>
+            <button type="button" class="btn btn-sm btn-secondary" id="product-add-ingredient" style="margin-top:.5rem"><i class="fas fa-plus"></i> Add Ingredient</button>
+          </div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label for="product-mrp">MRP (₹)</label>
-            <input type="number" id="product-mrp" step="0.01" min="0" value="0"></div>
-          <div class="form-group"><label for="product-wholesale">Wholesale (₹)</label>
-            <input type="number" id="product-wholesale" step="0.01" min="0" value="0"></div>
+
+        <!-- Pricing (sellable products only) -->
+        <div id="product-pricing-section">
+          <div class="section-divider"><span>Pricing</span></div>
+          <div class="form-row">
+            <div class="form-group"><label for="product-price">Selling Price (₹) *</label>
+              <input type="number" id="product-price" step="0.01" min="0" value="0"></div>
+            <div class="form-group"><label for="product-mrp">MRP (₹)</label>
+              <input type="number" id="product-mrp" step="0.01" min="0" value="0"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="product-wholesale">Wholesale (₹)</label>
+              <input type="number" id="product-wholesale" step="0.01" min="0" value="0"></div>
+            <div class="form-group"><label>Avg Cost &middot; Margin</label>
+              <input type="text" id="product-margin-preview" class="input-readonly" readonly tabindex="-1"></div>
+          </div>
         </div>
+
         <div class="form-row">
           <div class="form-group"><label for="product-gst">GST Rate</label>
             <select id="product-gst" class="select-input">
@@ -738,14 +748,10 @@
           <div class="form-group"><label for="product-hsn">HSN Code</label>
             <input type="text" id="product-hsn" placeholder="e.g. 8471"></div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label>Margin</label>
-            <input type="text" id="product-margin-preview" class="input-readonly" readonly tabindex="-1"></div>
-          <div class="form-group"></div>
-        </div>
+        <input type="hidden" id="product-cost-price" value="0">
         <div class="form-group"><label for="product-description">Description</label>
-          <textarea id="product-description" rows="3"></textarea></div>
-        <div class="form-group"><label class="checkbox-label">
+          <textarea id="product-description" rows="2"></textarea></div>
+        <div class="form-group" id="product-publish-group"><label class="checkbox-label">
           <input type="checkbox" id="product-published" checked> Publish to marketplace (visible to other shops)</label></div>
       </div>
       <div class="modal-footer">
@@ -760,26 +766,35 @@
 <div class="modal hidden" id="stock-modal">
   <div class="modal-overlay"></div>
   <div class="modal-content modal-sm">
-    <div class="modal-header"><h3 id="stock-modal-title">Adjust Stock</h3>
+    <div class="modal-header"><h3 id="stock-modal-title">Add Purchase Batch</h3>
       <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
     <form id="stock-form">
       <div class="modal-body">
-        <div class="form-group"><label for="stock-product">Product *</label>
-          <select id="stock-product" class="select-input" required><option value="">Select product</option></select></div>
-        <div class="form-group"><label for="stock-location">Location *</label>
-          <select id="stock-location" class="select-input" required><option value="">Select location</option></select></div>
+        <input type="hidden" id="stock-batch-id">
         <div class="form-row">
-          <div class="form-group"><label for="stock-quantity">Quantity *</label>
-            <input type="number" id="stock-quantity" min="0" value="0" required></div>
-          <div class="form-group"><label for="stock-min">Min Stock</label>
-            <input type="number" id="stock-min" min="0" value="5"></div>
+          <div class="form-group"><label for="stock-product">Product *</label>
+            <select id="stock-product" class="select-input" required><option value="">Select product</option></select></div>
+          <div class="form-group"><label for="stock-location">Location *</label>
+            <select id="stock-location" class="select-input" required><option value="">Select location</option></select></div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label for="stock-batch">Batch Number</label>
-            <input type="text" id="stock-batch" placeholder="e.g. BATCH-2025-001"></div>
-          <div class="form-group"><label for="stock-expiry">Expiry Date</label>
-            <input type="date" id="stock-expiry"></div>
+        <div id="stock-batch-fields">
+          <div class="form-row">
+            <div class="form-group"><label for="stock-quantity">Quantity *</label>
+              <input type="number" id="stock-quantity" min="0" step="0.01" value="0"></div>
+            <div class="form-group"><label for="stock-cost">Unit cost (₹) *</label>
+              <input type="number" id="stock-cost" min="0" step="0.01" value="0"></div>
+          </div>
+          <div class="form-row">
+            <div class="form-group"><label for="stock-batch">Batch / Lot #</label>
+              <input type="text" id="stock-batch" placeholder="Auto if blank"></div>
+            <div class="form-group"><label for="stock-expiry">Expiry / Shelf life</label>
+              <input type="date" id="stock-expiry"></div>
+          </div>
+          <div class="form-group"><label for="stock-supplier">Supplier (optional)</label>
+            <select id="stock-supplier" class="select-input"><option value="">— None —</option></select></div>
         </div>
+        <div class="form-group"><label for="stock-min">Low-stock alert (min) for this product &amp; location</label>
+          <input type="number" id="stock-min" min="0" value="0"></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary modal-close">Cancel</button>
@@ -824,54 +839,24 @@
   </div>
 </div>
 
-<!-- Recipe Modal -->
-<div class="modal hidden" id="recipe-modal">
-  <div class="modal-overlay"></div>
-  <div class="modal-content">
-    <div class="modal-header"><h3 id="recipe-modal-title">Add Recipe</h3>
-      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
-    <form id="recipe-form">
-      <div class="modal-body">
-        <div class="form-row">
-          <div class="form-group"><label for="recipe-name">Recipe Name *</label>
-            <input type="text" id="recipe-name" placeholder="e.g. Paneer Tikka Platter" required></div>
-          <div class="form-group"><label for="recipe-output">Output Product *</label>
-            <select id="recipe-output" class="select-input" required><option value="">Select product</option></select></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label for="recipe-output-qty">Output Quantity *</label>
-            <input type="number" id="recipe-output-qty" min="1" value="1" required></div>
-          <div class="form-group"><label>Est. Cost / Unit</label>
-            <input type="text" id="recipe-cost-preview" class="input-readonly" readonly tabindex="-1" value="₹0.00"></div>
-        </div>
-        <div class="form-group">
-          <label>Ingredients</label>
-          <div id="recipe-ingredients"></div>
-          <button type="button" class="btn btn-sm btn-secondary" id="add-ingredient-btn" style="margin-top:.5rem"><i class="fas fa-plus"></i> Add Ingredient</button>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary modal-close">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Recipe</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-<!-- Produce Modal -->
+<!-- Produce Modal (complex products) -->
 <div class="modal hidden" id="produce-modal">
   <div class="modal-overlay"></div>
   <div class="modal-content modal-sm">
-    <div class="modal-header"><h3>Produce from Recipe</h3>
+    <div class="modal-header"><h3 id="produce-title">Produce</h3>
       <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
     <form id="produce-form">
       <div class="modal-body">
-        <div class="form-group"><label for="produce-recipe">Recipe *</label>
-          <select id="produce-recipe" class="select-input" required><option value="">Select recipe</option></select></div>
-        <div class="form-group"><label for="produce-location">Location *</label>
-          <select id="produce-location" class="select-input" required><option value="">Select location</option></select></div>
-        <div class="form-group"><label for="produce-qty">Batches to Produce *</label>
-          <input type="number" id="produce-qty" min="1" value="1" required></div>
+        <div class="form-group"><label for="produce-product">Product *</label>
+          <select id="produce-product" class="select-input" required><option value="">Select product</option></select></div>
+        <div class="form-row">
+          <div class="form-group"><label for="produce-location">Location *</label>
+            <select id="produce-location" class="select-input" required><option value="">Select location</option></select></div>
+          <div class="form-group"><label for="produce-qty">Quantity to produce *</label>
+            <input type="number" id="produce-qty" min="1" value="1" required></div>
+        </div>
+        <div id="produce-ingredients"></div>
+        <div class="cart-total" style="margin-top:.75rem"><span>Est. making cost</span><strong id="produce-cost">\u20B90.00</strong></div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary modal-close">Cancel</button>
@@ -1042,17 +1027,19 @@
       </div>
       <div class="form-group"><label for="mp-location">Receive at location *</label>
         <select id="mp-location" class="select-input"></select></div>
-      <div class="form-row" style="display:grid;grid-template-columns:2fr 1fr 1fr auto;gap:.6rem;align-items:end">
+      <div class="form-row" style="display:grid;grid-template-columns:2fr 1fr 1fr 1.2fr auto;gap:.6rem;align-items:end">
         <div class="form-group" style="margin:0"><label for="mp-product">Product</label>
           <select id="mp-product" class="select-input"><option value="">-- Select --</option></select></div>
         <div class="form-group" style="margin:0"><label for="mp-cost">Unit cost</label>
           <input type="number" id="mp-cost" min="0" step="0.01" value="0"></div>
         <div class="form-group" style="margin:0"><label for="mp-qty">Qty</label>
           <input type="number" id="mp-qty" min="1" value="1"></div>
+        <div class="form-group" style="margin:0"><label for="mp-expiry">Expiry</label>
+          <input type="date" id="mp-expiry"></div>
         <div class="form-group" style="margin:0"><button type="button" class="btn btn-secondary" id="mp-add-item">Add</button></div>
       </div>
       <div class="table-wrap" style="margin-top:.75rem">
-        <table class="data-table"><thead><tr><th>Product</th><th>Cost</th><th>Qty</th><th>Total</th><th></th></tr></thead>
+        <table class="data-table"><thead><tr><th>Product</th><th>Cost</th><th>Qty</th><th>Expiry</th><th>Total</th><th></th></tr></thead>
         <tbody id="mp-items-body"></tbody></table>
       </div>
       <div class="cart-total" style="margin-top:.75rem"><span>Total</span><strong id="mp-total">₹0.00</strong></div>
@@ -1078,6 +1065,7 @@
       <p id="fulfill-summary" class="form-hint" style="margin-bottom:1rem"></p>
       <div class="form-group"><label for="fulfill-location">Fulfillment location *</label>
         <select id="fulfill-location" class="select-input"></select></div>
+      <div id="fulfill-lots"></div>
       <div class="form-group"><label for="fulfill-amount">Amount received</label>
         <input type="number" id="fulfill-amount" min="0" step="0.01" value="0">
         <small class="form-hint">Shortfall is posted to Khata as credit due from the customer.</small></div>
@@ -1119,6 +1107,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="js/firebase-config.js"></script>
 <script src="js/creds.js"></script>
+<script src="js/select.js"></script>
 
 <script src="js/store.js"></script>
 <script src="js/auth.js"></script>
@@ -1128,7 +1117,6 @@
 <script src="js/orders.js"></script>
 <script src="js/shop.js"></script>
 <script src="js/pos.js"></script>
-<script src="js/bom.js"></script>
 <script src="js/khata.js"></script>
 <script src="js/reports.js"></script>
 <script src="js/dashboard.js"></script>

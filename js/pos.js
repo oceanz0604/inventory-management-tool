@@ -4,7 +4,7 @@ const POS = (() => {
 
   function init() {
     document.getElementById('pos-search').addEventListener('input', renderProducts);
-    document.getElementById('pos-location').addEventListener('change', renderProducts);
+    document.getElementById('pos-location').addEventListener('change', () => { renderProducts(); _renderBill(); });
     document.getElementById('pos-cat-filter').addEventListener('change', renderProducts);
     document.getElementById('pos-clear-bill').addEventListener('click', clearBill);
     document.getElementById('pos-checkout-btn').addEventListener('click', checkout);
@@ -26,7 +26,7 @@ const POS = (() => {
     const search = document.getElementById('pos-search').value.toLowerCase().trim();
     const catFilter = document.getElementById('pos-cat-filter').value;
 
-    let products = Store.getProductsByOwner(Auth.ownerId());
+    let products = Store.getSellableProducts(Auth.ownerId());
     if (catFilter) products = products.filter(p => p.categoryId === catFilter);
     if (search) products = products.filter(p => p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search));
 
@@ -69,10 +69,16 @@ const POS = (() => {
     if (existing) {
       existing.qty++;
     } else {
-      bill.push({ productId, name: product.name, sku: product.sku, price: product.price, costPrice: product.costPrice || 0, gstRate: product.gstRate || 0, qty: 1 });
+      bill.push({ productId, name: product.name, sku: product.sku, price: product.price, costPrice: product.costPrice || 0, gstRate: product.gstRate || 0, qty: 1, batchId: null });
     }
     _renderBill();
     renderProducts();
+  }
+
+  // Per-line lot override (defaults to earliest-expiry / FEFO when left blank).
+  function setLot(productId, batchId) {
+    const item = bill.find(b => b.productId === productId);
+    if (item) item.batchId = batchId || null;
   }
 
   function updateBillQty(productId, qty) {
@@ -111,6 +117,7 @@ const POS = (() => {
     }
     btn.disabled = false;
 
+    const locId = document.getElementById('pos-location').value;
     let subtotal = 0, gst = 0, itemCount = 0;
     container.innerHTML = bill.map(b => {
       const lineTotal = b.qty * b.price;
@@ -118,9 +125,17 @@ const POS = (() => {
       subtotal += lineTotal;
       gst += lineGst;
       itemCount += b.qty;
+      const lots = locId ? Store.availableLots(b.productId, locId) : [];
+      let lotPicker = '';
+      if (lots.length > 1) {
+        lotPicker = '<div class="pos-bill-lot"><select onchange="POS.setLot(\'' + b.productId + '\',this.value)">' +
+          lots.map(l => '<option value="' + l.id + '"' + (b.batchId === l.id ? ' selected' : '') + '>' +
+            _esc(l.batchNumber || 'Lot') + ' \u00b7 ' + l.qty + ' left' + (l.expiryDate ? ' \u00b7 exp ' + new Date(l.expiryDate).toLocaleDateString('en-IN') : '') + '</option>').join('') +
+          '</select></div>';
+      }
       return '<div class="pos-bill-row">' +
         '<div class="pos-bill-row-info"><span class="pos-bill-row-name">' + _esc(b.name) + '</span>' +
-        '<span class="pos-bill-row-price">\u20B9' + b.price.toFixed(2) + (b.gstRate > 0 ? ' +' + b.gstRate + '%' : '') + '</span></div>' +
+        '<span class="pos-bill-row-price">\u20B9' + b.price.toFixed(2) + (b.gstRate > 0 ? ' +' + b.gstRate + '%' : '') + '</span>' + lotPicker + '</div>' +
         '<div class="pos-bill-row-controls">' +
         '<button onclick="POS.updateBillQty(\'' + b.productId + '\',' + (b.qty - 1) + ')"><i class="fas fa-minus"></i></button>' +
         '<span>' + b.qty + '</span>' +
@@ -144,7 +159,7 @@ const POS = (() => {
     const payment = document.getElementById('pos-payment').value;
     const customerName = document.getElementById('pos-customer-name').value.trim() || 'Walk-in';
 
-    const items = bill.map(b => ({ productId: b.productId, name: b.name, sku: b.sku, price: b.price, costPrice: b.costPrice, gstRate: b.gstRate, qty: b.qty }));
+    const items = bill.map(b => ({ productId: b.productId, name: b.name, sku: b.sku, price: b.price, costPrice: b.costPrice, gstRate: b.gstRate, qty: b.qty, batchId: b.batchId || null }));
     const sale = Store.createPosSale(Auth.ownerId(), locId, items, payment, customerName);
 
     _showReceipt(sale);
@@ -225,5 +240,5 @@ const POS = (() => {
 
   function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-  return { init, refresh, populateFilters, renderProducts, addToBill, updateBillQty, removeBillItem, clearBill, checkout };
+  return { init, refresh, populateFilters, renderProducts, addToBill, updateBillQty, removeBillItem, clearBill, checkout, setLot };
 })();
