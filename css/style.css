@@ -567,7 +567,8 @@ textarea { resize:vertical; }
 .quick-action:active { transform:scale(.96); }
 
 /* stat cards (now buttons) */
-.stat-card { font-family:inherit; text-align:left; cursor:pointer; width:100%; }
+.stat-card { font-family:inherit; text-align:left; cursor:pointer; width:100%; color:var(--text); }
+.stat-value { color:var(--text); }
 .stat-card .stat-go { margin-left:auto; color:var(--text-light); font-size:.8rem; opacity:0; transform:translateX(-6px); transition:all var(--transition); }
 .stat-card:hover .stat-go { opacity:1; transform:translateX(0); color:var(--primary); }
 #dash-stats { grid-template-columns:repeat(3,1fr); }
@@ -1004,10 +1005,7 @@ textarea { resize:vertical; }
   .bnav-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.2rem; border:none; background:none; color:var(--text-light); font-size:.64rem; font-weight:600; cursor:pointer; transition:color var(--transition), background var(--transition), transform .25s var(--bounce); border-radius:18px; min-height:44px; position:relative; overflow:hidden; }
   .bnav-item i { font-size:1.2rem; transition:transform .3s var(--bounce); }
   .bnav-item span { transition:opacity var(--transition); }
-  /* animated active indicator bar on top of the active item */
-  .bnav-item::before { content:''; position:absolute; top:5px; left:50%; transform:translateX(-50%) scaleX(0); transform-origin:center; width:22px; height:3px; border-radius:3px; background:var(--grad-primary); transition:transform .3s var(--bounce); }
   .bnav-item.active { color:var(--primary); background:var(--primary-soft); }
-  .bnav-item.active::before { transform:translateX(-50%) scaleX(1); }
   .bnav-item.active i { transform:translateY(-1px) scale(1.18); animation:bnavPop .4s var(--bounce); }
   @keyframes bnavPop { 0% { transform:translateY(2px) scale(.85); } 60% { transform:translateY(-2px) scale(1.25); } 100% { transform:translateY(-1px) scale(1.18); } }
   .bnav-item:active { transform:scale(.88); }
