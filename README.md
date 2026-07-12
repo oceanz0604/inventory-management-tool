@@ -1,4 +1,4 @@
-# झटपट (ZatPat) - Multi-Location Inventory Marketplace
+# Zentory - Multi-Location Inventory Marketplace
 
 A full-featured B2B inventory management marketplace built with vanilla HTML, CSS, and JavaScript. Every user is a shop owner who manages products, stock across locations, and orders -- and can also browse and buy from other shops. No build tools required.
 

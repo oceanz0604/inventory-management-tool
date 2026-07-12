@@ -7,7 +7,7 @@
 
 ## What It Is
 
-**झटपट (ZatPat)** — A B2B multi-location inventory marketplace. Vanilla HTML, CSS, and JavaScript; no build step. Each user is a shop owner: they manage products, stock across locations, and orders, and can browse and buy from other shops.
+**Zentory** — A B2B multi-location inventory marketplace. Vanilla HTML, CSS, and JavaScript; no build step. Each user is a shop owner: they manage products, stock across locations, and orders, and can browse and buy from other shops.
 
 ---
 

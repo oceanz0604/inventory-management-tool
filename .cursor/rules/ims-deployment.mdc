@@ -1,9 +1,9 @@
 ---
-description: How to commit and deploy ZatPat IMS (Vercel + required commit identity)
+description: How to commit and deploy Zentory IMS (Vercel + required commit identity)
 alwaysApply: true
 ---
 
-# Deployment & Commit Identity — ZatPat IMS
+# Deployment & Commit Identity — Zentory IMS
 
 ## Hosting
 

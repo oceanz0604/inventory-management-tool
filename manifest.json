@@ -1,6 +1,6 @@
 {
-  "name": "झटपट - Multi-Location Inventory",
-  "short_name": "झटपट",
+  "name": "Zentory - Multi-Location Inventory",
+  "short_name": "Zentory",
   "description": "B2B multi-location inventory marketplace with POS, recipes, khata, and reporting",
   "start_url": "./index.html",
   "display": "standalone",

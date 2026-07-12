@@ -1,5 +1,5 @@
 /* ============================================================
-   Firebase backend configuration for झटपट (ZatPat) IMS
+   Firebase backend configuration for Zentory IMS
    ------------------------------------------------------------
    SETUP (do this once):
    1. Create a project:  https://console.firebase.google.com

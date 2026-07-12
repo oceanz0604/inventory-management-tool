@@ -4,7 +4,7 @@ globs: **/store.js
 alwaysApply: false
 ---
 
-# Data Model — ZatPat IMS
+# Data Model — Zentory IMS
 
 ## localStorage Keys (all prefixed `ims_`)
 

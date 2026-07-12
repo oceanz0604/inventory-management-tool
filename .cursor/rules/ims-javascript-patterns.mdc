@@ -4,7 +4,7 @@ globs: **/*.js
 alwaysApply: false
 ---
 
-# JavaScript Patterns — ZatPat IMS
+# JavaScript Patterns — Zentory IMS
 
 ## Module Pattern (IIFE)
 

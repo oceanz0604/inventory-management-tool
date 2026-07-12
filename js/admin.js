@@ -1,5 +1,5 @@
 /* ============================================================
-   Admin Console for झटपट (ZatPat) IMS  —  super-admin only.
+   Admin Console for Zentory IMS  —  super-admin only.
    Separate endpoint (admin.html). Uses Firebase Auth (the single
    super-admin account) and talks to Firestore directly: full CRUD
    over customer companies + cross-tenant analytics.

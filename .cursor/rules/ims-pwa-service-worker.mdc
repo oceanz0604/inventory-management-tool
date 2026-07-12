@@ -4,11 +4,11 @@ globs: sw.js,manifest.json
 alwaysApply: false
 ---
 
-# PWA & Service Worker — ZatPat IMS
+# PWA & Service Worker — Zentory IMS
 
 ## Service Worker (`sw.js`)
 
-- Cache name format: `zatpat-v{N}` — bump version when deploying changes
+- Cache name format: `zentory-v{N}` — bump version when deploying changes
 - `STATIC_URLS` array lists every file to pre-cache (HTML, CSS, all JS modules, manifest, icon)
 - **When adding a new JS module**: add its path to `STATIC_URLS` and bump `CACHE_NAME`
 - Strategy: cache-first for local assets, network fallback

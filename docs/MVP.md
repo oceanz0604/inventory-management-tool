@@ -1,9 +1,9 @@
-# ZatPat (झटपट) — MVP Document
+# Zentory — MVP Document
 
 **Version:** 1.0
 **Date:** March 2026
 **Status:** Draft
-**Author:** ZatPat Product Team
+**Author:** Zentory Product Team
 
 ---
 
@@ -36,7 +36,7 @@ The supply chain is equally fragmented. Manufacturers sell to distributors over 
 
 ### The Vision
 
-**ZatPat (झटपट)** — meaning "instantly" in Marathi/Hindi — is a universal commerce platform where any business, regardless of type or size, can:
+**Zentory** — a blend of "zen" (calm, organized) and "inventory" — is a universal commerce platform where any business, regardless of type or size, can:
 
 - **Manage inventory** across multiple locations with real-time stock tracking
 - **Trade with other businesses** (B2B) through a built-in marketplace
@@ -61,7 +61,7 @@ One tool. Every business. From manufacturer to consumer.
 
 ## 2. Target Users & Business Types
 
-ZatPat is designed to be a single tool that adapts to any business type. Below is a breakdown of the primary user segments, their workflows, and what they need from the platform.
+Zentory is designed to be a single tool that adapts to any business type. Below is a breakdown of the primary user segments, their workflows, and what they need from the platform.
 
 ### 2.1 Manufacturers
 
@@ -204,7 +204,7 @@ A fast, touch-friendly billing interface for businesses with walk-in customers.
 
 ### 3.5 B2B Marketplace (Trade Portal)
 
-Every business on ZatPat can buy from and sell to other businesses.
+Every business on Zentory can buy from and sell to other businesses.
 
 | Feature | Description |
 |---|---|
@@ -535,7 +535,7 @@ RETAILER:
 ### 7.5 B2C Consumer Flow (Phase 2)
 
 ```
-Consumer opens ZatPat app → Location auto-detected
+Consumer opens Zentory app → Location auto-detected
 Sees nearby shops: "Sharma Medical", "Gupta Electronics", "Hotel Sai Prasad"
 Browses Sharma Medical → Adds Crocin, Dettol, Bandages to cart
 Checkout → Pays via UPI → Order placed
@@ -659,7 +659,7 @@ Consumer rates: ⭐⭐⭐⭐⭐ "Fast delivery!"
 
 ## 10. Competitive Analysis
 
-| Feature | ZatPat | Vyapar | Khatabook | Zoho Inventory | Udaan | Blinkit |
+| Feature | Zentory | Vyapar | Khatabook | Zoho Inventory | Udaan | Blinkit |
 |---|---|---|---|---|---|---|
 | **Inventory Management** | Yes | Yes | Basic | Yes | No | No |
 | **POS Counter** | Yes | Yes | No | No | No | No |
@@ -674,7 +674,7 @@ Consumer rates: ⭐⭐⭐⭐⭐ "Fast delivery!"
 | **Target Audience** | All MSMEs | Retailers | Small shops | Mid-large | B2B buyers | Consumers |
 | **Price** | ₹0-799/mo | ₹0-4999/yr | Free | $79+/mo | Free (commission) | N/A |
 
-### ZatPat's Differentiators
+### Zentory's Differentiators
 
 1. **All-in-one:** No other tool combines inventory + B2B marketplace + B2C marketplace + POS + BOM in a single platform
 2. **Universal:** Same tool works for a kirana store, a hotel, a manufacturer, and a home baker — competitors are niche
@@ -876,7 +876,7 @@ Consumer rates: ⭐⭐⭐⭐⭐ "Fast delivery!"
 **Workflow:**
 - Purchase ingredients from local market (manual entry)
 - Define recipes for products (Chocolate Cake, Veg Thali, Achar)
-- Receive orders via WhatsApp → Enter in ZatPat → Produce → Mark delivered
+- Receive orders via WhatsApp → Enter in Zentory → Produce → Mark delivered
 - Track ingredient costs vs selling price → Know exact profit per order
 - Phase 2: List products on B2C marketplace → Customers in locality can order directly
 

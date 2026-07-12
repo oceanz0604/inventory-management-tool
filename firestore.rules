@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// Security rules for ZatPat IMS Firestore data.
+// Security rules for Zentory IMS Firestore data.
 //
 // AUTH MODEL (important): Company users (owners + office/staff/marketing) sign in
 // with a username + password that is stored in the `users` collection and matched

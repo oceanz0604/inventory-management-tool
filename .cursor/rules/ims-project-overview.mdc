@@ -1,10 +1,10 @@
 ---
-description: Project architecture and conventions for the झटपट (ZatPat) inventory management system
+description: Project architecture and conventions for the Zentory inventory management system
 globs: 
 alwaysApply: true
 ---
 
-# झटपट (ZatPat) — Inventory Management System
+# Zentory — Inventory Management System
 
 ## Tech Stack
 
@@ -50,4 +50,4 @@ All monetary values use ₹ (INR). The Unicode character `\u20B9` is used in JS 
 
 ## Brand
 
-Name: **झटपट** (ZatPat). Uses Tiro Devanagari Marathi font. Icon: Font Awesome `fa-bolt`.
+Name: **Zentory** (Latin script, Inter font). Icon: Font Awesome `fa-bolt`. The Tiro Devanagari Marathi font is still loaded for the Marathi user guide (`guide-mr.html`), not the brand.
