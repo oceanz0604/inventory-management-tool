@@ -104,6 +104,8 @@ const App = (() => {
     _applyRoleGating();
     Locations.init();
     Products.init();
+    Catalog.init();
+    ImportData.init();
     Inventory.init();
     Orders.init();
     Shop.init();

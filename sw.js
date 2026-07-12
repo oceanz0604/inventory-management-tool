@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zentory-v23';
+const CACHE_NAME = 'zentory-v24';
 const STATIC_URLS = [
   './',
   './index.html',
@@ -13,6 +13,9 @@ const STATIC_URLS = [
   './js/auth.js',
   './js/locations.js',
   './js/products.js',
+  './js/catalog-data.js',
+  './js/catalog.js',
+  './js/import-data.js',
   './js/inventory.js',
   './js/orders.js',
   './js/shop.js',

@@ -18,6 +18,7 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.1/jspdf.plugin.autotable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -269,6 +270,8 @@
         </div>
         <div class="toolbar-actions">
           <button class="btn btn-secondary" id="produce-btn"><i class="fas fa-industry"></i> Produce</button>
+          <button class="btn btn-secondary" id="catalog-btn"><i class="fas fa-layer-group"></i> Catalog</button>
+          <button class="btn btn-secondary" id="import-btn"><i class="fas fa-file-import"></i> Import</button>
           <button class="btn btn-primary" id="add-product-btn"><i class="fas fa-plus"></i> Add Product</button>
         </div>
       </div>
@@ -898,6 +901,79 @@
   </div>
 </div>
 
+<!-- Add from Catalog Modal -->
+<div class="modal hidden" id="catalog-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-lg">
+    <div class="modal-header"><h3><i class="fas fa-layer-group" style="margin-right:.5rem"></i>Add from Catalog</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <div class="modal-body">
+      <p class="modal-hint">Pick a sector and select common products to add in bulk. Unit, GST % and HSN code are pre-filled — you set prices later when adding stock.</p>
+      <div class="catalog-sectors" id="catalog-sectors"></div>
+      <div class="search-bar catalog-search"><i class="fas fa-search"></i>
+        <input type="text" id="catalog-search" placeholder="Search items in this sector..."></div>
+      <label class="catalog-selectall"><input type="checkbox" id="catalog-select-all"> Select all shown</label>
+      <div class="catalog-items" id="catalog-items"></div>
+    </div>
+    <div class="modal-footer">
+      <span id="catalog-selected-count" class="import-count">0 selected</span>
+      <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+      <button type="button" class="btn btn-primary" id="catalog-add-btn" disabled><i class="fas fa-plus"></i> Add Selected</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bulk Import Modal -->
+<div class="modal hidden" id="import-modal">
+  <div class="modal-overlay"></div>
+  <div class="modal-content modal-lg">
+    <div class="modal-header"><h3><i class="fas fa-file-import" style="margin-right:.5rem"></i>Import Products &amp; Stock</h3>
+      <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
+    <div class="modal-body">
+
+      <!-- Step 1: upload -->
+      <div id="import-step-upload">
+        <p class="modal-hint">Upload a CSV or Excel (.xlsx) file with your products. Each row becomes a product, and if you include an opening stock quantity it's recorded as a purchase batch.</p>
+        <ol class="import-steps-list">
+          <li>Download the template and fill in your products (only <b>Name</b> is required).</li>
+          <li>Upload the file — we'll match your columns automatically.</li>
+          <li>Review the preview, then import.</li>
+        </ol>
+        <div class="import-upload-actions">
+          <button type="button" class="btn btn-secondary" id="import-template-btn"><i class="fas fa-file-csv"></i> Download template</button>
+          <label class="btn btn-primary import-file-label"><i class="fas fa-upload"></i> Choose file
+            <input type="file" id="import-file" accept=".csv,.xlsx,.xls" hidden></label>
+        </div>
+      </div>
+
+      <!-- Step 2: mapping -->
+      <div id="import-step-map" class="hidden">
+        <p class="modal-hint">Match each Zentory field to a column from your file. <span id="import-map-count"></span></p>
+        <div class="import-map-grid" id="import-map-body"></div>
+      </div>
+
+      <!-- Step 3: preview -->
+      <div id="import-step-preview" class="hidden">
+        <div class="import-preview-summary" id="import-preview-summary"></div>
+        <div class="table-wrap import-preview-wrap">
+          <table class="data-table"><thead><tr>
+            <th></th><th>Name</th><th>Type</th><th>Category</th><th>Opening Stock</th><th>Notes</th>
+          </tr></thead><tbody id="import-preview-body"></tbody></table>
+        </div>
+        <div class="import-more" id="import-preview-more"></div>
+      </div>
+
+    </div>
+    <div class="modal-footer" id="import-footer">
+      <button type="button" class="btn btn-secondary modal-close">Cancel</button>
+      <button type="button" class="btn btn-secondary hidden" id="import-map-back">Back</button>
+      <button type="button" class="btn btn-primary hidden" id="import-map-next">Continue to preview</button>
+      <button type="button" class="btn btn-secondary hidden" id="import-preview-back">Back</button>
+      <button type="button" class="btn btn-primary hidden" id="import-commit-btn"><i class="fas fa-file-import"></i> Import</button>
+    </div>
+  </div>
+</div>
+
 <!-- Khata Modal -->
 <div class="modal hidden" id="khata-modal">
   <div class="modal-overlay"></div>
@@ -1145,6 +1221,9 @@
 <script src="js/auth.js"></script>
 <script src="js/locations.js"></script>
 <script src="js/products.js"></script>
+<script src="js/catalog-data.js"></script>
+<script src="js/catalog.js"></script>
+<script src="js/import-data.js"></script>
 <script src="js/inventory.js"></script>
 <script src="js/orders.js"></script>
 <script src="js/shop.js"></script>
