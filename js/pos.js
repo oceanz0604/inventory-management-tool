@@ -37,21 +37,23 @@ const POS = (() => {
 
     const grid = document.getElementById('pos-product-grid');
     const empty = document.getElementById('no-pos-products');
-    const available = products.filter(p => (stockMap[p.id] || 0) > 0);
+    const available = products.filter(p => Store.availableSellQty(p, locId) > 0);
 
     if (available.length === 0) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
 
     grid.innerHTML = available.map(p => {
-      const qty = stockMap[p.id] || 0;
+      const mto = Store.isMakeToOrder(p);
+      const qty = Store.availableSellQty(p, locId);
       const icon = catIcons[p.categoryId] || 'fa-box';
       const inBill = bill.find(b => b.productId === p.id);
       const billQty = inBill ? inBill.qty : 0;
+      const stockLabel = mto ? qty + ' can make' : qty + ' in stock';
       return '<div class="pos-item-card ' + (billQty > 0 ? 'in-bill' : '') + '" onclick="POS.addToBill(\'' + p.id + '\')">' +
         '<div class="pos-item-icon"><i class="fas ' + icon + '"></i></div>' +
         '<div class="pos-item-name">' + _esc(p.name) + '</div>' +
         '<div class="pos-item-price">\u20B9' + p.price.toFixed(2) + '</div>' +
-        '<div class="pos-item-stock">' + qty + ' in stock</div>' +
+        '<div class="pos-item-stock">' + stockLabel + (mto ? ' <span class="type-pill complex">MTO</span>' : '') + '</div>' +
         (billQty > 0 ? '<div class="pos-item-badge">' + billQty + '</div>' : '') + '</div>';
     }).join('');
   }
@@ -60,11 +62,13 @@ const POS = (() => {
     const locId = document.getElementById('pos-location').value;
     const product = Store.getProductById(productId);
     if (!product) return;
-    const stockRec = Store.getStockRecord(productId, locId);
-    const available = stockRec ? stockRec.quantity : 0;
+    const available = Store.availableSellQty(product, locId);
     const existing = bill.find(b => b.productId === productId);
     const currentQty = existing ? existing.qty : 0;
-    if (currentQty >= available) { App.showToast('No more stock available', 'warning'); return; }
+    if (currentQty >= available) {
+      App.showToast(Store.isMakeToOrder(product) ? 'Not enough ingredients to make more' : 'No more stock available', 'warning');
+      return;
+    }
 
     if (existing) {
       existing.qty++;
@@ -86,9 +90,12 @@ const POS = (() => {
       bill = bill.filter(b => b.productId !== productId);
     } else {
       const locId = document.getElementById('pos-location').value;
-      const stockRec = Store.getStockRecord(productId, locId);
-      const available = stockRec ? stockRec.quantity : 0;
-      if (qty > available) { App.showToast('Exceeds available stock', 'warning'); return; }
+      const product = Store.getProductById(productId);
+      const available = product ? Store.availableSellQty(product, locId) : 0;
+      if (qty > available) {
+        App.showToast(product && Store.isMakeToOrder(product) ? 'Exceeds what you can make from ingredients' : 'Exceeds available stock', 'warning');
+        return;
+      }
       const item = bill.find(b => b.productId === productId);
       if (item) item.qty = qty;
     }
@@ -125,7 +132,7 @@ const POS = (() => {
       subtotal += lineTotal;
       gst += lineGst;
       itemCount += b.qty;
-      const lots = locId ? Store.availableLots(b.productId, locId) : [];
+      const lots = locId && !Store.isMakeToOrder(Store.getProductById(b.productId) || {}) ? Store.availableLots(b.productId, locId) : [];
       let lotPicker = '';
       if (lots.length > 1) {
         lotPicker = '<div class="pos-bill-lot"><select onchange="POS.setLot(\'' + b.productId + '\',this.value)">' +
@@ -160,7 +167,12 @@ const POS = (() => {
     const customerName = document.getElementById('pos-customer-name').value.trim() || 'Walk-in';
 
     const items = bill.map(b => ({ productId: b.productId, name: b.name, sku: b.sku, price: b.price, costPrice: b.costPrice, gstRate: b.gstRate, qty: b.qty, batchId: b.batchId || null }));
-    const sale = Store.createPosSale(Auth.ownerId(), locId, items, payment, customerName);
+    const result = Store.createPosSale(Auth.ownerId(), locId, items, payment, customerName);
+    if (!result.success) {
+      App.showToast(result.message || 'Could not complete sale', 'error');
+      return;
+    }
+    const sale = result.sale;
 
     _showReceipt(sale);
     bill = [];

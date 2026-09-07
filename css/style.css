@@ -1136,3 +1136,26 @@ textarea { resize:vertical; }
 .ob-list-item { display:flex; align-items:center; justify-content:space-between; gap:.75rem; padding:.5rem .75rem; background:var(--bg-input); border-radius:var(--radius); font-size:.85rem; }
 .ob-list-empty { color:var(--text-light); font-size:.82rem; padding:.4rem 0; }
 @media(max-width:560px){ .ob-grid { grid-template-columns:1fr; } .ob-step span { display:none; } }
+
+/* Product detail page */
+.clickable-row { cursor:pointer; }
+.clickable-row:hover { background:var(--primary-soft); }
+.pd-bar { display:flex; align-items:center; justify-content:space-between; gap:.75rem; margin-bottom:1.1rem; flex-wrap:wrap; }
+.pd-bar-actions { display:flex; gap:.5rem; flex-wrap:wrap; }
+.pd-hero { display:flex; justify-content:space-between; gap:1.25rem; flex-wrap:wrap; padding:1.25rem 1.4rem; margin-bottom:1.1rem;
+  background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow); }
+.pd-hero-text h2 { font-size:1.45rem; margin-bottom:.45rem; }
+.pd-hero-meta { display:flex; flex-wrap:wrap; align-items:center; gap:.5rem; color:var(--text-secondary); }
+.pd-hero-meta code { background:var(--bg); padding:.15rem .45rem; border-radius:6px; font-size:.78rem; }
+.pd-hero-stats { display:grid; grid-template-columns:repeat(4,minmax(88px,1fr)); gap:.75rem; min-width:min(100%,420px); }
+.pd-hero-stats div { background:var(--bg); border-radius:var(--radius); padding:.7rem .8rem; }
+.pd-hero-stats span { display:block; font-size:.72rem; color:var(--text-light); text-transform:uppercase; letter-spacing:.04em; margin-bottom:.2rem; }
+.pd-hero-stats strong { font-size:1.05rem; }
+.pd-layout { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(260px,.9fr); gap:1.15rem; align-items:start; }
+.pd-save-row { margin-top:1rem; }
+.pd-lot-list { list-style:none; display:flex; flex-direction:column; gap:.45rem; font-size:.85rem; }
+.pd-lot-list li { padding:.45rem .6rem; background:var(--bg); border-radius:var(--radius-sm); }
+@media(max-width:960px){
+  .pd-layout { grid-template-columns:1fr; }
+  .pd-hero-stats { grid-template-columns:repeat(2,1fr); width:100%; }
+}

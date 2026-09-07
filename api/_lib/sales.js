@@ -109,15 +109,35 @@ async function findSaleByExternalId(ownerId, externalId) {
 }
 
 export async function listProducts({ ownerId, locationId }) {
-  const [productDocs, categoryDocs, stock] = await Promise.all([
+  const [productDocs, categoryDocs, stock, batches] = await Promise.all([
     listByOwner("products", ownerId),
     listCollection("categories"),
     listByOwner("stock", ownerId),
+    listByOwner("batches", ownerId),
   ]);
   const catById = Object.fromEntries(categoryDocs.map((c) => [c.id, c]));
   const stockMap = {};
   stock.filter((s) => !locationId || s.locationId === locationId)
     .forEach((s) => { stockMap[s.productId] = (stockMap[s.productId] || 0) + (Number(s.quantity) || 0); });
+  const batchQty = {};
+  batches.filter((b) => b && (!locationId || b.locationId === locationId) && (b.qty || 0) > 0)
+    .forEach((b) => { batchQty[b.productId] = (batchQty[b.productId] || 0) + (Number(b.qty) || 0); });
+
+  function makeableQty(p) {
+    const recipe = p.recipe;
+    if ((p.type || "simple") !== "complex" || !recipe || !Array.isArray(recipe.ingredients) || !recipe.ingredients.length) {
+      return stockMap[p.id] ?? 0;
+    }
+    const out = Math.max(1, Number(recipe.outputQty) || 1);
+    let max = Infinity;
+    recipe.ingredients.forEach((ing) => {
+      const per = Number(ing.qty) || 0;
+      if (per <= 0) return;
+      const have = batchQty[ing.productId] || 0;
+      max = Math.min(max, Math.floor((have / per) * out + 1e-9));
+    });
+    return max === Infinity ? 0 : Math.max(0, max);
+  }
 
   const productsOut = productDocs
     .filter((p) => {
@@ -128,6 +148,7 @@ export async function listProducts({ ownerId, locationId }) {
     .map((p) => {
       const cat = catById[p.categoryId] || {};
       const categoryName = String(cat.name || "").trim() || "Uncategorized";
+      const mto = (p.type || "simple") === "complex" && p.recipe && Array.isArray(p.recipe.ingredients) && p.recipe.ingredients.length;
       return {
         id: p.id,
         name: p.name,
@@ -139,7 +160,8 @@ export async function listProducts({ ownerId, locationId }) {
         categoryId: p.categoryId || "",
         category: slugifyCategory(categoryName),
         categoryName,
-        stock: stockMap[p.id] ?? 0,
+        stock: makeableQty(p),
+        makeToOrder: !!mto,
         cafeExternalId: p.cafeExternalId || null,
         type: p.type || "simple",
       };

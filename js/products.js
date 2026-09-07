@@ -1,11 +1,12 @@
 const Products = (() => {
   let editingId = null;
+  let detailId = null;
   let currentSort = { field: 'name', direction: 'asc' };
 
   const TYPE_HINTS = {
     raw: 'Bought as ingredients (in batches at different rates). Never sold or published. No selling price.',
     simple: 'Bought from vendors in batches and resold as-is. Cost is the weighted average of your purchase batches.',
-    complex: 'Made from a recipe. Cost is auto-calculated from the ingredients consumed when you Produce it.',
+    complex: 'Make to order — each sale deducts recipe ingredients. Produce is optional if you want finished lots on the shelf.',
   };
 
   function _currentType() { return document.getElementById('product-type').value || 'simple'; }
@@ -51,6 +52,16 @@ const Products = (() => {
     document.getElementById('product-add-ingredient').addEventListener('click', () => _addIngredientRow());
     document.getElementById('product-recipe-outqty').addEventListener('input', _calcMakingCost);
 
+    document.getElementById('pd-back').addEventListener('click', () => App.goTo('products'));
+    document.getElementById('pd-delete').addEventListener('click', () => { if (detailId) confirmDelete(detailId); });
+    document.getElementById('pd-produce').addEventListener('click', () => { if (detailId) openProduce(detailId); });
+    document.getElementById('product-detail-form').addEventListener('submit', _handleDetailSubmit);
+    document.getElementById('pd-type').addEventListener('change', () => _applyDetailTypeUI());
+    document.getElementById('pd-add-ingredient').addEventListener('click', () => _addDetailIngredientRow());
+    document.getElementById('pd-recipe-outqty').addEventListener('input', _calcDetailMakingCost);
+    document.getElementById('pd-price').addEventListener('input', _updateDetailMargin);
+    document.getElementById('pd-mrp').addEventListener('input', _updateDetailMargin);
+
     // Produce flow
     document.getElementById('produce-btn').addEventListener('click', () => openProduce());
     document.getElementById('produce-form').addEventListener('submit', _handleProduce);
@@ -73,6 +84,8 @@ const Products = (() => {
     const opts = cats.map(c => '<option value="' + c.id + '">' + _esc(c.name) + '</option>').join('');
     document.getElementById('product-filter-category').innerHTML = '<option value="">All Categories</option>' + opts;
     document.getElementById('product-category').innerHTML = '<option value="">Select category</option>' + opts;
+    const pdCat = document.getElementById('pd-category');
+    if (pdCat) pdCat.innerHTML = '<option value="">Select category</option>' + opts;
     SearchableSelect.enhanceAll(document.getElementById('view-products'));
     SearchableSelect.enhance(document.getElementById('product-category'));
   }
@@ -125,17 +138,21 @@ const Products = (() => {
       const sell = sellable ? (p.price || 0) : 0;
       const margin = sell > 0 ? ((sell - cost) / sell * 100) : 0;
       const marginColor = margin >= 30 ? 'var(--success)' : margin >= 15 ? 'var(--warning)' : 'var(--danger)';
-      const typeLabel = { raw: 'Raw', simple: 'Simple', complex: 'Complex' }[type];
+      const typeLabel = type === 'complex' ? 'Make to order' : ({ raw: 'Raw', simple: 'Simple' }[type] || type);
+      const loc = Store.getDefaultLocation(Auth.ownerId());
+      const stockLabel = Store.isMakeToOrder(p) && loc
+        ? Store.maxMakeQty(p, loc.id) + ' makeable'
+        : totalStock.toLocaleString();
 
-      let actions = '<button class="btn-icon edit" title="Edit" onclick="Products.openModal(\'' + p.id + '\')"><i class="fas fa-pen"></i></button>';
-      if (type === 'complex') actions = '<button class="btn-icon" title="Produce" onclick="Products.openProduce(\'' + p.id + '\')"><i class="fas fa-industry"></i></button>' + actions;
-      actions += '<button class="btn-icon delete" title="Delete" onclick="Products.confirmDelete(\'' + p.id + '\')"><i class="fas fa-trash-can"></i></button>';
+      let actions = '<button class="btn-icon edit" title="Open" onclick="Products.openDetail(\'' + p.id + '\')"><i class="fas fa-arrow-up-right-from-square"></i></button>';
+      if (type === 'complex') actions = '<button class="btn-icon" title="Produce" onclick="event.stopPropagation();Products.openProduce(\'' + p.id + '\')"><i class="fas fa-industry"></i></button>' + actions;
+      actions += '<button class="btn-icon delete" title="Delete" onclick="event.stopPropagation();Products.confirmDelete(\'' + p.id + '\')"><i class="fas fa-trash-can"></i></button>';
 
       const publishCell = sellable
         ? '<label class="toggle"><input type="checkbox" ' + (p.isPublished ? 'checked' : '') + ' onchange="Products.togglePublish(\'' + p.id + '\',this.checked)"><span class="slider"></span></label>'
         : '<span style="color:var(--text-light)">—</span>';
 
-      return '<tr>' +
+      return '<tr class="clickable-row" onclick="Products.openDetail(\'' + p.id + '\')">' +
         '<td><strong>' + _esc(p.name) + '</strong></td>' +
         '<td><span class="type-pill ' + type + '">' + typeLabel + '</span></td>' +
         '<td><code style="background:var(--bg);padding:2px 6px;border-radius:4px;font-size:.8rem">' + _esc(p.sku) + '</code></td>' +
@@ -145,7 +162,7 @@ const Products = (() => {
         '<td>' + (sellable ? '\u20B9' + sell.toFixed(2) : '<span style="color:var(--text-light)">—</span>') + '</td>' +
         '<td>' + (p.gstRate || 0) + '%</td>' +
         '<td>' + (sellable ? '<span style="font-weight:600;color:' + marginColor + '">' + margin.toFixed(1) + '%</span>' : '<span style="color:var(--text-light)">—</span>') + '</td>' +
-        '<td>' + totalStock.toLocaleString() + '</td>' +
+        '<td>' + stockLabel + '</td>' +
         '<td>' + publishCell + '</td>' +
         '<td><div class="action-btns">' + actions + '</div></td></tr>';
     }).join('');
@@ -153,7 +170,8 @@ const Products = (() => {
 
   // ---------- Recipe builder (complex products) ----------
   function _ingredientOptions(selectedId) {
-    const prods = Store.getIngredientProducts(Auth.ownerId()).filter(p => p.id !== editingId);
+    const skip = detailId || editingId;
+    const prods = Store.getIngredientProducts(Auth.ownerId()).filter(p => p.id !== skip);
     return '<option value="">Select ingredient</option>' + prods.map(p =>
       '<option value="' + p.id + '"' + (selectedId === p.id ? ' selected' : '') + '>' + _esc(p.name) + ' (' + _esc(p.sku) + ')</option>').join('');
   }
@@ -266,8 +284,10 @@ const Products = (() => {
       const ings = _collectIngredients();
       if (ings.length === 0) { App.showToast('Add at least one ingredient to the recipe', 'warning'); return; }
       data.recipe = { outputQty: parseInt(document.getElementById('product-recipe-outqty').value, 10) || 1, ingredients: ings };
+      data.fulfillment = 'mto';
     } else {
       data.recipe = null;
+      data.fulfillment = type === 'simple' ? 'stock' : 'n/a';
     }
 
     if (editingId) {
@@ -306,6 +326,7 @@ const Products = (() => {
       Store.deleteProduct(prodId);
       document.getElementById('delete-modal').classList.add('hidden');
       App.showToast('Product deleted', 'success');
+      if (detailId === prodId) { detailId = null; App.goTo('products'); }
       render();
       Inventory.render();
       Dashboard.refresh();
@@ -376,5 +397,198 @@ const Products = (() => {
 
   function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-  return { init, render, openModal, togglePublish, confirmDelete, populateFilters, openProduce };
+  function openDetail(prodId) {
+    const p = Store.getProductById(prodId);
+    if (!p) return;
+    detailId = prodId;
+    App.goTo('product-detail');
+  }
+
+  function renderDetail() {
+    if (!detailId) return;
+    const p = Store.getProductById(detailId);
+    if (!p) { App.goTo('products'); return; }
+    populateFilters();
+    const type = p.type || 'simple';
+    const loc = Store.getDefaultLocation(Auth.ownerId());
+    const locId = loc ? loc.id : '';
+    const sellable = Store.isSellableType(type);
+    const mto = Store.isMakeToOrder(p);
+    const cost = type === 'complex' ? Store.calcMakingCost(p) : (p.costPrice || 0);
+    const sell = p.price || 0;
+    const margin = sell > 0 ? ((sell - cost) / sell * 100) : 0;
+    const makeable = locId && mto ? Store.maxMakeQty(p, locId) : Store.getTotalStockForProduct(p.id);
+    const cat = Store.getCategoryById(p.categoryId);
+    document.getElementById('pd-hero').innerHTML =
+      '<div class="pd-hero-text"><h2>' + _esc(p.name) + '</h2>' +
+      '<div class="pd-hero-meta"><span class="type-pill ' + type + '">' + (mto ? 'Make to order' : type) + '</span>' +
+      (cat ? '<span class="category-tag"><span class="dot" style="background:' + cat.color + '"></span>' + _esc(cat.name) + '</span>' : '') +
+      '<code>' + _esc(p.sku) + '</code></div></div>' +
+      '<div class="pd-hero-stats">' +
+      '<div><span>Sell</span><strong>\u20B9' + sell.toFixed(2) + '</strong></div>' +
+      '<div><span>Cost</span><strong>\u20B9' + cost.toFixed(2) + '</strong></div>' +
+      '<div><span>Margin</span><strong>' + (sellable ? margin.toFixed(1) + '%' : '—') + '</strong></div>' +
+      '<div><span>' + (mto ? 'Can make' : 'Stock') + '</span><strong>' + makeable + '</strong></div></div>';
+
+    document.getElementById('pd-type').value = type;
+    document.getElementById('pd-name').value = p.name || '';
+    document.getElementById('pd-sku').value = p.sku || '';
+    document.getElementById('pd-category').value = p.categoryId || '';
+    document.getElementById('pd-unit').value = p.unit || 'pcs';
+    document.getElementById('pd-cost-price').value = cost;
+    document.getElementById('pd-price').value = p.price || 0;
+    document.getElementById('pd-mrp').value = p.mrp || 0;
+    document.getElementById('pd-wholesale').value = p.wholesalePrice || 0;
+    document.getElementById('pd-gst').value = p.gstRate != null ? p.gstRate : 18;
+    document.getElementById('pd-hsn').value = p.hsnCode || '';
+    document.getElementById('pd-description').value = p.description || '';
+    document.getElementById('pd-published').checked = !!p.isPublished;
+    document.getElementById('pd-recipe-outqty').value = (p.recipe && p.recipe.outputQty) || 1;
+    document.getElementById('pd-ingredients').innerHTML = '';
+    if (type === 'complex' && p.recipe && p.recipe.ingredients) {
+      p.recipe.ingredients.forEach(ing => _addDetailIngredientRow(ing.productId, ing.qty));
+    }
+    _applyDetailTypeUI();
+    SearchableSelect.enhanceAll(document.getElementById('view-product-detail'));
+    document.getElementById('pd-produce').classList.toggle('hidden', type !== 'complex');
+
+    const bomBody = document.getElementById('pd-bom-body');
+    if (mto && locId) {
+      const rows = (p.recipe.ingredients || []).map(ing => {
+        const ip = Store.getProductById(ing.productId);
+        const have = Store.getBatchQty(ing.productId, locId);
+        const need = Number(ing.qty) || 0;
+        const ok = have + 1e-6 >= need;
+        return '<tr><td>' + _esc(ip ? ip.name : '?') + '</td><td>' + need + ' ' + _esc((ip && ip.unit) || '') + '</td><td>' + (Math.round(have * 1000) / 1000) + '</td><td>' + (ok ? '<span class="badge badge-success">OK</span>' : '<span class="badge badge-danger">Short</span>') + '</td></tr>';
+      }).join('');
+      bomBody.innerHTML = '<p class="form-hint">At ' + _esc(loc.name) + ' you can make <strong>' + makeable + '</strong> right now.</p>' +
+        '<div class="table-wrap"><table class="data-table"><thead><tr><th>Ingredient</th><th>Per plate</th><th>On hand</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    } else if (type === 'complex') {
+      bomBody.innerHTML = '<p class="form-hint">Add a recipe and a default location to see make-to-order availability.</p>';
+    } else {
+      bomBody.innerHTML = '<p class="form-hint">Simple / raw items sell from their own lots — not a recipe.</p>';
+    }
+
+    const lots = Store.getBatchesByProduct(p.id).filter(b => b.qty > 0);
+    const lotsBody = document.getElementById('pd-lots-body');
+    if (!lots.length) lotsBody.innerHTML = '<p class="form-hint">' + (mto ? 'No finished lots (normal for make-to-order).' : 'No lots on hand.') + '</p>';
+    else lotsBody.innerHTML = '<ul class="pd-lot-list">' + lots.map(b => {
+      const locn = Store.getLocationById(b.locationId);
+      return '<li><strong>' + (b.qty) + '</strong> ' + _esc(p.unit || '') + ' · ' + _esc((locn && locn.name) || '') + ' · \u20B9' + (b.unitCost || 0).toFixed(2) + '</li>';
+    }).join('') + '</ul>';
+
+    const sales = Store.getPosSales(Auth.ownerId()).filter(s => (s.items || []).some(i => i.productId === p.id)).slice().reverse().slice(0, 8);
+    const salesBody = document.getElementById('pd-sales-body');
+    if (!sales.length) salesBody.innerHTML = '<p class="form-hint">No POS sales of this item yet.</p>';
+    else salesBody.innerHTML = '<ul class="pd-lot-list">' + sales.map(s => {
+      const line = (s.items || []).find(i => i.productId === p.id);
+      return '<li>' + new Date(s.createdAt).toLocaleString('en-IN') + ' · ' + (line ? line.qty : 0) + ' · \u20B9' + (s.total || 0).toFixed(0) + (s.stockShort ? ' · <span class="badge badge-warning">short</span>' : '') + '</li>';
+    }).join('') + '</ul>';
+  }
+
+  function _applyDetailTypeUI() {
+    const type = document.getElementById('pd-type').value || 'simple';
+    const sellable = Store.isSellableType(type);
+    document.getElementById('pd-pricing-section').classList.toggle('hidden', !sellable);
+    document.getElementById('pd-recipe-section').classList.toggle('hidden', type !== 'complex');
+    document.getElementById('pd-publish-group').classList.toggle('hidden', !sellable);
+    document.getElementById('pd-price').required = sellable;
+    document.getElementById('pd-type-hint').textContent = TYPE_HINTS[type] || '';
+    if (type === 'complex' && document.querySelectorAll('#pd-ingredients .ingredient-row').length === 0) _addDetailIngredientRow();
+    _updateDetailMargin();
+    _calcDetailMakingCost();
+  }
+
+  function _updateDetailMargin() {
+    const cost = parseFloat(document.getElementById('pd-cost-price').value) || 0;
+    const sell = parseFloat(document.getElementById('pd-price').value) || 0;
+    const mrp = parseFloat(document.getElementById('pd-mrp').value) || 0;
+    const preview = document.getElementById('pd-margin-preview');
+    if (mrp > 0 && sell > mrp) { preview.value = 'Sell > MRP!'; preview.style.color = 'var(--danger)'; return; }
+    preview.style.color = '';
+    if (sell > 0) preview.value = '\u20B9' + cost.toFixed(2) + ' cost \u00b7 ' + (((sell - cost) / sell * 100).toFixed(1)) + '%';
+    else preview.value = '\u20B9' + cost.toFixed(2) + ' cost';
+  }
+
+  function _addDetailIngredientRow(productId, qty) {
+    const container = document.getElementById('pd-ingredients');
+    const row = document.createElement('div');
+    row.className = 'ingredient-row';
+    const sel = document.createElement('select');
+    sel.className = 'select-input ing-product';
+    sel.innerHTML = _ingredientOptions(productId);
+    const qtyInput = document.createElement('input');
+    qtyInput.type = 'number'; qtyInput.className = 'ing-qty'; qtyInput.step = '0.01'; qtyInput.min = '0.01';
+    qtyInput.value = qty || 1; qtyInput.placeholder = 'Qty';
+    const del = document.createElement('button');
+    del.type = 'button'; del.className = 'btn-icon delete'; del.title = 'Remove';
+    del.innerHTML = '<i class="fas fa-xmark"></i>';
+    row.appendChild(sel); row.appendChild(qtyInput); row.appendChild(del);
+    container.appendChild(row);
+    del.addEventListener('click', () => { row.remove(); _calcDetailMakingCost(); });
+    sel.addEventListener('change', _calcDetailMakingCost);
+    qtyInput.addEventListener('input', _calcDetailMakingCost);
+    SearchableSelect.enhance(sel);
+    _calcDetailMakingCost();
+  }
+
+  function _collectDetailIngredients() {
+    const ings = [];
+    document.querySelectorAll('#pd-ingredients .ingredient-row').forEach(r => {
+      const pid = r.querySelector('.ing-product').value;
+      const q = parseFloat(r.querySelector('.ing-qty').value) || 0;
+      if (pid && q > 0) ings.push({ productId: pid, qty: q });
+    });
+    return ings;
+  }
+
+  function _calcDetailMakingCost() {
+    if (document.getElementById('pd-type').value !== 'complex') return;
+    const ings = _collectDetailIngredients();
+    let total = 0;
+    ings.forEach(i => { const p = Store.getProductById(i.productId); if (p) total += (p.costPrice || 0) * i.qty; });
+    const outQty = parseInt(document.getElementById('pd-recipe-outqty').value, 10) || 1;
+    const unit = outQty > 0 ? total / outQty : total;
+    document.getElementById('pd-makingcost').value = '\u20B9' + unit.toFixed(2);
+    document.getElementById('pd-cost-price').value = unit.toFixed(2);
+    _updateDetailMargin();
+  }
+
+  function _handleDetailSubmit(e) {
+    e.preventDefault();
+    if (!detailId) return;
+    const type = document.getElementById('pd-type').value || 'simple';
+    const sellable = Store.isSellableType(type);
+    const data = {
+      type,
+      name: document.getElementById('pd-name').value.trim(),
+      sku: document.getElementById('pd-sku').value.trim(),
+      categoryId: document.getElementById('pd-category').value,
+      unit: document.getElementById('pd-unit').value,
+      price: sellable ? (parseFloat(document.getElementById('pd-price').value) || 0) : 0,
+      mrp: sellable ? (parseFloat(document.getElementById('pd-mrp').value) || 0) : 0,
+      wholesalePrice: sellable ? (parseFloat(document.getElementById('pd-wholesale').value) || 0) : 0,
+      gstRate: parseInt(document.getElementById('pd-gst').value, 10) || 0,
+      hsnCode: document.getElementById('pd-hsn').value.trim(),
+      description: document.getElementById('pd-description').value.trim(),
+      isPublished: sellable ? document.getElementById('pd-published').checked : false,
+    };
+    if (sellable && data.mrp > 0 && data.price > data.mrp) { App.showToast('Selling price cannot exceed MRP', 'warning'); return; }
+    if (type === 'complex') {
+      const ings = _collectDetailIngredients();
+      if (ings.length === 0) { App.showToast('Add at least one ingredient to the recipe', 'warning'); return; }
+      data.recipe = { outputQty: parseInt(document.getElementById('pd-recipe-outqty').value, 10) || 1, ingredients: ings };
+      data.fulfillment = 'mto';
+      data.costPrice = Store.calcMakingCost({ ...Store.getProductById(detailId), ...data });
+    } else {
+      data.recipe = null;
+      data.fulfillment = type === 'simple' ? 'stock' : 'n/a';
+    }
+    Store.updateProduct(detailId, data);
+    App.showToast('Product saved', 'success');
+    renderDetail();
+    render();
+  }
+
+  return { init, render, openModal, openDetail, renderDetail, togglePublish, confirmDelete, populateFilters, openProduce };
 })();
