@@ -297,6 +297,124 @@
       </div></div>
     </section>
 
+    <!-- ===== Product detail (full page, not a popup) ===== -->
+    <section id="view-product-detail" class="view hidden">
+      <div class="pd-bar">
+        <button type="button" class="btn btn-secondary" id="pd-back"><i class="fas fa-arrow-left"></i> All products</button>
+        <div class="pd-bar-actions">
+          <button type="button" class="btn btn-secondary" id="pd-produce"><i class="fas fa-industry"></i> Produce (optional)</button>
+          <button type="button" class="btn btn-danger" id="pd-delete"><i class="fas fa-trash-can"></i> Delete</button>
+        </div>
+      </div>
+      <div id="pd-hero" class="pd-hero"></div>
+      <div class="pd-layout">
+        <div class="pd-main">
+          <div class="card">
+            <div class="card-header"><h3>Product details</h3></div>
+            <div class="card-body">
+              <form id="product-detail-form">
+                <div class="form-group"><label for="pd-type">Product Type *</label>
+                  <select id="pd-type" class="select-input" required>
+                    <option value="simple">Simple / Trading good (buy &amp; resell)</option>
+                    <option value="raw">Raw material / Ingredient (not for sale)</option>
+                    <option value="complex">Make to order (recipe deducted on each sale)</option>
+                  </select>
+                  <small class="form-hint" id="pd-type-hint"></small>
+                </div>
+                <div class="form-row">
+                  <div class="form-group"><label for="pd-name">Name *</label>
+                    <input type="text" id="pd-name" required></div>
+                  <div class="form-group"><label for="pd-sku">SKU *</label>
+                    <input type="text" id="pd-sku" required></div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group"><label for="pd-category">Category</label>
+                    <select id="pd-category" class="select-input"><option value="">Select category</option></select></div>
+                  <div class="form-group"><label for="pd-unit">Unit</label>
+                    <select id="pd-unit" class="select-input">
+                      <option value="pcs">Pieces (pcs)</option>
+                      <option value="kg">Kilogram (kg)</option>
+                      <option value="g">Gram (g)</option>
+                      <option value="L">Litre (L)</option>
+                      <option value="ml">Millilitre (ml)</option>
+                      <option value="box">Box</option>
+                      <option value="pack">Pack</option>
+                      <option value="set">Set</option>
+                      <option value="strip">Strip</option>
+                      <option value="dozen">Dozen</option>
+                      <option value="m">Metre (m)</option>
+                    </select></div>
+                </div>
+                <div id="pd-recipe-section" class="hidden">
+                  <div class="section-divider"><span>Recipe / Bill of Materials</span></div>
+                  <p class="form-hint">Each sale consumes these ingredients automatically. You do not need to Produce first.</p>
+                  <div class="form-row">
+                    <div class="form-group"><label for="pd-recipe-outqty">Output qty per batch *</label>
+                      <input type="number" id="pd-recipe-outqty" min="1" value="1"></div>
+                    <div class="form-group"><label>Making cost / unit</label>
+                      <input type="text" id="pd-makingcost" class="input-readonly" readonly tabindex="-1" value="₹0.00"></div>
+                  </div>
+                  <div class="form-group"><label>Ingredients</label>
+                    <div id="pd-ingredients"></div>
+                    <button type="button" class="btn btn-sm btn-secondary" id="pd-add-ingredient" style="margin-top:.5rem"><i class="fas fa-plus"></i> Add Ingredient</button>
+                  </div>
+                </div>
+                <div id="pd-pricing-section">
+                  <div class="section-divider"><span>Pricing</span></div>
+                  <div class="form-row">
+                    <div class="form-group"><label for="pd-price">Selling Price (₹) *</label>
+                      <input type="number" id="pd-price" step="0.01" min="0" value="0"></div>
+                    <div class="form-group"><label for="pd-mrp">MRP (₹)</label>
+                      <input type="number" id="pd-mrp" step="0.01" min="0" value="0"></div>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group"><label for="pd-wholesale">Wholesale (₹)</label>
+                      <input type="number" id="pd-wholesale" step="0.01" min="0" value="0"></div>
+                    <div class="form-group"><label>Avg Cost &middot; Margin</label>
+                      <input type="text" id="pd-margin-preview" class="input-readonly" readonly tabindex="-1"></div>
+                  </div>
+                </div>
+                <div class="form-row">
+                  <div class="form-group"><label for="pd-gst">GST Rate</label>
+                    <select id="pd-gst" class="select-input">
+                      <option value="0">0%</option>
+                      <option value="5">5%</option>
+                      <option value="12">12%</option>
+                      <option value="18" selected>18%</option>
+                      <option value="28">28%</option>
+                    </select></div>
+                  <div class="form-group"><label for="pd-hsn">HSN Code</label>
+                    <input type="text" id="pd-hsn"></div>
+                </div>
+                <input type="hidden" id="pd-cost-price" value="0">
+                <div class="form-group"><label for="pd-description">Description</label>
+                  <textarea id="pd-description" rows="3"></textarea></div>
+                <div class="form-group" id="pd-publish-group"><label class="checkbox-label">
+                  <input type="checkbox" id="pd-published" checked> Publish to marketplace</label></div>
+                <div class="pd-save-row">
+                  <button type="submit" class="btn btn-primary"><i class="fas fa-floppy-disk"></i> Save changes</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+        <aside class="pd-side">
+          <div class="card" id="pd-bom-card">
+            <div class="card-header"><h3>Can we make it?</h3></div>
+            <div class="card-body" id="pd-bom-body"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>Lots on hand</h3></div>
+            <div class="card-body" id="pd-lots-body"></div>
+          </div>
+          <div class="card">
+            <div class="card-header"><h3>Recent sales</h3></div>
+            <div class="card-body" id="pd-sales-body"></div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
     <!-- ===== Inventory (Stock) View ===== -->
     <section id="view-inventory" class="view hidden">
       <div class="view-toolbar">
@@ -710,7 +828,7 @@
           <select id="product-type" class="select-input" required>
             <option value="simple">Simple / Trading good (buy &amp; resell)</option>
             <option value="raw">Raw material / Ingredient (not for sale)</option>
-            <option value="complex">Complex / Manufactured (made from a recipe)</option>
+            <option value="complex">Make to order (recipe deducted on each sale)</option>
           </select>
           <small class="form-hint" id="product-type-hint"></small>
         </div>

@@ -322,6 +322,89 @@ const Store = (() => {
     return getBatchesByProduct(productId).reduce((s, b) => s + Math.max(0, b.qty) * (b.unitCost || 0), 0);
   }
 
+  // Make-to-order: complex items with a recipe deduct ingredients on sale
+  // instead of requiring a finished-goods Produce step first.
+  function isMakeToOrder(product) {
+    if (!product) return false;
+    if (product.fulfillment === 'stock') return false;
+    const recipe = product.recipe;
+    return (product.type || 'simple') === 'complex'
+      && recipe && Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0;
+  }
+
+  function _bomNeeds(product, qty) {
+    const recipe = product.recipe || { outputQty: 1, ingredients: [] };
+    const scale = (Number(qty) || 0) / Math.max(1, Number(recipe.outputQty) || 1);
+    return (recipe.ingredients || []).map(ing => ({
+      productId: ing.productId,
+      qty: (Number(ing.qty) || 0) * scale,
+    })).filter(n => n.productId && n.qty > 0);
+  }
+
+  function checkBom(product, locationId, qty) {
+    const shortages = [];
+    _bomNeeds(product, qty).forEach(need => {
+      const have = getBatchQty(need.productId, locationId);
+      if (have + 1e-6 < need.qty) {
+        const ip = getProductById(need.productId);
+        shortages.push({ productId: need.productId, name: ip ? ip.name : 'ingredient', need: need.qty, have: have });
+      }
+    });
+    return { ok: shortages.length === 0, shortages };
+  }
+
+  function maxMakeQty(product, locationId) {
+    if (!isMakeToOrder(product)) return getBatchQty(product.id, locationId);
+    const recipe = product.recipe;
+    const out = Math.max(1, Number(recipe.outputQty) || 1);
+    let max = Infinity;
+    (recipe.ingredients || []).forEach(ing => {
+      const per = Number(ing.qty) || 0;
+      if (per <= 0) return;
+      const have = getBatchQty(ing.productId, locationId);
+      max = Math.min(max, Math.floor((have / per) * out + 1e-9));
+    });
+    if (max === Infinity) return 0;
+    return Math.max(0, max);
+  }
+
+  function availableSellQty(product, locationId) {
+    if (!product) return 0;
+    if (isMakeToOrder(product)) return maxMakeQty(product, locationId);
+    return getBatchQty(product.id, locationId);
+  }
+
+  function consumeForSale(product, locationId, qty, preferredBatchId) {
+    if (isMakeToOrder(product)) {
+      const check = checkBom(product, locationId, qty);
+      if (!check.ok) return { success: false, shortages: check.shortages, picks: [], cost: 0 };
+      const allPicks = [];
+      _bomNeeds(product, qty).forEach(need => {
+        const picks = pickLots(need.productId, locationId, need.qty);
+        (picks || []).forEach(pk => allPicks.push({ ...pk, productId: need.productId }));
+      });
+      const cost = consumeLots(allPicks);
+      return { success: true, picks: allPicks, cost };
+    }
+    const picks = pickLots(product.id, locationId, qty, preferredBatchId);
+    if (!picks) {
+      return {
+        success: false,
+        shortages: [{ productId: product.id, name: product.name, need: qty, have: getBatchQty(product.id, locationId) }],
+        picks: [],
+        cost: 0,
+      };
+    }
+    const cost = consumeLots(picks);
+    return { success: true, picks: picks.map(pk => ({ ...pk, productId: product.id })), cost };
+  }
+
+  function _formatShortages(shortages) {
+    return (shortages || []).map(s =>
+      (s.name || 'item') + ' (need ' + (Math.round(s.need * 1000) / 1000) + ', have ' + (Math.round(s.have * 1000) / 1000) + ')'
+    ).join('; ');
+  }
+
   // Produce a complex product: consume the chosen ingredient lots, compute the
   // actual making cost, and create a finished batch at that cost.
   function produceComplex(productId, locationId, qty, lotChoices) {
@@ -524,30 +607,51 @@ const Store = (() => {
   function getPosSales(ownerId) { return (_get(KEYS.POS_SALES) || []).filter(s => s.ownerId === ownerId); }
 
   function createPosSale(ownerId, locationId, items, paymentMethod, customerName) {
+    const issues = [];
+    items.forEach(i => {
+      const product = getProductById(i.productId);
+      if (!product) { issues.push({ name: i.name || i.productId, need: i.qty, have: 0 }); return; }
+      if (isMakeToOrder(product)) {
+        const check = checkBom(product, locationId, i.qty);
+        if (!check.ok) issues.push.apply(issues, check.shortages);
+      } else {
+        const have = getBatchQty(i.productId, locationId);
+        if (have + 1e-6 < i.qty) issues.push({ name: product.name, need: i.qty, have });
+      }
+    });
+    if (issues.length) {
+      return { success: false, message: 'Not enough stock: ' + _formatShortages(issues), shortages: issues };
+    }
+
     const sale = {
       id: generateId(),
       receiptNumber: _nextReceiptNumber(),
       ownerId,
       locationId,
-      items,
+      items: items.map(i => ({ ...i })),
       subtotal: items.reduce((s, i) => s + i.qty * i.price, 0),
       taxAmount: items.reduce((s, i) => s + i.qty * i.price * ((i.gstRate || 0) / 100), 0),
       paymentMethod: paymentMethod || 'cash',
       customerName: customerName || 'Walk-in',
       createdAt: new Date().toISOString(),
+      stockShort: false,
     };
     sale.total = sale.subtotal + sale.taxAmount;
-    // Consume lots (per-line preferred batch if supplied) and record real COGS.
-    items.forEach(i => {
-      const picks = i.lots && i.lots.length ? i.lots : pickLots(i.productId, locationId, i.qty, i.batchId);
-      if (picks) i.costPrice = consumeLots(picks) / Math.max(1, i.qty);
+    const allConsumed = [];
+    sale.items.forEach(i => {
+      const product = getProductById(i.productId);
+      const res = consumeForSale(product, locationId, i.qty, i.batchId);
+      i.costPrice = res.cost / Math.max(1, i.qty);
+      i.makeToOrder = isMakeToOrder(product);
       delete i.lots; delete i.batchId;
+      allConsumed.push.apply(allConsumed, res.picks || []);
     });
+    sale.consumedLots = allConsumed;
     const all = _get(KEYS.POS_SALES) || [];
     all.push(sale);
     _set(KEYS.POS_SALES, all);
     _cloudSave('pos_sales', sale);
-    return sale;
+    return { success: true, sale };
   }
 
   function getPosSalesToday(ownerId) {
@@ -802,6 +906,7 @@ const Store = (() => {
     getProducts, getProductsByOwner, getProductsByType, getSellableProducts, getIngredientProducts, getPublishedProducts, getProductById, addProduct, updateProduct, deleteProduct, isSellableType,
     getStock, getStockByOwner, getStockByLocation, getStockByProduct, getStockRecord, setStock, adjustStock, getTotalStockForProduct, getLowStockItems, getExpiringStock,
     getBatches, getBatchById, getBatchesByProduct, availableLots, getBatchQty, addBatch, updateBatch, deleteBatch, pickLots, consumeLots, calcMakingCost, getProductStockValue, produceComplex,
+    isMakeToOrder, checkBom, maxMakeQty, availableSellQty, consumeForSale, _formatShortages,
     getOrders, getOrderById, getSalesOrders, getPurchaseOrders, createOrder, updateOrderStatus,
     createManualPurchase, createFieldSale, acceptOrder, cancelOrder, fulfillFieldSale, receiveManualPurchase, settleOrder,
     getParties, getPartiesByType, getPartyById, addParty, updateParty, deleteParty,

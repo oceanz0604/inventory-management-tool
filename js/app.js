@@ -300,6 +300,7 @@ const App = (() => {
 
   const titles = {
     dashboard: 'Dashboard', locations: 'Locations', products: 'Products',
+    'product-detail': 'Product',
     inventory: 'Inventory', pos: 'POS Counter', orders: 'Orders',
     categories: 'Categories', shop: 'Shop',
     reports: 'Reports', khata: 'Khata / Credit',
@@ -308,23 +309,30 @@ const App = (() => {
 
   function _navigate(view) {
     // Keep workers inside the views their role allows.
-    if (_allowedViews().indexOf(view) < 0) view = _defaultView();
+    const allowed = _allowedViews();
+    if (view === 'product-detail') {
+      if (allowed.indexOf('products') < 0) view = _defaultView();
+    } else if (allowed.indexOf(view) < 0) {
+      view = _defaultView();
+    }
     currentView = view;
     document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
     const el = document.getElementById('view-' + view);
     if (el) el.classList.remove('hidden');
 
     document.querySelectorAll('.sidebar .nav-item').forEach(n => n.classList.remove('active'));
-    const nav = document.querySelector('.sidebar .nav-item[data-view="' + view + '"]');
+    const navKey = view === 'product-detail' ? 'products' : view;
+    const nav = document.querySelector('.sidebar .nav-item[data-view="' + navKey + '"]');
     if (nav) nav.classList.add('active');
 
     document.getElementById('page-title').textContent = titles[view] || view;
 
-    _syncBottomNav(view);
+    _syncBottomNav(navKey);
 
     if (view === 'dashboard') Dashboard.refresh();
     if (view === 'locations') Locations.render();
     if (view === 'products') { Products.populateFilters(); Products.render(); }
+    if (view === 'product-detail') Products.renderDetail();
     if (view === 'inventory') { Inventory.refreshFilters(); Inventory.render(); }
     if (view === 'pos') POS.refresh();
     if (view === 'orders') Orders.render();

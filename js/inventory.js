@@ -103,7 +103,11 @@ const Inventory = (() => {
       const key = s.productId + '@' + s.locationId;
       const isOpen = !!expanded[key];
       const type = s.product.type || 'simple';
-      const badge = s.quantity === 0 ? '<span class="badge badge-danger">Out</span>' : s.quantity <= s.minStock ? '<span class="badge badge-warning">Low</span>' : '<span class="badge badge-success">In Stock</span>';
+      const mto = Store.isMakeToOrder(s.product);
+      const makeable = mto ? Store.maxMakeQty(s.product, s.locationId) : s.quantity;
+      const badge = mto
+        ? (makeable > 0 ? '<span class="badge badge-success">Can make ' + makeable + '</span>' : '<span class="badge badge-warning">MTO · short</span>')
+        : s.quantity === 0 ? '<span class="badge badge-danger">Out</span>' : s.quantity <= s.minStock ? '<span class="badge badge-warning">Low</span>' : '<span class="badge badge-success">In Stock</span>';
       const lots = Store.getBatchesByProduct(s.productId, s.locationId).filter(b => b.qty > 0).sort((a, b) => {
         const ax = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
         const bx = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
@@ -114,9 +118,9 @@ const Inventory = (() => {
       const main = '<tr>' +
         '<td>' + (lotCount ? '<button class="btn-icon" onclick="Inventory.toggle(\'' + key + '\')"><i class="fas fa-chevron-' + (isOpen ? 'down' : 'right') + '"></i></button>' : '') + '</td>' +
         '<td><strong>' + _esc(s.product.name) + '</strong> <code style="background:var(--bg);padding:1px 5px;border-radius:4px;font-size:.72rem">' + _esc(s.product.sku) + '</code></td>' +
-        '<td><span class="type-pill ' + type + '">' + ({ raw: 'Raw', simple: 'Simple', complex: 'Complex' }[type]) + '</span></td>' +
+        '<td><span class="type-pill ' + type + '">' + (mto ? 'Make to order' : ({ raw: 'Raw', simple: 'Simple', complex: 'Complex' }[type])) + '</span></td>' +
         '<td>' + _esc(s.location.name) + '</td>' +
-        '<td><strong>' + s.quantity + '</strong> <span style="color:var(--text-light);font-size:.75rem">(' + lotCount + ' lot' + (lotCount !== 1 ? 's' : '') + ')</span></td>' +
+        '<td><strong>' + (mto ? makeable : s.quantity) + '</strong> <span style="color:var(--text-light);font-size:.75rem">' + (mto ? 'makeable' : '(' + lotCount + ' lot' + (lotCount !== 1 ? 's' : '') + ')') + '</span></td>' +
         '<td>' + s.minStock + '</td>' +
         '<td>' + badge + '</td>' +
         '<td><div class="action-btns">' +
