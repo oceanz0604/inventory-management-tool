@@ -294,7 +294,7 @@ const Store = (() => {
     let cost = 0;
     product.recipe.ingredients.forEach(ing => {
       const ip = getProductById(ing.productId);
-      if (ip) cost += (ip.costPrice || 0) * ing.qty;
+      if (ip) cost += (ip.costPrice || 0) * _ingQty(ing);
     });
     const out = product.recipe.outputQty || 1;
     return out > 0 ? cost / out : cost;
@@ -332,12 +332,18 @@ const Store = (() => {
       && recipe && Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0;
   }
 
+  function _ingQty(ing) {
+    const q = Number(ing && ing.qty) || 0;
+    const waste = Math.max(0, Number(ing && ing.wastagePct) || 0);
+    return q * (1 + waste / 100);
+  }
+
   function _bomNeeds(product, qty) {
     const recipe = product.recipe || { outputQty: 1, ingredients: [] };
     const scale = (Number(qty) || 0) / Math.max(1, Number(recipe.outputQty) || 1);
     return (recipe.ingredients || []).map(ing => ({
       productId: ing.productId,
-      qty: (Number(ing.qty) || 0) * scale,
+      qty: _ingQty(ing) * scale,
     })).filter(n => n.productId && n.qty > 0);
   }
 
@@ -359,7 +365,7 @@ const Store = (() => {
     const out = Math.max(1, Number(recipe.outputQty) || 1);
     let max = Infinity;
     (recipe.ingredients || []).forEach(ing => {
-      const per = Number(ing.qty) || 0;
+      const per = _ingQty(ing);
       if (per <= 0) return;
       const have = getBatchQty(ing.productId, locationId);
       max = Math.min(max, Math.floor((have / per) * out + 1e-9));
@@ -413,12 +419,12 @@ const Store = (() => {
     if (!locationId) return { success: false, message: 'Select a location' };
     qty = Math.max(1, qty || 1);
     const allPicks = [];
-    for (const ing of p.recipe.ingredients) {
-      const need = ing.qty * qty;
-      const picks = pickLots(ing.productId, locationId, need, (lotChoices || {})[ing.productId]);
+    const needs = _bomNeeds(p, qty);
+    for (const need of needs) {
+      const picks = pickLots(need.productId, locationId, need.qty, (lotChoices || {})[need.productId]);
       if (!picks) {
-        const ip = getProductById(ing.productId);
-        return { success: false, message: 'Not enough ' + (ip ? ip.name : 'ingredient') + ' at this location (need ' + need + ')' };
+        const ip = getProductById(need.productId);
+        return { success: false, message: 'Not enough ' + (ip ? ip.name : 'ingredient') + ' at this location (need ' + need.qty + ')' };
       }
       picks.forEach(pk => allPicks.push(pk));
     }

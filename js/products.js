@@ -46,6 +46,8 @@ const Products = (() => {
     document.getElementById('product-search').addEventListener('input', render);
     document.getElementById('product-filter-category').addEventListener('change', render);
     document.getElementById('product-filter-published').addEventListener('change', render);
+    document.getElementById('product-filter-type').addEventListener('change', render);
+    document.getElementById('product-filter-unit').addEventListener('change', render);
     document.getElementById('product-price').addEventListener('input', _updateMarginPreview);
     document.getElementById('product-mrp').addEventListener('input', _updateMarginPreview);
     document.getElementById('product-type').addEventListener('change', () => _applyTypeUI(_currentType()));
@@ -53,6 +55,15 @@ const Products = (() => {
     document.getElementById('product-recipe-outqty').addEventListener('input', _calcMakingCost);
 
     document.getElementById('pd-back').addEventListener('click', () => App.goTo('products'));
+    document.getElementById('pd-edit').addEventListener('click', () => {
+      const card = document.getElementById('pd-form-card');
+      if (!card) return;
+      card.classList.add('pd-highlight');
+      card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const name = document.getElementById('pd-name');
+      if (name) setTimeout(() => name.focus(), 250);
+      setTimeout(() => card.classList.remove('pd-highlight'), 1800);
+    });
     document.getElementById('pd-delete').addEventListener('click', () => { if (detailId) confirmDelete(detailId); });
     document.getElementById('pd-produce').addEventListener('click', () => { if (detailId) openProduce(detailId); });
     document.getElementById('product-detail-form').addEventListener('submit', _handleDetailSubmit);
@@ -68,36 +79,51 @@ const Products = (() => {
     document.getElementById('produce-product').addEventListener('change', _renderProduceIngredients);
     document.getElementById('produce-location').addEventListener('change', _renderProduceIngredients);
     document.getElementById('produce-qty').addEventListener('input', _renderProduceIngredients);
-
-    document.querySelectorAll('#view-products .sortable').forEach(th => {
-      th.addEventListener('click', () => {
-        const f = th.dataset.sort;
-        if (currentSort.field === f) currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-        else { currentSort.field = f; currentSort.direction = 'asc'; }
-        render();
-      });
-    });
   }
 
   function populateFilters() {
     const cats = Store.getCategories();
     const opts = cats.map(c => '<option value="' + c.id + '">' + _esc(c.name) + '</option>').join('');
-    document.getElementById('product-filter-category').innerHTML = '<option value="">All Categories</option>' + opts;
+    const catFilter = document.getElementById('product-filter-category');
+    const pubFilter = document.getElementById('product-filter-published');
+    const typeFilter = document.getElementById('product-filter-type');
+    const unitFilter = document.getElementById('product-filter-unit');
+    const keep = {
+      cat: catFilter.value,
+      pub: pubFilter.value,
+      type: typeFilter ? typeFilter.value : '',
+      unit: unitFilter ? unitFilter.value : '',
+    };
+    catFilter.innerHTML = '<option value="">All Categories</option>' + opts;
     document.getElementById('product-category').innerHTML = '<option value="">Select category</option>' + opts;
     const pdCat = document.getElementById('pd-category');
     if (pdCat) pdCat.innerHTML = '<option value="">Select category</option>' + opts;
-    SearchableSelect.enhanceAll(document.getElementById('view-products'));
+    const units = Array.from(new Set(Store.getProductsByOwner(Auth.ownerId()).map(p => p.unit || 'pcs'))).sort();
+    if (unitFilter) {
+      unitFilter.innerHTML = '<option value="">All Units</option>' + units.map(u => '<option value="' + _esc(u) + '">' + _esc(u) + '</option>').join('');
+    }
+    catFilter.value = keep.cat;
+    pubFilter.value = keep.pub;
+    if (typeFilter) typeFilter.value = keep.type;
+    if (unitFilter && keep.unit) unitFilter.value = keep.unit;
+    SearchableSelect.enhance(catFilter);
     SearchableSelect.enhance(document.getElementById('product-category'));
+    SearchableSelect.refresh(catFilter);
+    SearchableSelect.refresh(document.getElementById('product-category'));
   }
 
   function render() {
     const search = document.getElementById('product-search').value.toLowerCase().trim();
     const catFilter = document.getElementById('product-filter-category').value;
     const pubFilter = document.getElementById('product-filter-published').value;
+    const typeFilter = (document.getElementById('product-filter-type') || {}).value || '';
+    const unitFilter = (document.getElementById('product-filter-unit') || {}).value || '';
 
     let prods = Store.getProductsByOwner(Auth.ownerId());
     if (search) prods = prods.filter(p => p.name.toLowerCase().includes(search) || (p.sku || '').toLowerCase().includes(search));
     if (catFilter) prods = prods.filter(p => p.categoryId === catFilter);
+    if (typeFilter) prods = prods.filter(p => (p.type || 'simple') === typeFilter);
+    if (unitFilter) prods = prods.filter(p => (p.unit || 'pcs') === unitFilter);
     if (pubFilter === '1') prods = prods.filter(p => p.isPublished);
     if (pubFilter === '0') prods = prods.filter(p => !p.isPublished);
 
@@ -175,44 +201,69 @@ const Products = (() => {
     return '<option value="">Select ingredient</option>' + prods.map(p =>
       '<option value="' + p.id + '"' + (selectedId === p.id ? ' selected' : '') + '>' + _esc(p.name) + ' (' + _esc(p.sku) + ')</option>').join('');
   }
-  function _addIngredientRow(productId, qty) {
-    const container = document.getElementById('product-ingredients');
+  function _syncIngredientMeta(row) {
+    const pid = row.querySelector('.ing-product').value;
+    const p = Store.getProductById(pid);
+    const unit = row.querySelector('.ing-unit');
+    if (unit) unit.textContent = p ? (p.unit || 'pcs') : '—';
+    const q = parseFloat(row.querySelector('.ing-qty').value) || 0;
+    const w = parseFloat(row.querySelector('.ing-wastage').value) || 0;
+    const used = q * (1 + Math.max(0, w) / 100);
+    const costEl = row.querySelector('.ing-line-cost');
+    if (costEl) costEl.textContent = '\u20B9' + ((p ? (p.costPrice || 0) : 0) * used).toFixed(2);
+  }
+
+  function _mountIngredientRow(container, productId, qty, wastagePct, onChange) {
     const row = document.createElement('div');
     row.className = 'ingredient-row';
     const sel = document.createElement('select');
     sel.className = 'select-input ing-product';
     sel.innerHTML = _ingredientOptions(productId);
     const qtyInput = document.createElement('input');
-    qtyInput.type = 'number'; qtyInput.className = 'ing-qty'; qtyInput.step = '0.01'; qtyInput.min = '0.01';
-    qtyInput.value = qty || 1; qtyInput.placeholder = 'Qty';
+    qtyInput.type = 'number'; qtyInput.className = 'ing-qty'; qtyInput.step = '0.01'; qtyInput.min = '0';
+    qtyInput.value = qty != null ? qty : 1; qtyInput.placeholder = 'Qty'; qtyInput.title = 'Quantity per batch';
+    const unit = document.createElement('span');
+    unit.className = 'ing-unit'; unit.textContent = '—';
+    const waste = document.createElement('input');
+    waste.type = 'number'; waste.className = 'ing-wastage'; waste.step = '0.1'; waste.min = '0'; waste.max = '100';
+    waste.value = wastagePct != null ? wastagePct : 0; waste.placeholder = '0'; waste.title = 'Wastage % added on top of qty';
+    const cost = document.createElement('span');
+    cost.className = 'ing-line-cost'; cost.textContent = '\u20B90.00';
     const del = document.createElement('button');
     del.type = 'button'; del.className = 'btn-icon delete'; del.title = 'Remove';
     del.innerHTML = '<i class="fas fa-xmark"></i>';
-    row.appendChild(sel); row.appendChild(qtyInput); row.appendChild(del);
+    row.appendChild(sel); row.appendChild(qtyInput); row.appendChild(unit);
+    row.appendChild(waste); row.appendChild(cost); row.appendChild(del);
     container.appendChild(row);
-    del.addEventListener('click', () => { row.remove(); _calcMakingCost(); });
-    sel.addEventListener('change', _calcMakingCost);
-    qtyInput.addEventListener('input', _calcMakingCost);
+    const bump = () => { _syncIngredientMeta(row); onChange(); };
+    del.addEventListener('click', () => { row.remove(); onChange(); });
+    sel.addEventListener('change', bump);
+    qtyInput.addEventListener('input', bump);
+    waste.addEventListener('input', bump);
     SearchableSelect.enhance(sel);
-    _calcMakingCost();
+    bump();
   }
-  function _collectIngredients() {
-    const rows = document.querySelectorAll('#product-ingredients .ingredient-row');
+
+  function _collectFrom(rootSel) {
     const ings = [];
-    rows.forEach(r => {
+    document.querySelectorAll(rootSel + ' .ingredient-row').forEach(r => {
       const pid = r.querySelector('.ing-product').value;
       const q = parseFloat(r.querySelector('.ing-qty').value) || 0;
-      if (pid && q > 0) ings.push({ productId: pid, qty: q });
+      const w = parseFloat(r.querySelector('.ing-wastage').value) || 0;
+      if (pid && q > 0) ings.push({ productId: pid, qty: q, wastagePct: w });
     });
     return ings;
   }
+
+  function _addIngredientRow(productId, qty, wastagePct) {
+    _mountIngredientRow(document.getElementById('product-ingredients'), productId, qty, wastagePct, _calcMakingCost);
+  }
+  function _collectIngredients() { return _collectFrom('#product-ingredients'); }
   function _calcMakingCost() {
     if (_currentType() !== 'complex') return;
-    const ings = _collectIngredients();
-    let total = 0;
-    ings.forEach(i => { const p = Store.getProductById(i.productId); if (p) total += (p.costPrice || 0) * i.qty; });
-    const outQty = parseInt(document.getElementById('product-recipe-outqty').value, 10) || 1;
-    const unit = outQty > 0 ? total / outQty : total;
+    const unit = Store.calcMakingCost({
+      recipe: { outputQty: parseInt(document.getElementById('product-recipe-outqty').value, 10) || 1, ingredients: _collectIngredients() },
+    });
     document.getElementById('product-makingcost').value = '\u20B9' + unit.toFixed(2);
     document.getElementById('product-cost-price').value = unit.toFixed(2);
   }
@@ -244,7 +295,7 @@ const Products = (() => {
       document.getElementById('product-description').value = p.description || '';
       document.getElementById('product-published').checked = !!p.isPublished;
       document.getElementById('product-recipe-outqty').value = (p.recipe && p.recipe.outputQty) || 1;
-      if (type === 'complex' && p.recipe && p.recipe.ingredients) p.recipe.ingredients.forEach(ing => _addIngredientRow(ing.productId, ing.qty));
+      if (type === 'complex' && p.recipe && p.recipe.ingredients) p.recipe.ingredients.forEach(ing => _addIngredientRow(ing.productId, ing.qty, ing.wastagePct));
     } else {
       title.textContent = 'Add Product';
       document.getElementById('product-type').value = 'simple';
@@ -446,7 +497,7 @@ const Products = (() => {
     document.getElementById('pd-recipe-outqty').value = (p.recipe && p.recipe.outputQty) || 1;
     document.getElementById('pd-ingredients').innerHTML = '';
     if (type === 'complex' && p.recipe && p.recipe.ingredients) {
-      p.recipe.ingredients.forEach(ing => _addDetailIngredientRow(ing.productId, ing.qty));
+      p.recipe.ingredients.forEach(ing => _addDetailIngredientRow(ing.productId, ing.qty, ing.wastagePct));
     }
     _applyDetailTypeUI();
     SearchableSelect.enhanceAll(document.getElementById('view-product-detail'));
@@ -456,10 +507,10 @@ const Products = (() => {
     if (mto && locId) {
       const rows = (p.recipe.ingredients || []).map(ing => {
         const ip = Store.getProductById(ing.productId);
+        const need = (Number(ing.qty) || 0) * (1 + Math.max(0, Number(ing.wastagePct) || 0) / 100);
         const have = Store.getBatchQty(ing.productId, locId);
-        const need = Number(ing.qty) || 0;
         const ok = have + 1e-6 >= need;
-        return '<tr><td>' + _esc(ip ? ip.name : '?') + '</td><td>' + need + ' ' + _esc((ip && ip.unit) || '') + '</td><td>' + (Math.round(have * 1000) / 1000) + '</td><td>' + (ok ? '<span class="badge badge-success">OK</span>' : '<span class="badge badge-danger">Short</span>') + '</td></tr>';
+        return '<tr><td>' + _esc(ip ? ip.name : '?') + '</td><td>' + (Math.round(need * 1000) / 1000) + ' ' + _esc((ip && ip.unit) || '') + (ing.wastagePct ? ' (incl. ' + ing.wastagePct + '% waste)' : '') + '</td><td>' + (Math.round(have * 1000) / 1000) + '</td><td>' + (ok ? '<span class="badge badge-success">OK</span>' : '<span class="badge badge-danger">Short</span>') + '</td></tr>';
       }).join('');
       bomBody.innerHTML = '<p class="form-hint">At ' + _esc(loc.name) + ' you can make <strong>' + makeable + '</strong> right now.</p>' +
         '<div class="table-wrap"><table class="data-table"><thead><tr><th>Ingredient</th><th>Per plate</th><th>On hand</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
@@ -510,45 +561,17 @@ const Products = (() => {
     else preview.value = '\u20B9' + cost.toFixed(2) + ' cost';
   }
 
-  function _addDetailIngredientRow(productId, qty) {
-    const container = document.getElementById('pd-ingredients');
-    const row = document.createElement('div');
-    row.className = 'ingredient-row';
-    const sel = document.createElement('select');
-    sel.className = 'select-input ing-product';
-    sel.innerHTML = _ingredientOptions(productId);
-    const qtyInput = document.createElement('input');
-    qtyInput.type = 'number'; qtyInput.className = 'ing-qty'; qtyInput.step = '0.01'; qtyInput.min = '0.01';
-    qtyInput.value = qty || 1; qtyInput.placeholder = 'Qty';
-    const del = document.createElement('button');
-    del.type = 'button'; del.className = 'btn-icon delete'; del.title = 'Remove';
-    del.innerHTML = '<i class="fas fa-xmark"></i>';
-    row.appendChild(sel); row.appendChild(qtyInput); row.appendChild(del);
-    container.appendChild(row);
-    del.addEventListener('click', () => { row.remove(); _calcDetailMakingCost(); });
-    sel.addEventListener('change', _calcDetailMakingCost);
-    qtyInput.addEventListener('input', _calcDetailMakingCost);
-    SearchableSelect.enhance(sel);
-    _calcDetailMakingCost();
+  function _addDetailIngredientRow(productId, qty, wastagePct) {
+    _mountIngredientRow(document.getElementById('pd-ingredients'), productId, qty, wastagePct, _calcDetailMakingCost);
   }
 
-  function _collectDetailIngredients() {
-    const ings = [];
-    document.querySelectorAll('#pd-ingredients .ingredient-row').forEach(r => {
-      const pid = r.querySelector('.ing-product').value;
-      const q = parseFloat(r.querySelector('.ing-qty').value) || 0;
-      if (pid && q > 0) ings.push({ productId: pid, qty: q });
-    });
-    return ings;
-  }
+  function _collectDetailIngredients() { return _collectFrom('#pd-ingredients'); }
 
   function _calcDetailMakingCost() {
     if (document.getElementById('pd-type').value !== 'complex') return;
-    const ings = _collectDetailIngredients();
-    let total = 0;
-    ings.forEach(i => { const p = Store.getProductById(i.productId); if (p) total += (p.costPrice || 0) * i.qty; });
-    const outQty = parseInt(document.getElementById('pd-recipe-outqty').value, 10) || 1;
-    const unit = outQty > 0 ? total / outQty : total;
+    const unit = Store.calcMakingCost({
+      recipe: { outputQty: parseInt(document.getElementById('pd-recipe-outqty').value, 10) || 1, ingredients: _collectDetailIngredients() },
+    });
     document.getElementById('pd-makingcost').value = '\u20B9' + unit.toFixed(2);
     document.getElementById('pd-cost-price').value = unit.toFixed(2);
     _updateDetailMargin();

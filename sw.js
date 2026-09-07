@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zentory-v25';
+const CACHE_NAME = 'zentory-v26';
 const STATIC_URLS = [
   './',
   './index.html',
@@ -9,6 +9,7 @@ const STATIC_URLS = [
   './js/firebase-config.js',
   './js/creds.js',
   './js/select.js',
+  './js/tables.js',
   './js/store.js',
   './js/auth.js',
   './js/locations.js',
@@ -18,6 +19,7 @@ const STATIC_URLS = [
   './js/import-data.js',
   './js/inventory.js',
   './js/orders.js',
+  './js/purchase.js',
   './js/shop.js',
   './js/pos.js',
   './js/khata.js',

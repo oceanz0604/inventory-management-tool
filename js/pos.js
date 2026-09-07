@@ -16,8 +16,13 @@ const POS = (() => {
     const locations = Store.getLocationsByOwner(Auth.ownerId());
     const cats = Store.getCategories();
     const locSel = document.getElementById('pos-location');
+    const catSel = document.getElementById('pos-cat-filter');
+    const keepLoc = locSel.value;
+    const keepCat = catSel.value;
     locSel.innerHTML = locations.map(l => '<option value="' + l.id + '"' + (l.isDefault ? ' selected' : '') + '>' + _esc(l.name) + '</option>').join('');
-    document.getElementById('pos-cat-filter').innerHTML = '<option value="">All</option>' + cats.map(c => '<option value="' + c.id + '">' + _esc(c.name) + '</option>').join('');
+    catSel.innerHTML = '<option value="">All</option>' + cats.map(c => '<option value="' + c.id + '">' + _esc(c.name) + '</option>').join('');
+    if (keepLoc) locSel.value = keepLoc;
+    if (keepCat) catSel.value = keepCat;
   }
 
   function renderProducts() {

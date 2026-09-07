@@ -380,21 +380,7 @@ const Orders = (() => {
   }
 
   function openManualPurchase() {
-    mpItems = [];
-    _populateMpSellers();
-    const locSel = document.getElementById('mp-location');
-    const locs = Store.getLocationsByOwner(Auth.ownerId());
-    locSel.innerHTML = locs.map(l => '<option value="' + l.id + '"' + (l.isDefault ? ' selected' : '') + '>' + _esc(l.name) + '</option>').join('');
-    const prodSel = document.getElementById('mp-product');
-    const prods = Store.getProductsByOwner(Auth.ownerId()).filter(p => (p.type || 'simple') !== 'complex');
-    prodSel.innerHTML = '<option value="">-- Select --</option>' + prods.map(p => '<option value="' + p.id + '">' + _esc(p.name) + '</option>').join('');
-    document.getElementById('mp-cost').value = 0;
-    document.getElementById('mp-qty').value = 1;
-    document.getElementById('mp-expiry').value = '';
-    document.getElementById('mp-paid').value = 0;
-    _renderMpItems();
-    SearchableSelect.enhanceAll(document.getElementById('manual-purchase-modal'));
-    document.getElementById('manual-purchase-modal').classList.remove('hidden');
+    App.goTo('purchase');
   }
 
   function _mpAddItem() {

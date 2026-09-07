@@ -12,15 +12,6 @@ const Inventory = (() => {
     document.getElementById('filter-location').addEventListener('change', render);
     document.getElementById('filter-category').addEventListener('change', render);
     document.getElementById('filter-stock').addEventListener('change', render);
-
-    document.querySelectorAll('#view-inventory .sortable').forEach(th => {
-      th.addEventListener('click', () => {
-        const f = th.dataset.sort;
-        if (currentSort.field === f) currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
-        else { currentSort.field = f; currentSort.direction = 'asc'; }
-        render();
-      });
-    });
   }
 
   // Products that can be stocked via purchase batches (raw + simple; complex is
@@ -34,13 +25,20 @@ const Inventory = (() => {
     const cats = Store.getCategories();
     const prods = _stockableProducts();
     const sellers = Store.getPartiesByType(Auth.ownerId(), 'seller');
-
-    document.getElementById('filter-location').innerHTML = '<option value="">All Locations</option>' + locs.map(l => '<option value="' + l.id + '">' + _esc(l.name) + '</option>').join('');
-    document.getElementById('filter-category').innerHTML = '<option value="">All Categories</option>' + cats.map(c => '<option value="' + c.id + '">' + _esc(c.name) + '</option>').join('');
+    const locEl = document.getElementById('filter-location');
+    const catEl = document.getElementById('filter-category');
+    const keepLoc = locEl.value;
+    const keepCat = catEl.value;
+    locEl.innerHTML = '<option value="">All Locations</option>' + locs.map(l => '<option value="' + l.id + '">' + _esc(l.name) + '</option>').join('');
+    catEl.innerHTML = '<option value="">All Categories</option>' + cats.map(c => '<option value="' + c.id + '">' + _esc(c.name) + '</option>').join('');
+    if (keepLoc) locEl.value = keepLoc;
+    if (keepCat) catEl.value = keepCat;
     document.getElementById('stock-product').innerHTML = '<option value="">Select product</option>' + prods.map(p => '<option value="' + p.id + '">' + _esc(p.name) + ' (' + _esc(p.sku) + ')</option>').join('');
     document.getElementById('stock-location').innerHTML = '<option value="">Select location</option>' + locs.map(l => '<option value="' + l.id + '">' + _esc(l.name) + '</option>').join('');
     document.getElementById('stock-supplier').innerHTML = '<option value="">— None —</option>' + sellers.map(s => '<option value="' + s.id + '">' + _esc(s.name) + '</option>').join('');
     SearchableSelect.enhanceAll(document.getElementById('view-inventory'));
+    SearchableSelect.refresh(locEl);
+    SearchableSelect.refresh(catEl);
   }
 
   // Build product x location summary rows from the stock cache.

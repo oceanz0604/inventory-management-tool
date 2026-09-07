@@ -7,6 +7,7 @@ const App = (() => {
     _initTheme();
     _bindAuthEvents();
     _bindNavEvents();
+    _bindNavGroups();
     _bindModalClose();
     _bindNotifications();
     _bindSidebarToggle();
@@ -108,6 +109,7 @@ const App = (() => {
     ImportData.init();
     Inventory.init();
     Orders.init();
+    if (window.Purchase) Purchase.init();
     Shop.init();
     POS.init();
     KhataModule.init();
@@ -141,8 +143,8 @@ const App = (() => {
 
   // Views each role may reach. Owner/super-admin get everything.
   const ROLE_VIEWS = {
-    owner: ['dashboard', 'locations', 'products', 'inventory', 'pos', 'orders', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties', 'team'],
-    office: ['dashboard', 'locations', 'products', 'inventory', 'orders', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties'],
+    owner: ['dashboard', 'locations', 'products', 'inventory', 'pos', 'orders', 'purchase', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties', 'team'],
+    office: ['dashboard', 'locations', 'products', 'inventory', 'orders', 'purchase', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties'],
     staff: ['pos'],
     marketing: ['field-order'],
   };
@@ -167,6 +169,10 @@ const App = (() => {
     const allowed = _allowedViews();
     document.querySelectorAll('.sidebar .nav-item[data-view]').forEach(el => {
       el.style.display = allowed.indexOf(el.dataset.view) >= 0 ? '' : 'none';
+    });
+    document.querySelectorAll('.nav-group').forEach(g => {
+      const visible = Array.from(g.querySelectorAll('.nav-item[data-view]')).some(el => el.style.display !== 'none');
+      g.style.display = visible ? '' : 'none';
     });
 
     // Only owners can reconfigure the company's bottom bar.
@@ -285,7 +291,7 @@ const App = (() => {
 
   // ========== Navigation ==========
   function _bindNavEvents() {
-    document.querySelectorAll('.sidebar .nav-item').forEach(item => {
+    document.querySelectorAll('.sidebar .nav-item[data-view]').forEach(item => {
       item.addEventListener('click', (e) => {
         e.preventDefault();
         _navigate(item.dataset.view);
@@ -298,10 +304,37 @@ const App = (() => {
     });
   }
 
+  function _navGroupStorage() {
+    try { return JSON.parse(localStorage.getItem('zentory_nav_collapsed') || '[]'); }
+    catch (e) { return []; }
+  }
+
+  function _bindNavGroups() {
+    const collapsed = _navGroupStorage();
+    document.querySelectorAll('.nav-group').forEach(g => {
+      if (collapsed.indexOf(g.dataset.group) >= 0) {
+        g.classList.add('collapsed');
+        const btn = g.querySelector('.nav-group-toggle');
+        if (btn) btn.setAttribute('aria-expanded', 'false');
+      }
+      const toggle = g.querySelector('.nav-group-toggle');
+      if (!toggle) return;
+      toggle.addEventListener('click', (e) => {
+        e.preventDefault();
+        g.classList.toggle('collapsed');
+        const isCollapsed = g.classList.contains('collapsed');
+        toggle.setAttribute('aria-expanded', isCollapsed ? 'false' : 'true');
+        const list = _navGroupStorage().filter(id => id !== g.dataset.group);
+        if (isCollapsed) list.push(g.dataset.group);
+        localStorage.setItem('zentory_nav_collapsed', JSON.stringify(list));
+      });
+    });
+  }
+
   const titles = {
     dashboard: 'Dashboard', locations: 'Locations', products: 'Products',
     'product-detail': 'Product',
-    inventory: 'Inventory', pos: 'POS Counter', orders: 'Orders',
+    inventory: 'Inventory', pos: 'POS Counter', orders: 'Orders', purchase: 'Purchase',
     categories: 'Categories', shop: 'Shop',
     reports: 'Reports', khata: 'Khata / Credit',
     'field-order': 'Field Orders', parties: 'Customers / Sellers', team: 'Team'
@@ -323,7 +356,15 @@ const App = (() => {
     document.querySelectorAll('.sidebar .nav-item').forEach(n => n.classList.remove('active'));
     const navKey = view === 'product-detail' ? 'products' : view;
     const nav = document.querySelector('.sidebar .nav-item[data-view="' + navKey + '"]');
-    if (nav) nav.classList.add('active');
+    if (nav) {
+      nav.classList.add('active');
+      const group = nav.closest('.nav-group');
+      if (group && group.classList.contains('collapsed')) {
+        group.classList.remove('collapsed');
+        const btn = group.querySelector('.nav-group-toggle');
+        if (btn) btn.setAttribute('aria-expanded', 'true');
+      }
+    }
 
     document.getElementById('page-title').textContent = titles[view] || view;
 
@@ -336,6 +377,7 @@ const App = (() => {
     if (view === 'inventory') { Inventory.refreshFilters(); Inventory.render(); }
     if (view === 'pos') POS.refresh();
     if (view === 'orders') Orders.render();
+    if (view === 'purchase') Purchase.refresh();
     if (view === 'categories') _renderCategories();
     if (view === 'shop') { Shop.populateFilters(); Shop.renderProducts(); }
     if (view === 'reports') Reports.refresh();
@@ -343,6 +385,7 @@ const App = (() => {
     if (view === 'field-order') FieldOrders.render();
     if (view === 'parties') Parties.render();
     if (view === 'team') Team.render();
+    if (window.TableSort) TableSort.refresh(el);
   }
 
   // ========== Bottom Nav (Mobile) ==========
@@ -354,6 +397,7 @@ const App = (() => {
     locations: { icon: 'fa-location-dot', label: 'Locations' },
     pos: { icon: 'fa-cash-register', label: 'POS' },
     orders: { icon: 'fa-file-invoice', label: 'Orders' },
+    purchase: { icon: 'fa-truck-ramp-box', label: 'Purchase' },
     categories: { icon: 'fa-tags', label: 'Categories' },
     reports: { icon: 'fa-chart-bar', label: 'Reports' },
     khata: { icon: 'fa-book', label: 'Khata' },
