@@ -26,6 +26,35 @@ async function recountStock(productId, locationId, ownerId, minStock = 0) {
   return qty;
 }
 
+async function consumeSaleQty(product, locationId, ownerId, qty) {
+  const recipe = product.recipe;
+  if ((product.type || "simple") === "complex" && recipe && Array.isArray(recipe.ingredients) && recipe.ingredients.length) {
+    const scale = qty / Math.max(1, Number(recipe.outputQty) || 1);
+    const picks = [];
+    for (const ing of recipe.ingredients) {
+      const need = (Number(ing.qty) || 0) * scale;
+      if (need <= 0) continue;
+      const lotPicks = await pickLots(ing.productId, locationId, ownerId, need);
+      if (!lotPicks) {
+        throw Object.assign(
+          new Error(`Insufficient stock for ${product.name} (need ${need} of an ingredient)`),
+          { status: 409 }
+        );
+      }
+      picks.push(...lotPicks.map((pk) => ({ ...pk, productId: ing.productId })));
+    }
+    const costTotal = await consumeLots(picks, ownerId);
+    return { picks, costTotal };
+  }
+  const lotPicks = await pickLots(product.id, locationId, ownerId, qty);
+  if (!lotPicks) {
+    throw Object.assign(new Error(`Insufficient stock for ${product.name} (need ${qty})`), { status: 409 });
+  }
+  const picks = lotPicks.map((pk) => ({ ...pk, productId: product.id }));
+  const costTotal = await consumeLots(picks, ownerId);
+  return { picks, costTotal };
+}
+
 async function pickLots(productId, locationId, ownerId, qty) {
   const lots = await availableLots(productId, locationId, ownerId);
   let need = Number(qty) || 0;
@@ -161,10 +190,8 @@ export async function createSale(payload) {
     const product = byId[productId];
     if (!product) throw Object.assign(new Error(`Unknown productId: ${productId}`), { status: 400 });
     const price = raw.unitPrice != null ? Number(raw.unitPrice) : Number(product.price) || 0;
-    const picks = await pickLots(productId, locationId, ownerId, qty);
-    if (!picks) throw Object.assign(new Error(`Insufficient stock for ${product.name} (need ${qty})`), { status: 409 });
-    const costTotal = await consumeLots(picks, ownerId);
-    allConsumed.push(...picks.map((pk) => ({ ...pk, productId })));
+    const { picks, costTotal } = await consumeSaleQty(product, locationId, ownerId, qty);
+    allConsumed.push(...picks);
     lineItems.push({
       productId,
       name: product.name,
