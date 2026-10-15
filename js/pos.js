@@ -42,7 +42,8 @@ const POS = (() => {
 
     const grid = document.getElementById('pos-product-grid');
     const empty = document.getElementById('no-pos-products');
-    const available = products.filter(p => Store.availableSellQty(p, locId) > 0);
+    const trackIng = Store.tracksIngredientStock(Auth.ownerId());
+    const available = products.filter(p => (Store.isMakeToOrder(p) && !trackIng) || Store.availableSellQty(p, locId) > 0);
 
     if (available.length === 0) { grid.innerHTML = ''; empty.classList.remove('hidden'); return; }
     empty.classList.add('hidden');
@@ -53,7 +54,7 @@ const POS = (() => {
       const icon = catIcons[p.categoryId] || 'fa-box';
       const inBill = bill.find(b => b.productId === p.id);
       const billQty = inBill ? inBill.qty : 0;
-      const stockLabel = mto ? qty + ' can make' : qty + ' in stock';
+      const stockLabel = mto && !trackIng ? 'Always available' : (mto ? qty + ' can make' : qty + ' in stock');
       return '<div class="pos-item-card ' + (billQty > 0 ? 'in-bill' : '') + '" onclick="POS.addToBill(\'' + p.id + '\')">' +
         '<div class="pos-item-icon"><i class="fas ' + icon + '"></i></div>' +
         '<div class="pos-item-name">' + _esc(p.name) + '</div>' +
@@ -67,10 +68,12 @@ const POS = (() => {
     const locId = document.getElementById('pos-location').value;
     const product = Store.getProductById(productId);
     if (!product) return;
+    const trackIng = Store.tracksIngredientStock(Auth.ownerId());
+    const openMto = Store.isMakeToOrder(product) && !trackIng;
     const available = Store.availableSellQty(product, locId);
     const existing = bill.find(b => b.productId === productId);
     const currentQty = existing ? existing.qty : 0;
-    if (currentQty >= available) {
+    if (!openMto && currentQty >= available) {
       App.showToast(Store.isMakeToOrder(product) ? 'Not enough ingredients to make more' : 'No more stock available', 'warning');
       return;
     }
@@ -96,8 +99,9 @@ const POS = (() => {
     } else {
       const locId = document.getElementById('pos-location').value;
       const product = Store.getProductById(productId);
+      const openMto = product && Store.isMakeToOrder(product) && !Store.tracksIngredientStock(Auth.ownerId());
       const available = product ? Store.availableSellQty(product, locId) : 0;
-      if (qty > available) {
+      if (!openMto && qty > available) {
         App.showToast(product && Store.isMakeToOrder(product) ? 'Exceeds what you can make from ingredients' : 'Exceeds available stock', 'warning');
         return;
       }

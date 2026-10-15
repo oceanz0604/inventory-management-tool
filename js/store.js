@@ -289,12 +289,41 @@ const Store = (() => {
   // ---- Product cost (derived) ----
   // raw/simple: weighted average of remaining batches (fallback to last batch).
   // complex: making cost from the current recipe + ingredient costs.
+  // Per company. Missing/true keeps today's behaviour: MTO sales need ingredient stock.
+  // false: sell make-to-order items without deducting raw quantities. Cost still
+  // uses each ingredient's latest purchase batch (fallback: saved cost price).
+  function tracksIngredientStock(ownerId) {
+    if (!ownerId) return true;
+    const c = getCompanyById(ownerId);
+    if (!c || c.trackIngredientStock == null) return true;
+    return c.trackIngredientStock !== false;
+  }
+
+  function latestBatchCost(productId) {
+    const all = getBatchesByProduct(productId).slice().sort((a, b) => {
+      const ta = new Date(a.createdAt || a.purchaseDate || 0).getTime();
+      const tb = new Date(b.createdAt || b.purchaseDate || 0).getTime();
+      return tb - ta;
+    });
+    if (!all.length) return null;
+    return { unitCost: Number(all[0].unitCost) || 0, batch: all[0] };
+  }
+
+  function ingredientRate(product) {
+    if (!product) return 0;
+    if (product.ownerId && !tracksIngredientStock(product.ownerId)) {
+      const latest = latestBatchCost(product.id);
+      if (latest) return latest.unitCost;
+    }
+    return Number(product.costPrice) || 0;
+  }
+
   function calcMakingCost(product) {
     if (!product || !product.recipe || !product.recipe.ingredients) return product ? (product.costPrice || 0) : 0;
     let cost = 0;
     product.recipe.ingredients.forEach(ing => {
       const ip = getProductById(ing.productId);
-      if (ip) cost += (ip.costPrice || 0) * _ingQty(ing);
+      if (ip) cost += ingredientRate(ip) * _ingQty(ing);
     });
     const out = product.recipe.outputQty || 1;
     return out > 0 ? cost / out : cost;
@@ -348,6 +377,9 @@ const Store = (() => {
   }
 
   function checkBom(product, locationId, qty) {
+    if (product && product.ownerId && !tracksIngredientStock(product.ownerId)) {
+      return { ok: true, shortages: [], untracked: true };
+    }
     const shortages = [];
     _bomNeeds(product, qty).forEach(need => {
       const have = getBatchQty(need.productId, locationId);
@@ -361,6 +393,7 @@ const Store = (() => {
 
   function maxMakeQty(product, locationId) {
     if (!isMakeToOrder(product)) return getBatchQty(product.id, locationId);
+    if (product.ownerId && !tracksIngredientStock(product.ownerId)) return Infinity;
     const recipe = product.recipe;
     const out = Math.max(1, Number(recipe.outputQty) || 1);
     let max = Infinity;
@@ -382,6 +415,10 @@ const Store = (() => {
 
   function consumeForSale(product, locationId, qty, preferredBatchId) {
     if (isMakeToOrder(product)) {
+      if (product.ownerId && !tracksIngredientStock(product.ownerId)) {
+        const unit = calcMakingCost(product);
+        return { success: true, picks: [], cost: unit * (Number(qty) || 0), untracked: true };
+      }
       const check = checkBom(product, locationId, qty);
       if (!check.ok) return { success: false, shortages: check.shortages, picks: [], cost: 0 };
       const allPicks = [];
@@ -418,6 +455,11 @@ const Store = (() => {
     if (!p || (p.type || 'simple') !== 'complex' || !p.recipe) return { success: false, message: 'Not a complex product' };
     if (!locationId) return { success: false, message: 'Select a location' };
     qty = Math.max(1, qty || 1);
+    if (p.ownerId && !tracksIngredientStock(p.ownerId)) {
+      const unit = Math.round((calcMakingCost(p) || 0) * 100) / 100;
+      addBatch({ productId, locationId, batchNumber: 'PROD-' + generateId().slice(0, 5).toUpperCase(), unitCost: unit, qty, note: 'Produced without deducting ingredients' });
+      return { success: true, cost: unit * qty, unitCost: unit, untracked: true };
+    }
     const allPicks = [];
     const needs = _bomNeeds(p, qty);
     for (const need of needs) {
@@ -473,8 +515,14 @@ const Store = (() => {
       const buyerDefaultLoc = getDefaultLocation(order.buyerId);
       order.items.forEach(item => {
         if (order.fulfillmentLocationId) {
-          const picks = pickLots(item.productId, order.fulfillmentLocationId, item.qty);
-          if (picks) item.costPrice = consumeLots(picks) / Math.max(1, item.qty);
+          const product = getProductById(item.productId);
+          if (product && isMakeToOrder(product)) {
+            const res = consumeForSale(product, order.fulfillmentLocationId, item.qty);
+            if (res.success) item.costPrice = res.cost / Math.max(1, item.qty);
+          } else {
+            const picks = pickLots(item.productId, order.fulfillmentLocationId, item.qty);
+            if (picks) item.costPrice = consumeLots(picks) / Math.max(1, item.qty);
+          }
         }
         if (buyerDefaultLoc) {
           let buyerProduct = getProductsByOwner(order.buyerId).find(p => p.name === item.name);
@@ -549,11 +597,21 @@ const Store = (() => {
     // Verify every line can be satisfied from stock before consuming anything.
     const plan = [];
     for (const i of order.items) {
-      const picks = pickLots(i.productId, loc, i.qty, (lotChoices || {})[i.productId]);
-      if (!picks) return { success: false, message: 'Not enough stock of ' + i.name + ' at this location' };
-      plan.push({ item: i, picks });
+      const product = getProductById(i.productId);
+      if (product && isMakeToOrder(product)) {
+        const res = consumeForSale(product, loc, i.qty);
+        if (!res.success) return { success: false, message: 'Not enough ingredients for ' + (i.name || product.name) };
+        plan.push({ item: i, cost: res.cost });
+      } else {
+        const picks = pickLots(i.productId, loc, i.qty, (lotChoices || {})[i.productId]);
+        if (!picks) return { success: false, message: 'Not enough stock of ' + i.name + ' at this location' };
+        plan.push({ item: i, picks });
+      }
     }
-    plan.forEach(p => { p.item.costPrice = consumeLots(p.picks) / Math.max(1, p.item.qty); });
+    plan.forEach(p => {
+      if (p.picks) p.item.costPrice = consumeLots(p.picks) / Math.max(1, p.item.qty);
+      else p.item.costPrice = (p.cost || 0) / Math.max(1, p.item.qty);
+    });
     _setOrder(orderId, o => { o.items = order.items; });
     const paid = Math.max(0, amountReceived || 0);
     const balance = order.total - paid;
@@ -911,7 +969,8 @@ const Store = (() => {
     getLocations, getLocationsByOwner, getLocationById, addLocation, updateLocation, deleteLocation, getDefaultLocation,
     getProducts, getProductsByOwner, getProductsByType, getSellableProducts, getIngredientProducts, getPublishedProducts, getProductById, addProduct, updateProduct, deleteProduct, isSellableType,
     getStock, getStockByOwner, getStockByLocation, getStockByProduct, getStockRecord, setStock, adjustStock, getTotalStockForProduct, getLowStockItems, getExpiringStock,
-    getBatches, getBatchById, getBatchesByProduct, availableLots, getBatchQty, addBatch, updateBatch, deleteBatch, pickLots, consumeLots, calcMakingCost, getProductStockValue, produceComplex,
+    getBatches, getBatchById, getBatchesByProduct, availableLots, getBatchQty, addBatch, updateBatch, deleteBatch, pickLots, consumeLots,     calcMakingCost, getProductStockValue, produceComplex,
+    tracksIngredientStock, latestBatchCost, ingredientRate,
     isMakeToOrder, checkBom, maxMakeQty, availableSellQty, consumeForSale, _formatShortages,
     getOrders, getOrderById, getSalesOrders, getPurchaseOrders, createOrder, updateOrderStatus,
     createManualPurchase, createFieldSale, acceptOrder, cancelOrder, fulfillFieldSale, receiveManualPurchase, settleOrder,

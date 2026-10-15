@@ -12,9 +12,18 @@ const Team = (() => {
     if (form) form.addEventListener('submit', _handleSubmit);
     const search = document.getElementById('team-search');
     if (search) search.addEventListener('input', render);
+    const track = document.getElementById('track-ingredient-stock');
+    if (track) track.addEventListener('change', async () => {
+      try { await Auth.setCompanyConfig({ trackIngredientStock: track.checked }); } catch (e) { /* local copy is already saved */ }
+      App.showToast(track.checked
+        ? 'Raw material quantities are tracked again'
+        : 'Make-to-order sales no longer depend on raw material quantities', 'success');
+    });
   }
 
   function render() {
+    const track = document.getElementById('track-ingredient-stock');
+    if (track) track.checked = Store.tracksIngredientStock(Auth.ownerId());
     const tbody = document.getElementById('team-table-body');
     const empty = document.getElementById('no-team');
     if (!tbody) return;
