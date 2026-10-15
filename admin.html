@@ -196,6 +196,12 @@
           <input type="password" id="cust-password" placeholder="At least 4 characters" minlength="4">
           <small class="form-hint" id="cust-password-hint">Owner signs in with the company code + username + this password.</small>
         </div>
+        <div class="form-group">
+          <label class="checkbox-label">
+            <input type="checkbox" id="cust-track-ingredients" checked> Track raw material quantities
+          </label>
+          <small class="form-hint">Leave this on for normal stock. Turn it off so this customer can sell make-to-order items even when ingredients are out. Quantities are not deducted; making cost still uses the latest purchase batch rate of each raw material.</small>
+        </div>
         <div class="form-group" id="cust-status-group" style="display:none;">
           <label for="cust-status">Account status</label>
           <select id="cust-status" class="select-input">

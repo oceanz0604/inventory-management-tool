@@ -166,8 +166,9 @@ const Products = (() => {
       const marginColor = margin >= 30 ? 'var(--success)' : margin >= 15 ? 'var(--warning)' : 'var(--danger)';
       const typeLabel = type === 'complex' ? 'Make to order' : ({ raw: 'Raw', simple: 'Simple' }[type] || type);
       const loc = Store.getDefaultLocation(Auth.ownerId());
+      const trackIng = Store.tracksIngredientStock(p.ownerId);
       const stockLabel = Store.isMakeToOrder(p) && loc
-        ? Store.maxMakeQty(p, loc.id) + ' makeable'
+        ? (trackIng ? Store.maxMakeQty(p, loc.id) + ' makeable' : 'Not tracked')
         : totalStock.toLocaleString();
 
       let actions = '<button class="btn-icon edit" title="Open" onclick="Products.openDetail(\'' + p.id + '\')"><i class="fas fa-arrow-up-right-from-square"></i></button>';
@@ -210,7 +211,8 @@ const Products = (() => {
     const w = parseFloat(row.querySelector('.ing-wastage').value) || 0;
     const used = q * (1 + Math.max(0, w) / 100);
     const costEl = row.querySelector('.ing-line-cost');
-    if (costEl) costEl.textContent = '\u20B9' + ((p ? (p.costPrice || 0) : 0) * used).toFixed(2);
+    const rate = p ? (Store.ingredientRate ? Store.ingredientRate(p) : (p.costPrice || 0)) : 0;
+    if (costEl) costEl.textContent = '\u20B9' + (rate * used).toFixed(2);
   }
 
   function _mountIngredientRow(container, productId, qty, wastagePct, onChange) {
@@ -468,7 +470,9 @@ const Products = (() => {
     const cost = type === 'complex' ? Store.calcMakingCost(p) : (p.costPrice || 0);
     const sell = p.price || 0;
     const margin = sell > 0 ? ((sell - cost) / sell * 100) : 0;
+    const trackIng = Store.tracksIngredientStock(p.ownerId);
     const makeable = locId && mto ? Store.maxMakeQty(p, locId) : Store.getTotalStockForProduct(p.id);
+    const makeText = mto && !trackIng ? 'Not tracked' : (makeable === Infinity ? '—' : makeable);
     const cat = Store.getCategoryById(p.categoryId);
     document.getElementById('pd-hero').innerHTML =
       '<div class="pd-hero-text"><h2>' + _esc(p.name) + '</h2>' +
@@ -479,7 +483,7 @@ const Products = (() => {
       '<div><span>Sell</span><strong>\u20B9' + sell.toFixed(2) + '</strong></div>' +
       '<div><span>Cost</span><strong>\u20B9' + cost.toFixed(2) + '</strong></div>' +
       '<div><span>Margin</span><strong>' + (sellable ? margin.toFixed(1) + '%' : '—') + '</strong></div>' +
-      '<div><span>' + (mto ? 'Can make' : 'Stock') + '</span><strong>' + makeable + '</strong></div></div>';
+      '<div><span>' + (mto && !trackIng ? 'Ingredients' : (mto ? 'Can make' : 'Stock')) + '</span><strong>' + makeText + '</strong></div></div>';
 
     document.getElementById('pd-type').value = type;
     document.getElementById('pd-name').value = p.name || '';
@@ -504,7 +508,18 @@ const Products = (() => {
     document.getElementById('pd-produce').classList.toggle('hidden', type !== 'complex');
 
     const bomBody = document.getElementById('pd-bom-body');
-    if (mto && locId) {
+    if (mto && !trackIng) {
+      const rows = (p.recipe.ingredients || []).map(ing => {
+        const ip = Store.getProductById(ing.productId);
+        const need = (Number(ing.qty) || 0) * (1 + Math.max(0, Number(ing.wastagePct) || 0) / 100);
+        const rate = ip ? Store.ingredientRate(ip) : 0;
+        const latest = ip ? Store.latestBatchCost(ip.id) : null;
+        const source = latest ? 'latest batch' : 'saved cost';
+        return '<tr><td>' + _esc(ip ? ip.name : '?') + '</td><td>' + (Math.round(need * 1000) / 1000) + ' ' + _esc((ip && ip.unit) || '') + '</td><td>\u20B9' + rate.toFixed(2) + ' <span style="color:var(--text-light)">(' + source + ')</span></td><td>\u20B9' + (rate * need).toFixed(2) + '</td></tr>';
+      }).join('');
+      bomBody.innerHTML = '<p class="form-hint">This company does not track raw material quantities. Make-to-order items can always be sold, and ingredient stock is not reduced. Making cost uses each ingredient\u2019s latest purchase batch rate.</p>' +
+        '<div class="table-wrap"><table class="data-table"><thead><tr><th>Ingredient</th><th>Per batch</th><th>Rate</th><th>Line cost</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    } else if (mto && locId) {
       const rows = (p.recipe.ingredients || []).map(ing => {
         const ip = Store.getProductById(ing.productId);
         const need = (Number(ing.qty) || 0) * (1 + Math.max(0, Number(ing.wastagePct) || 0) / 100);

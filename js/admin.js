@@ -242,7 +242,8 @@ const Admin = (() => {
       const created = c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
       const login = info.owner.username ? '@' + _esc(info.owner.username) : '<span style="color:var(--text-light)">—</span>';
       const suspended = c.status === 'suspended';
-      const status = suspended ? '<span class="badge badge-danger">Suspended</span>' : '<span class="badge badge-success">Active</span>';
+      const status = (suspended ? '<span class="badge badge-danger">Suspended</span>' : '<span class="badge badge-success">Active</span>') +
+        (c.trackIngredientStock === false ? ' <span class="badge badge-warning">MTO open</span>' : '');
       return '<tr>' +
         '<td data-label="Company"><strong>' + _esc(c.name) + '</strong></td>' +
         '<td data-label="Code"><span class="code-chip">' + _esc(c.code) + '</span></td>' +
@@ -280,6 +281,8 @@ const Admin = (() => {
     $('cust-password-label').textContent = 'Owner password';
     $('cust-password-hint').textContent = 'Owner signs in with the company code + username + this password.';
     $('cust-status-group').style.display = 'none';
+    const trackNew = $('cust-track-ingredients');
+    if (trackNew) trackNew.checked = true;
     _hide('customer-error');
     _openModal('customer-modal');
     setTimeout(() => $('cust-company').focus(), 50);
@@ -302,6 +305,8 @@ const Admin = (() => {
     $('cust-password-hint').textContent = 'Leave blank to keep the current password.';
     $('cust-status-group').style.display = '';
     $('cust-status').value = c.status === 'suspended' ? 'suspended' : 'active';
+    const trackEdit = $('cust-track-ingredients');
+    if (trackEdit) trackEdit.checked = c.trackIngredientStock !== false;
     _hide('customer-error');
     _openModal('customer-modal');
   }
@@ -317,6 +322,7 @@ const Admin = (() => {
     const username = $('cust-username').value.trim().toLowerCase();
     const password = $('cust-password').value;
     const status = $('cust-status').value;
+    const trackIngredientStock = $('cust-track-ingredients') ? $('cust-track-ingredients').checked : true;
 
     if (!name) { _err('customer-error', 'Company name is required.'); return; }
     if (!code) { _err('customer-error', 'Company code must contain letters or numbers.'); return; }
@@ -338,7 +344,7 @@ const Admin = (() => {
           id: cid, name: ownerName, username, shopName: name, role: 'owner', companyId: cid,
           salt: cred.salt, passwordHash: cred.passwordHash, createdAt: new Date().toISOString(),
         });
-        await Firebase.save('companies', { id: cid, ownerId: cid, name, code, status: 'active', createdAt: new Date().toISOString() });
+        await Firebase.save('companies', { id: cid, ownerId: cid, name, code, status: 'active', trackIngredientStock, createdAt: new Date().toISOString() });
         _toast('Customer "' + name + '" created (code: ' + code + ', login: @' + username + ')', 'success');
       } else {
         const c = DATA.companies.find(x => x.id === id) || {};
@@ -347,7 +353,7 @@ const Admin = (() => {
         const unameClash = DATA.users.find(u => u.companyId === id && (u.username || '').toLowerCase() === username && u.id !== info.owner.id);
         if (unameClash) { _err('customer-error', 'That username is taken inside this company.'); return; }
 
-        await Firebase.save('companies', { id, name, code, status });
+        await Firebase.save('companies', { id, name, code, status, trackIngredientStock });
         const ownerPatch = { id: info.owner.id || id, companyId: id, role: info.owner.role || 'owner', name: ownerName, username, shopName: name };
         if (password) { const cred = await Creds.make(password); ownerPatch.salt = cred.salt; ownerPatch.passwordHash = cred.passwordHash; }
         await Firebase.save('users', ownerPatch);
@@ -376,6 +382,7 @@ const Admin = (() => {
       '<div class="detail-grid">' +
         _mini('Company code', '<span class="code-chip">' + _esc(c.code) + '</span>') +
         _mini('Status', c.status === 'suspended' ? '<span class="badge badge-danger">Suspended</span>' : '<span class="badge badge-success">Active</span>') +
+        _mini('Raw material qty', c.trackIngredientStock === false ? 'Not tracked (MTO always sellable)' : 'Tracked') +
         _mini('Owner login', info.owner.username ? '@' + _esc(info.owner.username) : '—') +
         _mini('Created', c.createdAt ? new Date(c.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—') +
       '</div>' +

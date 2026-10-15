@@ -763,6 +763,15 @@
 
     <!-- ===== Team View (owner / admin) ===== -->
     <section id="view-team" class="view hidden">
+      <div class="card" id="ingredient-stock-card">
+        <div class="card-header"><h3>Make-to-order ingredients</h3></div>
+        <div class="card-body">
+          <label class="checkbox-label">
+            <input type="checkbox" id="track-ingredient-stock" checked> Track raw material quantities
+          </label>
+          <p class="form-hint">Turn this off when this company should sell every make-to-order item even if ingredients are out of stock. Raw quantities are not reduced on those sales. Making cost still includes each ingredient, using its latest purchase batch rate (or the saved cost if there is no batch).</p>
+        </div>
+      </div>
       <div class="view-toolbar">
         <div class="search-bar"><i class="fas fa-search"></i>
           <input type="text" id="team-search" placeholder="Search team..."></div>

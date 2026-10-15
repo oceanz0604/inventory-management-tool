@@ -26,9 +26,46 @@ async function recountStock(productId, locationId, ownerId, minStock = 0) {
   return qty;
 }
 
-async function consumeSaleQty(product, locationId, ownerId, qty) {
+async function companyTracksIngredients(ownerId) {
+  const company = await getDoc("companies", ownerId);
+  if (!company || company.trackIngredientStock == null) return true;
+  return company.trackIngredientStock !== false;
+}
+
+function latestUnitCost(productId, batches, fallback) {
+  const mine = (batches || [])
+    .filter((b) => b && b.productId === productId)
+    .sort((a, b) => new Date(b.createdAt || b.purchaseDate || 0) - new Date(a.createdAt || a.purchaseDate || 0));
+  if (mine.length) return Number(mine[0].unitCost) || 0;
+  return Number(fallback) || 0;
+}
+
+function recipeLineQty(ing) {
+  const q = Number(ing && ing.qty) || 0;
+  const waste = Math.max(0, Number(ing && ing.wastagePct) || 0);
+  return q * (1 + waste / 100);
+}
+
+function theoreticalMakingCost(product, ownerId, qty, batches, productsById) {
+  const recipe = product.recipe || { outputQty: 1, ingredients: [] };
+  const scale = (Number(qty) || 0) / Math.max(1, Number(recipe.outputQty) || 1);
+  let cost = 0;
+  for (const ing of recipe.ingredients || []) {
+    const ip = productsById[ing.productId];
+    const rate = latestUnitCost(ing.productId, batches, ip ? ip.costPrice : 0);
+    cost += rate * recipeLineQty(ing) * scale;
+  }
+  return cost;
+}
+
+async function consumeSaleQty(product, locationId, ownerId, qty, ctx) {
   const recipe = product.recipe;
-  if ((product.type || "simple") === "complex" && recipe && Array.isArray(recipe.ingredients) && recipe.ingredients.length) {
+  const mto = (product.type || "simple") === "complex" && recipe && Array.isArray(recipe.ingredients) && recipe.ingredients.length;
+  if (mto && ctx && ctx.trackIngredients === false) {
+    const costTotal = theoreticalMakingCost(product, ownerId, qty, ctx.batches, ctx.productsById);
+    return { picks: [], costTotal };
+  }
+  if (mto) {
     const scale = qty / Math.max(1, Number(recipe.outputQty) || 1);
     const picks = [];
     for (const ing of recipe.ingredients) {
@@ -123,9 +160,14 @@ export async function listProducts({ ownerId, locationId }) {
   batches.filter((b) => b && (!locationId || b.locationId === locationId) && (b.qty || 0) > 0)
     .forEach((b) => { batchQty[b.productId] = (batchQty[b.productId] || 0) + (Number(b.qty) || 0); });
 
+  const trackIngredients = await companyTracksIngredients(ownerId);
+  const productsById = Object.fromEntries(productDocs.map((p) => [p.id, p]));
+
   function makeableQty(p) {
     const recipe = p.recipe;
-    if ((p.type || "simple") !== "complex" || !recipe || !Array.isArray(recipe.ingredients) || !recipe.ingredients.length) {
+    const mto = (p.type || "simple") === "complex" && recipe && Array.isArray(recipe.ingredients) && recipe.ingredients.length;
+    if (mto && !trackIngredients) return 9999;
+    if (!mto) {
       return stockMap[p.id] ?? 0;
     }
     const out = Math.max(1, Number(recipe.outputQty) || 1);
@@ -149,18 +191,23 @@ export async function listProducts({ ownerId, locationId }) {
       const cat = catById[p.categoryId] || {};
       const categoryName = String(cat.name || "").trim() || "Uncategorized";
       const mto = (p.type || "simple") === "complex" && p.recipe && Array.isArray(p.recipe.ingredients) && p.recipe.ingredients.length;
+      let costPrice = Number(p.costPrice) || 0;
+      if (mto && !trackIngredients) {
+        costPrice = Math.round(theoreticalMakingCost(p, ownerId, 1, batches, productsById) * 100) / 100;
+      }
       return {
         id: p.id,
         name: p.name,
         sku: p.sku || "",
         price: Number(p.price) || 0,
-        costPrice: Number(p.costPrice) || 0,
+        costPrice,
         gstRate: Number(p.gstRate) || 0,
         unit: p.unit || "pcs",
         categoryId: p.categoryId || "",
         category: slugifyCategory(categoryName),
         categoryName,
         stock: makeableQty(p),
+        ingredientStockTracked: !(mto && !trackIngredients),
         makeToOrder: !!mto,
         cafeExternalId: p.cafeExternalId || null,
         type: p.type || "simple",
@@ -200,8 +247,13 @@ export async function createSale(payload) {
   const existing = await findSaleByExternalId(ownerId, externalId);
   if (existing && !existing.voided) return { sale: existing, idempotent: true };
 
-  const products = await listByOwner("products", ownerId);
+  const [products, batches] = await Promise.all([
+    listByOwner("products", ownerId),
+    listByOwner("batches", ownerId),
+  ]);
   const byId = Object.fromEntries(products.map((p) => [p.id, p]));
+  const trackIngredients = await companyTracksIngredients(ownerId);
+  const saleCtx = { trackIngredients, batches, productsById: byId };
   const lineItems = [];
   const allConsumed = [];
 
@@ -212,7 +264,7 @@ export async function createSale(payload) {
     const product = byId[productId];
     if (!product) throw Object.assign(new Error(`Unknown productId: ${productId}`), { status: 400 });
     const price = raw.unitPrice != null ? Number(raw.unitPrice) : Number(product.price) || 0;
-    const { picks, costTotal } = await consumeSaleQty(product, locationId, ownerId, qty);
+    const { picks, costTotal } = await consumeSaleQty(product, locationId, ownerId, qty, saleCtx);
     allConsumed.push(...picks);
     lineItems.push({
       productId,

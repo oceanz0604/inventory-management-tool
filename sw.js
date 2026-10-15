@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zentory-v26';
+const CACHE_NAME = 'zentory-v27';
 const STATIC_URLS = [
   './',
   './index.html',
