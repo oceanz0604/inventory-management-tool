@@ -1,4 +1,18 @@
-import { genId, getDoc, setDoc, listByOwner, listCollection } from "./firestore.js";
+import { genId, getDoc, setDoc, listByOwner, listCollection, queryEquals } from "./firestore.js";
+
+const CATALOG_TTL_MS = 45 * 1000;
+const _catalogCache = new Map();
+
+function _catalogKey(ownerId, locationId) {
+  return String(ownerId || "") + "|" + String(locationId || "");
+}
+
+function dropCatalog(ownerId) {
+  const prefix = String(ownerId || "") + "|";
+  for (const key of _catalogCache.keys()) {
+    if (key.startsWith(prefix)) _catalogCache.delete(key);
+  }
+}
 
 function lotSort(a, b) {
   const ax = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
@@ -7,23 +21,78 @@ function lotSort(a, b) {
   return new Date(a.purchaseDate || a.createdAt || 0) - new Date(b.purchaseDate || b.createdAt || 0);
 }
 
-async function availableLots(productId, locationId, ownerId) {
-  const batches = await listByOwner("batches", ownerId);
+function stockKey(productId, locationId) {
+  return productId + "|" + locationId;
+}
+
+function liveLots(batches, productId, locationId) {
   return batches
-    .filter((b) => b.productId === productId && b.locationId === locationId && (b.qty || 0) > 0)
+    .filter((b) => b && b.productId === productId && b.locationId === locationId && (Number(b.qty) || 0) > 0)
     .sort(lotSort);
 }
 
-async function recountStock(productId, locationId, ownerId, minStock = 0) {
-  const lots = await availableLots(productId, locationId, ownerId);
-  const qty = lots.reduce((s, b) => s + Math.max(0, Number(b.qty) || 0), 0);
-  const allStock = await listByOwner("stock", ownerId);
-  const rec = allStock.find((s) => s.productId === productId && s.locationId === locationId);
-  const id = rec?.id || genId("stk_");
-  await setDoc("stock", id, {
-    id, ownerId, productId, locationId, quantity: qty, minStock: rec?.minStock ?? minStock,
-  });
-  return qty;
+// Reserve quantity on the in-memory batch list. Returns null when short and
+// leaves the list unchanged in that case.
+function reserveLots(batches, productId, locationId, qty) {
+  const lots = liveLots(batches, productId, locationId);
+  let need = Number(qty) || 0;
+  const picks = [];
+  for (const lot of lots) {
+    if (need <= 0) break;
+    const have = Number(lot.qty) || 0;
+    const take = Math.min(have, need);
+    if (take <= 0) continue;
+    lot.qty = have - take;
+    picks.push({
+      batchId: lot.id,
+      qty: take,
+      unitCost: Number(lot.unitCost) || 0,
+      productId,
+      locationId,
+    });
+    need -= take;
+  }
+  if (need > 0.0001) {
+    for (const pk of picks) {
+      const lot = batches.find((b) => b && b.id === pk.batchId);
+      if (lot) lot.qty = (Number(lot.qty) || 0) + pk.qty;
+    }
+    return null;
+  }
+  return picks;
+}
+
+async function writeReserved(batches, picks) {
+  const dirty = new Set((picks || []).map((pk) => pk.batchId));
+  for (const batch of batches) {
+    if (batch && dirty.has(batch.id)) await setDoc("batches", batch.id, batch);
+  }
+}
+
+async function writeStockTotals(batches, stockRows, touched, ownerId) {
+  const stockByKey = {};
+  for (const row of stockRows || []) {
+    if (row) stockByKey[stockKey(row.productId, row.locationId)] = row;
+  }
+  const seen = new Set();
+  for (const t of touched || []) {
+    const key = stockKey(t.productId, t.locationId);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const qty = batches
+      .filter((b) => b && b.productId === t.productId && b.locationId === t.locationId)
+      .reduce((sum, b) => sum + Math.max(0, Number(b.qty) || 0), 0);
+    const rec = stockByKey[key];
+    const id = (rec && rec.id) || genId("stk_");
+    await setDoc("stock", id, {
+      id,
+      ownerId,
+      productId: t.productId,
+      locationId: t.locationId,
+      quantity: qty,
+      minStock: rec && rec.minStock != null ? rec.minStock : 0,
+    });
+  }
 }
 
 async function companyTracksIngredients(ownerId) {
@@ -58,7 +127,7 @@ function theoreticalMakingCost(product, ownerId, qty, batches, productsById) {
   return cost;
 }
 
-async function consumeSaleQty(product, locationId, ownerId, qty, ctx) {
+function consumeSaleQty(product, locationId, ownerId, qty, ctx) {
   const recipe = product.recipe;
   const mto = (product.type || "simple") === "complex" && recipe && Array.isArray(recipe.ingredients) && recipe.ingredients.length;
   if (mto && ctx && ctx.trackIngredients === false) {
@@ -71,60 +140,54 @@ async function consumeSaleQty(product, locationId, ownerId, qty, ctx) {
     for (const ing of recipe.ingredients) {
       const need = (Number(ing.qty) || 0) * scale;
       if (need <= 0) continue;
-      const lotPicks = await pickLots(ing.productId, locationId, ownerId, need);
+      const lotPicks = reserveLots(ctx.batches, ing.productId, locationId, need);
       if (!lotPicks) {
         throw Object.assign(
           new Error(`Insufficient stock for ${product.name} (need ${need} of an ingredient)`),
           { status: 409 }
         );
       }
-      picks.push(...lotPicks.map((pk) => ({ ...pk, productId: ing.productId })));
+      picks.push(...lotPicks);
     }
-    const costTotal = await consumeLots(picks, ownerId);
+    const costTotal = picks.reduce((sum, pk) => sum + pk.qty * pk.unitCost, 0);
     return { picks, costTotal };
   }
-  const lotPicks = await pickLots(product.id, locationId, ownerId, qty);
-  if (!lotPicks) {
+  const picks = reserveLots(ctx.batches, product.id, locationId, qty);
+  if (!picks) {
     throw Object.assign(new Error(`Insufficient stock for ${product.name} (need ${qty})`), { status: 409 });
   }
-  const picks = lotPicks.map((pk) => ({ ...pk, productId: product.id }));
-  const costTotal = await consumeLots(picks, ownerId);
+  const costTotal = picks.reduce((sum, pk) => sum + pk.qty * pk.unitCost, 0);
   return { picks, costTotal };
 }
 
-async function pickLots(productId, locationId, ownerId, qty) {
-  const lots = await availableLots(productId, locationId, ownerId);
-  let need = Number(qty) || 0;
-  const picks = [];
-  for (const l of lots) {
-    if (need <= 0) break;
-    const take = Math.min(Number(l.qty) || 0, need);
-    if (take <= 0) continue;
-    picks.push({ batchId: l.id, qty: take, unitCost: Number(l.unitCost) || 0 });
-    need -= take;
-  }
-  return need > 0.0001 ? null : picks;
-}
-
-async function consumeLots(picks, ownerId) {
-  let cost = 0;
-  for (const pk of picks || []) {
-    const b = await getDoc("batches", pk.batchId);
-    if (!b) continue;
-    const take = Math.max(0, Math.min(Number(b.qty) || 0, Number(pk.qty) || 0));
-    cost += take * (Number(b.unitCost) || 0);
-    await setDoc("batches", b.id, { ...b, qty: (Number(b.qty) || 0) - take });
-    await recountStock(b.productId, b.locationId, ownerId, 0);
-  }
-  return cost;
-}
-
 async function restoreLots(consumedLots, ownerId) {
+  const stock = await listByOwner("stock", ownerId);
+  const stockByKey = {};
+  for (const row of stock) {
+    if (row) stockByKey[stockKey(row.productId, row.locationId)] = row;
+  }
+  const deltas = {};
   for (const pk of consumedLots || []) {
-    const b = await getDoc("batches", pk.batchId);
-    if (!b) continue;
-    await setDoc("batches", b.id, { ...b, qty: (Number(b.qty) || 0) + (Number(pk.qty) || 0) });
-    await recountStock(b.productId, b.locationId, ownerId, 0);
+    const batch = await getDoc("batches", pk.batchId);
+    if (!batch) continue;
+    const add = Number(pk.qty) || 0;
+    await setDoc("batches", batch.id, { ...batch, qty: (Number(batch.qty) || 0) + add });
+    const key = stockKey(batch.productId, batch.locationId);
+    deltas[key] = deltas[key] || { productId: batch.productId, locationId: batch.locationId, delta: 0 };
+    deltas[key].delta += add;
+  }
+  for (const d of Object.values(deltas)) {
+    const rec = stockByKey[stockKey(d.productId, d.locationId)];
+    const id = (rec && rec.id) || genId("stk_");
+    const quantity = Math.max(0, (rec && Number(rec.quantity) || 0) + d.delta);
+    await setDoc("stock", id, {
+      id,
+      ownerId,
+      productId: d.productId,
+      locationId: d.locationId,
+      quantity,
+      minStock: rec && rec.minStock != null ? rec.minStock : 0,
+    });
   }
 }
 
@@ -141,11 +204,14 @@ export function slugifyCategory(name) {
 }
 
 async function findSaleByExternalId(ownerId, externalId) {
-  const sales = await listByOwner("pos_sales", ownerId);
-  return sales.find((s) => s.externalId === externalId) || null;
+  const rows = await queryEquals("pos_sales", "externalId", externalId);
+  return rows.find((s) => s && s.ownerId === ownerId) || null;
 }
 
 export async function listProducts({ ownerId, locationId }) {
+  const cacheKey = _catalogKey(ownerId, locationId);
+  const hit = _catalogCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < CATALOG_TTL_MS) return hit.data;
   const [productDocs, categoryDocs, stock, batches] = await Promise.all([
     listByOwner("products", ownerId),
     listCollection("categories"),
@@ -229,7 +295,9 @@ export async function listProducts({ ownerId, locationId }) {
     catMap.get(id).count += 1;
   }
   const categories = [...catMap.values()].sort((a, b) => a.name.localeCompare(b.name));
-  return { products: productsOut, categories };
+  const data = { products: productsOut, categories };
+  _catalogCache.set(cacheKey, { at: Date.now(), data });
+  return data;
 }
 
 export async function createSale(payload) {
@@ -247,9 +315,10 @@ export async function createSale(payload) {
   const existing = await findSaleByExternalId(ownerId, externalId);
   if (existing && !existing.voided) return { sale: existing, idempotent: true };
 
-  const [products, batches] = await Promise.all([
+  const [products, batches, stockRows] = await Promise.all([
     listByOwner("products", ownerId),
     listByOwner("batches", ownerId),
+    listByOwner("stock", ownerId),
   ]);
   const byId = Object.fromEntries(products.map((p) => [p.id, p]));
   const trackIngredients = await companyTracksIngredients(ownerId);
@@ -264,7 +333,7 @@ export async function createSale(payload) {
     const product = byId[productId];
     if (!product) throw Object.assign(new Error(`Unknown productId: ${productId}`), { status: 400 });
     const price = raw.unitPrice != null ? Number(raw.unitPrice) : Number(product.price) || 0;
-    const { picks, costTotal } = await consumeSaleQty(product, locationId, ownerId, qty, saleCtx);
+    const { picks, costTotal } = consumeSaleQty(product, locationId, ownerId, qty, saleCtx);
     allConsumed.push(...picks);
     lineItems.push({
       productId,
@@ -302,7 +371,10 @@ export async function createSale(payload) {
     voided: false,
     createdAt: new Date().toISOString(),
   };
+  await writeReserved(batches, allConsumed);
+  await writeStockTotals(batches, stockRows, allConsumed, ownerId);
   await setDoc("pos_sales", sale.id, sale, false);
+  dropCatalog(ownerId);
   return { sale, idempotent: false };
 }
 
@@ -317,5 +389,6 @@ export async function voidSale({ externalId, ownerId }) {
   await restoreLots(sale.consumedLots || [], sale.ownerId);
   const patched = { ...sale, voided: true, voidedAt: new Date().toISOString() };
   await setDoc("pos_sales", sale.id, patched);
+  dropCatalog(sale.ownerId);
   return { sale: patched, alreadyVoided: false };
 }

@@ -144,6 +144,14 @@ const Admin = (() => {
   }
 
   /* ---------------- Overview: stats ---------------- */
+  function _upsert(list, doc) {
+    if (!doc || !doc.id) return;
+    const i = list.findIndex(x => x.id === doc.id);
+    if (i >= 0) list[i] = Object.assign({}, list[i], doc);
+    else list.push(doc);
+  }
+  function _paint() { _renderStats(); _renderCharts(); _renderCompanies(); }
+
   function _renderStats() {
     const owners = DATA.users.filter(u => OWNER_ROLES.indexOf(u.role) >= 0).length;
     const workers = DATA.users.filter(u => WORKER_ROLES.indexOf(u.role) >= 0).length;
@@ -337,8 +345,10 @@ const Admin = (() => {
       const clash = DATA.companies.find(c => (c.code || '').toLowerCase() === code && c.id !== id);
       if (clash) { _err('customer-error', 'That company code is already taken.'); return; }
 
+      let cid = id;
+      let ownerPatch = null;
       if (!isEdit) {
-        const cid = _genId();
+        cid = _genId();
         const cred = await Creds.make(password);
         await Firebase.save('users', {
           id: cid, name: ownerName, username, shopName: name, role: 'owner', companyId: cid,
@@ -354,13 +364,22 @@ const Admin = (() => {
         if (unameClash) { _err('customer-error', 'That username is taken inside this company.'); return; }
 
         await Firebase.save('companies', { id, name, code, status, trackIngredientStock });
-        const ownerPatch = { id: info.owner.id || id, companyId: id, role: info.owner.role || 'owner', name: ownerName, username, shopName: name };
+        ownerPatch = { id: info.owner.id || id, companyId: id, role: info.owner.role || 'owner', name: ownerName, username, shopName: name };
         if (password) { const cred = await Creds.make(password); ownerPatch.salt = cred.salt; ownerPatch.passwordHash = cred.passwordHash; }
         await Firebase.save('users', ownerPatch);
         _toast('Saved changes to "' + name + '"' + (password ? ' (password reset)' : ''), 'success');
       }
       _closeModal('customer-modal');
-      await _loadAll();
+      if (!isEdit) {
+        _upsert(DATA.users, {
+          id: cid, name: ownerName, username, shopName: name, role: 'owner', companyId: cid, createdAt: new Date().toISOString(),
+        });
+        _upsert(DATA.companies, { id: cid, ownerId: cid, name, code, status: 'active', trackIngredientStock, createdAt: new Date().toISOString() });
+      } else {
+        _upsert(DATA.companies, { id, name, code, status, trackIngredientStock });
+        _upsert(DATA.users, ownerPatch);
+      }
+      _paint();
     } catch (err) {
       _err('customer-error', _friendly(err));
     } finally { btn.disabled = false; btn.textContent = orig; }
@@ -402,7 +421,13 @@ const Admin = (() => {
     $('details-team').addEventListener('click', async (e) => {
       const rm = e.target.closest('[data-rmworker]'); if (!rm) return;
       if (!confirm('Remove this team member? They will no longer be able to log in.')) return;
-      try { await Firebase.remove('users', rm.dataset.rmworker); _toast('Team member removed', 'success'); _closeModal('details-modal'); await _loadAll(); }
+      try {
+        await Firebase.remove('users', rm.dataset.rmworker);
+        DATA.users = DATA.users.filter(u => u.id !== rm.dataset.rmworker);
+        _toast('Team member removed', 'success');
+        _closeModal('details-modal');
+        _paint();
+      }
       catch (err) { _toast(_friendly(err), 'error'); }
     });
     $('details-body').querySelectorAll('[data-act-detail]').forEach(b => b.addEventListener('click', () => {
@@ -440,8 +465,12 @@ const Admin = (() => {
         if (docs.length) await Firebase.removeMany(coll, docs.map(d => d.id));
       }
       // Orders reference the company as seller or buyer.
-      const orders = await Firebase.list('orders').catch(() => []);
-      const orderIds = orders.filter(o => o.sellerId === c.id || o.buyerId === c.id).map(o => o.id);
+      const [buyOrders, sellOrders] = await Promise.all([
+        Firebase.listWhere('orders', 'buyerId', '==', c.id).catch(() => []),
+        Firebase.listWhere('orders', 'sellerId', '==', c.id).catch(() => []),
+      ]);
+      const orderIds = [];
+      buyOrders.concat(sellOrders).forEach(o => { if (o && o.id && orderIds.indexOf(o.id) < 0) orderIds.push(o.id); });
       if (orderIds.length) await Firebase.removeMany('orders', orderIds);
       // Users that belong to the company.
       const userIds = DATA.users.filter(u => u.companyId === c.id || u.id === c.id).map(u => u.id);
@@ -449,10 +478,16 @@ const Admin = (() => {
       // Finally the company itself.
       await Firebase.remove('companies', c.id);
 
+      DATA.companies = DATA.companies.filter(x => x.id !== c.id);
+      DATA.users = DATA.users.filter(u => u.companyId !== c.id && u.id !== c.id);
+      DATA.products = DATA.products.filter(p => p.ownerId !== c.id);
+      DATA.orders = DATA.orders.filter(o => o.sellerId !== c.id && o.buyerId !== c.id);
+      DATA.pos = DATA.pos.filter(s => s.ownerId !== c.id);
+      DATA.batches = DATA.batches.filter(b => b.ownerId !== c.id);
       _toast('Deleted "' + c.name + '" and all its data.', 'success');
       deleteTarget = null;
       _closeModal('delete-modal');
-      await _loadAll();
+      _paint();
     } catch (err) {
       _toast(_friendly(err), 'error');
     } finally { btn.disabled = false; btn.innerHTML = orig; }
