@@ -484,6 +484,9 @@ textarea { resize:vertical; }
 .topbar-title { flex:1; min-width:0; }
 .topbar-title h2 { font-size:1.25rem; font-weight:700; letter-spacing:-.02em; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .topbar-actions { display:flex; align-items:center; gap:.4rem; }
+#sync-refresh.is-busy { pointer-events:none; opacity:.7; }
+#sync-refresh.is-busy i { animation:syncspin .8s linear infinite; }
+@keyframes syncspin { to { transform:rotate(360deg); } }
 .sidebar-toggle { display:none; }
 .notification-bell { position:relative; cursor:pointer; width:46px; height:46px; display:flex; align-items:center; justify-content:center; border-radius:14px; border:1px solid transparent; transition:all var(--transition); }
 .notification-bell:hover { background:var(--bg-2); border-color:var(--border); }

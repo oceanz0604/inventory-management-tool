@@ -102,7 +102,29 @@ export async function listCollection(collection, pageSize = 300) {
   return out;
 }
 
+// Equality query via the single-field index. Only matching documents are
+// billed, unlike listCollection which reads every company.
+export async function queryEquals(collection, field, value) {
+  if (value == null || value === "") return [];
+  const rows = await fsFetch(":runQuery", {
+    method: "POST",
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId: collection }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: field },
+            op: "EQUAL",
+            value: encodeValue(value),
+          },
+        },
+      },
+    }),
+  });
+  return (rows || []).filter((r) => r && r.document).map((r) => decodeDoc(r.document));
+}
+
 export async function listByOwner(collection, ownerId) {
-  const all = await listCollection(collection);
-  return all.filter((d) => d && d.ownerId === ownerId);
+  if (!ownerId) return [];
+  return queryEquals(collection, "ownerId", ownerId);
 }

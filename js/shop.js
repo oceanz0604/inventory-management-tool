@@ -10,26 +10,31 @@ const Shop = (() => {
     document.getElementById('clear-cart-btn').addEventListener('click', clearCart);
   }
 
+  function _sellerName(ownerId) {
+    const company = Store.getCompanyById(ownerId);
+    if (company && company.name) return company.name;
+    const user = Store.getUserById(ownerId);
+    return user ? (user.shopName || user.name) : 'Shop';
+  }
+
   function populateFilters() {
-    const user = Auth.getUser();
-    const allUsers = Store.getUsers().filter(u => u.id !== Auth.ownerId());
+    const shops = Store.getCompanies().filter(c => c.id !== Auth.ownerId());
     const cats = Store.getCategories();
 
-    document.getElementById('shop-seller-filter').innerHTML = '<option value="">All Shops</option>' + allUsers.map(u => `<option value="${u.id}">${u.name || u.shopName}</option>`).join('');
+    document.getElementById('shop-seller-filter').innerHTML = '<option value="">All Shops</option>' + shops.map(c => '<option value="' + c.id + '">' + _esc(c.name || 'Shop') + '</option>').join('');
     document.getElementById('shop-category-filter').innerHTML = '<option value="">All Categories</option>' + cats.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
   }
 
   function renderProducts() {
-    const user = Auth.getUser();
     const search = document.getElementById('shop-search').value.toLowerCase().trim();
     const sellerFilter = document.getElementById('shop-seller-filter').value;
     const catFilter = document.getElementById('shop-category-filter').value;
 
-    const otherUsers = Store.getUsers().filter(u => u.id !== Auth.ownerId());
+    const shops = Store.getCompanies().filter(c => c.id !== Auth.ownerId());
     let products = [];
-    otherUsers.forEach(u => {
-      Store.getPublishedProducts(u.id).forEach(p => {
-        products.push({ ...p, shopName: u.name || u.shopName });
+    shops.forEach(c => {
+      Store.getPublishedProducts(c.id).forEach(p => {
+        products.push({ ...p, shopName: _sellerName(c.id) });
       });
     });
 

@@ -18,10 +18,13 @@ const Reports = (() => {
     charts = {};
   }
 
-  function render() {
+  async function render() {
     const user = Auth.getUser();
     const days = parseInt(document.getElementById('report-range').value) || 30;
     const startDate = new Date(Date.now() - days * 86400000);
+    if (Store.ensurePosSales) {
+      try { await Store.ensurePosSales(Auth.ownerId(), days); } catch (e) { /* chart the sales already cached */ }
+    }
 
     _destroyCharts();
     _renderStats(user, startDate);
