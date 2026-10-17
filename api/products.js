@@ -10,6 +10,7 @@ export default async function handler(req, res) {
     const locationId = url.searchParams.get("locationId") || process.env.ZENTORY_DEFAULT_LOCATION_ID;
     if (!ownerId) return json(res, 400, { error: "ownerId required" }, req);
     const { products, categories } = await listProducts({ ownerId, locationId });
+    res.setHeader("Cache-Control", "private, max-age=30");
     return json(res, 200, {
       ok: true,
       ownerId,

@@ -239,10 +239,16 @@ const Store = (() => {
     _recalcProductCost(batch.productId);
     return batch;
   }
-  function updateBatch(id, updates) {
+  function updateBatch(id, updates, opts) {
     let merged = null;
     _set(KEYS.BATCHES, (_get(KEYS.BATCHES) || []).map(b => b.id === id ? (merged = { ...b, ...updates }) : b));
-    if (merged) { _cloudSave('batches', merged); _recountStock(merged.productId, merged.locationId); _recalcProductCost(merged.productId); }
+    if (merged) {
+      _cloudSave('batches', merged);
+      if (!opts || !opts.defer) {
+        _recountStock(merged.productId, merged.locationId);
+        _recalcProductCost(merged.productId);
+      }
+    }
     return merged;
   }
   function deleteBatch(id) {
@@ -276,13 +282,23 @@ const Store = (() => {
   // Decrement chosen batches; returns total COGS consumed.
   function consumeLots(picks) {
     let cost = 0;
+    const touched = [];
     (picks || []).forEach(pk => {
       const b = getBatchById(pk.batchId);
       if (!b) return;
       const take = Math.max(0, Math.min(b.qty, pk.qty));
       cost += take * (b.unitCost || 0);
-      updateBatch(b.id, { qty: b.qty - take });
+      updateBatch(b.id, { qty: b.qty - take }, { defer: true });
+      touched.push({ productId: b.productId, locationId: b.locationId });
     });
+    const seenLoc = {};
+    const seenProd = {};
+    touched.forEach(t => {
+      const locKey = t.productId + '|' + t.locationId;
+      if (!seenLoc[locKey]) { seenLoc[locKey] = true; _recountStock(t.productId, t.locationId); }
+      seenProd[t.productId] = true;
+    });
+    Object.keys(seenProd).forEach(id => _recalcProductCost(id));
     return cost;
   }
 
@@ -908,9 +924,40 @@ const Store = (() => {
   // Never keep password material in the local read cache.
   function _stripUserSecrets(arr) { return (arr || []).map(u => { const { passwordHash, salt, ...rest } = u; return rest; }); }
 
-  async function sync(user) {
+  const SYNC_TTL_MS = 10 * 60 * 1000;
+  const MARKET_TTL_MS = 6 * 60 * 60 * 1000;
+  const POS_SYNC_DAYS = 30;
+
+  function _syncStampKey(scopeId) { return 'ims_sync_at_' + scopeId; }
+  function _posDaysKey(scopeId) { return 'ims_pos_days_' + scopeId; }
+  function _sinceIso(days) { return new Date(Date.now() - days * 86400000).toISOString(); }
+  function _mergeById(existing, incoming) {
+    const map = {};
+    (existing || []).forEach(x => { if (x && x.id) map[x.id] = x; });
+    (incoming || []).forEach(x => { if (x && x.id) map[x.id] = x; });
+    return Object.values(map);
+  }
+  function _hasOwnProducts(scopeId) {
+    return (getProducts() || []).some(p => p && p.ownerId === scopeId);
+  }
+
+  // Recent POS rows when the composite index exists. Otherwise the caller's
+  // fallback reads the whole company, which is the old cost.
+  async function _recentPos(scopeId, days) {
+    const since = _sinceIso(days);
+    const rows = await Firebase.listRecent('pos_sales', 'ownerId', scopeId, since);
+    return { rows, days };
+  }
+
+  async function sync(user, opts) {
+    opts = opts || {};
     if (!_cloudOn() || !user) return;
     const isAdmin = user.role === 'superadmin';
+    const scopeId = user.companyId || user.id;
+    if (!opts.force && !isAdmin && _hasOwnProducts(scopeId)) {
+      const last = parseInt(localStorage.getItem(_syncStampKey(scopeId)) || '0', 10);
+      if (last && Date.now() - last < SYNC_TTL_MS) return { skipped: true };
+    }
     try {
       if (isAdmin) {
         const [users, cats, locs, prods, stock, orders, pos, recipes, khata, parties, companies, batches] = await Promise.all([
@@ -922,42 +969,107 @@ const Store = (() => {
         _set(KEYS.PRODUCTS, prods); _set(KEYS.STOCK, stock); _set(KEYS.ORDERS, orders);
         _set(KEYS.POS_SALES, pos); _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata); _set(KEYS.PARTIES, parties); _set(KEYS.COMPANIES, companies); _set(KEYS.BATCHES, batches);
       } else {
-        // Workers scope to their company; owners scope to themselves.
-        const scopeId = user.companyId || user.id;
-        const [users, cats, locs, ownProds, pubProds, stock, ordBuy, ordSell, pos, recipes, khata, parties, batches] = await Promise.all([
-          Firebase.list('users'),
+        // Company users only. Marketplace catalogs load when Shop is opened.
+        const [users, selfDoc, cats, locs, ownProds, stock, ordBuy, ordSell, recipes, khata, parties, batches] = await Promise.all([
+          Firebase.listWhere('users', 'companyId', '==', scopeId),
+          Firebase.getDoc('users', user.id),
           Firebase.list('categories'),
           Firebase.listByOwner('locations', scopeId),
           Firebase.listByOwner('products', scopeId),
-          Firebase.listWhere('products', 'isPublished', '==', true),
           Firebase.listByOwner('stock', scopeId),
           Firebase.listWhere('orders', 'buyerId', '==', scopeId),
           Firebase.listWhere('orders', 'sellerId', '==', scopeId),
-          Firebase.listByOwner('pos_sales', scopeId),
           Firebase.listByOwner('recipes', scopeId),
           Firebase.listByOwner('khata', scopeId),
           Firebase.listByOwner('parties', scopeId),
           Firebase.listByOwner('batches', scopeId),
         ]);
-        const prodMap = {}; ownProds.concat(pubProds).forEach(p => { prodMap[p.id] = p; });
+        if (selfDoc && !users.some(u => u.id === selfDoc.id)) users.push(selfDoc);
+        let posRows;
+        let posDays = POS_SYNC_DAYS;
+        try {
+          const recent = await _recentPos(scopeId, POS_SYNC_DAYS);
+          posRows = recent.rows;
+        } catch (e) {
+          console.warn('[sync] recent sales query unavailable, reading company sales', e && e.message);
+          posRows = await Firebase.listByOwner('pos_sales', scopeId);
+          posDays = 3650;
+        }
+        const keptPub = getProducts().filter(p => p && p.isPublished && p.ownerId !== scopeId);
+        const prodMap = {};
+        ownProds.concat(keptPub).forEach(p => { prodMap[p.id] = p; });
         const ordMap = {}; ordBuy.concat(ordSell).forEach(o => { ordMap[o.id] = o; });
+        const otherPos = (_get(KEYS.POS_SALES) || []).filter(s => s && s.ownerId !== scopeId);
         _set(KEYS.USERS, _stripUserSecrets(users)); _set(KEYS.CATEGORIES, cats); _set(KEYS.LOCATIONS, locs);
         _set(KEYS.PRODUCTS, Object.values(prodMap)); _set(KEYS.STOCK, stock);
-        _set(KEYS.ORDERS, Object.values(ordMap)); _set(KEYS.POS_SALES, pos);
+        _set(KEYS.ORDERS, Object.values(ordMap));
+        _set(KEYS.POS_SALES, otherPos.concat(posRows || []));
         _set(KEYS.RECIPES, recipes); _set(KEYS.KHATA, khata); _set(KEYS.PARTIES, parties); _set(KEYS.BATCHES, batches);
+        localStorage.setItem(_posDaysKey(scopeId), String(posDays));
         let company = null;
         try { company = await Firebase.getDoc('companies', scopeId); } catch (e) { company = null; }
-        _set(KEYS.COMPANIES, company ? [company] : []);
+        const companyMap = {};
+        getCompanies().forEach(c => { if (c && c.id) companyMap[c.id] = c; });
+        if (company) companyMap[company.id] = company;
+        _set(KEYS.COMPANIES, Object.values(companyMap));
       }
       _recomputeSequences();
+      if (!isAdmin) localStorage.setItem(_syncStampKey(scopeId), String(Date.now()));
+      return { skipped: false };
     } catch (e) {
       console.error('[sync] hydration failed:', e && e.message);
+      throw e;
     }
+  }
+
+  // Published products and company names, only when someone opens Shop.
+  async function syncMarketplace(opts) {
+    opts = opts || {};
+    if (!_cloudOn()) return;
+    const last = parseInt(localStorage.getItem('ims_mkt_at') || '0', 10);
+    if (!opts.force && last && Date.now() - last < MARKET_TTL_MS) return;
+    const [pub, companies] = await Promise.all([
+      Firebase.listWhere('products', 'isPublished', '==', true),
+      Firebase.list('companies'),
+    ]);
+    const scopeId = (getCurrentUser() || {}).companyId || (getCurrentUser() || {}).id;
+    const local = getProducts().filter(p => !p || p.ownerId === scopeId || !p.isPublished);
+    const map = {};
+    local.concat(pub || []).forEach(p => { if (p && p.id) map[p.id] = p; });
+    _set(KEYS.PRODUCTS, Object.values(map));
+    if (companies && companies.length) _set(KEYS.COMPANIES, companies);
+    localStorage.setItem('ims_mkt_at', String(Date.now()));
+  }
+
+  // Pull a wider POS window when Reports asks for more than the boot cache.
+  async function ensurePosSales(ownerId, days) {
+    if (!_cloudOn() || !ownerId) return;
+    const need = Math.max(POS_SYNC_DAYS, days || POS_SYNC_DAYS);
+    const covered = parseInt(localStorage.getItem(_posDaysKey(ownerId)) || '0', 10);
+    if (covered >= need) return;
+    let rows;
+    try {
+      rows = (await _recentPos(ownerId, need)).rows;
+    } catch (e) {
+      console.warn('[sync] could not extend sales history', e && e.message);
+      return;
+    }
+    const others = (_get(KEYS.POS_SALES) || []).filter(s => s && s.ownerId !== ownerId);
+    const mine = (_get(KEYS.POS_SALES) || []).filter(s => s && s.ownerId === ownerId);
+    _set(KEYS.POS_SALES, others.concat(_mergeById(mine, rows)));
+    localStorage.setItem(_posDaysKey(ownerId), String(need));
+    _recomputeSequences();
   }
 
   function _clearLocalData() {
     [KEYS.CATEGORIES, KEYS.LOCATIONS, KEYS.PRODUCTS, KEYS.STOCK, KEYS.ORDERS,
      KEYS.POS_SALES, KEYS.RECIPES, KEYS.KHATA, KEYS.PARTIES, KEYS.COMPANIES, KEYS.BATCHES, KEYS.USERS, KEYS.CART].forEach(k => localStorage.removeItem(k));
+    const drop = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.indexOf('ims_sync_at_') === 0 || k.indexOf('ims_pos_days_') === 0 || k === 'ims_mkt_at')) drop.push(k);
+    }
+    drop.forEach(k => localStorage.removeItem(k));
   }
 
 
@@ -980,6 +1092,6 @@ const Store = (() => {
     getKhataEntries, getKhataByParty, addKhataEntry, getKhataBalance, getKhataParties,
     getRevenueData,
     getCart, setCart, clearCart, addToCart, updateCartItemQty, getCartItemCount,
-    getCompanies, getCompanyById, addCompany, sync, _clearLocalData,
+    getCompanies, getCompanyById, addCompany, sync, syncMarketplace, ensurePosSales, _clearLocalData,
   };
 })();

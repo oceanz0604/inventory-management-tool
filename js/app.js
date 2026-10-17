@@ -11,6 +11,7 @@ const App = (() => {
     _bindModalClose();
     _bindNotifications();
     _bindSidebarToggle();
+    _bindCloudRefresh();
     _bindCategoryEvents();
     _bindBottomNav();
     _preventZoomGestures();
@@ -379,7 +380,10 @@ const App = (() => {
     if (view === 'orders') Orders.render();
     if (view === 'purchase') Purchase.refresh();
     if (view === 'categories') _renderCategories();
-    if (view === 'shop') { Shop.populateFilters(); Shop.renderProducts(); }
+    if (view === 'shop') {
+      const paintShop = () => { Shop.populateFilters(); Shop.renderProducts(); };
+      Promise.resolve(Store.syncMarketplace ? Store.syncMarketplace() : null).then(paintShop).catch(paintShop);
+    }
     if (view === 'reports') Reports.refresh();
     if (view === 'khata') KhataModule.refresh();
     if (view === 'field-order') FieldOrders.render();
@@ -527,6 +531,28 @@ const App = (() => {
     const match = nav.querySelector('.bnav-item[data-view="' + view + '"]');
     if (match) match.classList.add('active');
     else { const more = document.getElementById('bnav-more'); if (more) more.classList.add('active'); }
+  }
+
+  function _bindCloudRefresh() {
+    const btn = document.getElementById('sync-refresh');
+    if (!btn) return;
+    btn.addEventListener('click', async () => {
+      const profile = Auth.ensureSession();
+      if (!profile) return;
+      btn.disabled = true;
+      btn.classList.add('is-busy');
+      try {
+        await Store.sync(profile, { force: true });
+        if (currentView === 'shop' && Store.syncMarketplace) await Store.syncMarketplace({ force: true });
+        _navigate(currentView);
+        showToast('Data refreshed', 'success');
+      } catch (e) {
+        showToast('Could not refresh. Showing the last saved copy.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.classList.remove('is-busy');
+      }
+    });
   }
 
   // ========== Sidebar Toggle ==========

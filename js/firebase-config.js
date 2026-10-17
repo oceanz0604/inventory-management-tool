@@ -131,6 +131,14 @@ const Firebase = (() => {
 
   function listByOwner(collection, ownerId) { return listWhere(collection, 'ownerId', '==', ownerId); }
 
+  // owner (or buyer/seller) plus a createdAt lower bound. Needs a composite
+  // index; the caller falls back to the unscoped owner query if it is missing.
+  function listRecent(collection, field, value, sinceIso) {
+    if (!enabled) return Promise.resolve([]);
+    return db.collection(collection).where(field, '==', value).where('createdAt', '>=', sinceIso)
+      .get().then(snap => snap.docs.map(d => d.data()));
+  }
+
   function getDoc(collection, id) {
     if (!enabled) return Promise.resolve(null);
     return db.collection(collection).doc(id).get().then(d => d.exists ? d.data() : null);
@@ -168,7 +176,7 @@ const Firebase = (() => {
   return {
     init, isEnabled, getAuth, getDb, config: FIREBASE_CONFIG,
     signIn, signUp, signOut, currentUser, onAuth, createWorkerAccount, createAuthAccount,
-    save, saveMany, list, listWhere, listByOwner, getDoc, remove, removeMany, findCompanyByCode,
+    save, saveMany, list, listWhere, listByOwner, listRecent, getDoc, remove, removeMany, findCompanyByCode,
   };
 })();
 
