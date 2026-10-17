@@ -122,16 +122,15 @@ const POS = (() => {
     const container = document.getElementById('pos-bill-items');
     const btn = document.getElementById('pos-checkout-btn');
 
+    if (btn) btn.disabled = false;
     if (bill.length === 0) {
       container.innerHTML = '<div class="pos-bill-empty"><i class="fas fa-hand-pointer"></i><p>Tap products to add</p></div>';
       document.getElementById('pos-item-count').textContent = '0';
       document.getElementById('pos-subtotal').textContent = '\u20B90.00';
       document.getElementById('pos-gst').textContent = '\u20B90.00';
       document.getElementById('pos-total').textContent = '\u20B90.00';
-      btn.disabled = true;
       return;
     }
-    btn.disabled = false;
 
     const locId = document.getElementById('pos-location').value;
     let subtotal = 0, gst = 0, itemCount = 0;
@@ -168,28 +167,36 @@ const POS = (() => {
 
   function clearBill() { bill = []; _renderBill(); renderProducts(); }
 
-  function checkout() {
-    if (bill.length === 0) return;
-    const user = Auth.getUser();
-    const locId = document.getElementById('pos-location').value;
-    const payment = document.getElementById('pos-payment').value;
-    const customerName = document.getElementById('pos-customer-name').value.trim() || 'Walk-in';
+  function checkout(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    if (typeof SearchableSelect !== 'undefined') SearchableSelect.closeAll();
+    if (bill.length === 0) { App.showToast('Add a product to the bill first', 'warning'); return; }
+    try {
+      const locId = document.getElementById('pos-location').value;
+      if (!locId) { App.showToast('Select a location', 'warning'); return; }
+      const payment = document.getElementById('pos-payment').value;
+      const customerName = document.getElementById('pos-customer-name').value.trim() || 'Walk-in';
 
-    const items = bill.map(b => ({ productId: b.productId, name: b.name, sku: b.sku, price: b.price, costPrice: b.costPrice, gstRate: b.gstRate, qty: b.qty, batchId: b.batchId || null }));
-    const result = Store.createPosSale(Auth.ownerId(), locId, items, payment, customerName);
-    if (!result.success) {
-      App.showToast(result.message || 'Could not complete sale', 'error');
-      return;
+      const items = bill.map(b => ({ productId: b.productId, name: b.name, sku: b.sku, price: b.price, costPrice: b.costPrice, gstRate: b.gstRate, qty: b.qty, batchId: b.batchId || null }));
+      const result = Store.createPosSale(Auth.ownerId(), locId, items, payment, customerName);
+      if (!result || !result.success) {
+        App.showToast((result && result.message) || 'Could not complete sale', 'error');
+        return;
+      }
+      const sale = result.sale;
+
+      _showReceipt(sale);
+      bill = [];
+      _renderBill();
+      renderProducts();
+      _renderTodaySummary();
+      document.getElementById('pos-customer-name').value = '';
+      if (typeof Inventory !== 'undefined') Inventory.render();
+      if (typeof Dashboard !== 'undefined') Dashboard.refresh();
+      App.showToast('Sale completed! Stock updated.', 'success');
+    } catch (err) {
+      App.showToast((err && err.message) || 'Could not complete sale', 'error');
     }
-    const sale = result.sale;
-
-    _showReceipt(sale);
-    bill = [];
-    _renderBill();
-    renderProducts();
-    _renderTodaySummary();
-    document.getElementById('pos-customer-name').value = '';
-    App.showToast('Sale completed! Stock updated.', 'success');
   }
 
   function _showReceipt(sale) {

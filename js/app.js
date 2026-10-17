@@ -109,7 +109,7 @@ const App = (() => {
     ImportData.init();
     Inventory.init();
     Orders.init();
-    if (window.Purchase) Purchase.init();
+    if (typeof Purchase !== 'undefined') Purchase.init();
     Shop.init();
     POS.init();
     KhataModule.init();
@@ -385,7 +385,7 @@ const App = (() => {
     if (view === 'field-order') FieldOrders.render();
     if (view === 'parties') Parties.render();
     if (view === 'team') Team.render();
-    if (window.TableSort) TableSort.refresh(el);
+    if (typeof TableSort !== 'undefined') TableSort.refresh(el);
   }
 
   // ========== Bottom Nav (Mobile) ==========

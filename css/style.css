@@ -327,11 +327,11 @@ textarea { resize:vertical; }
 .ss-label.ss-placeholder { color:var(--text-light); }
 .ss-caret { font-size:.7rem; color:var(--text-light); flex-shrink:0; }
 .ss-panel { position:absolute; z-index:60; top:calc(100% + 4px); left:0; right:0; background:var(--bg-card); border:1.5px solid var(--border);
-  border-radius:var(--radius); box-shadow:var(--shadow-lg); overflow:hidden; }
+  border-radius:var(--radius); box-shadow:var(--shadow-lg); overflow:hidden; display:flex; flex-direction:column; }
 .ss-search { position:relative; padding:.5rem; border-bottom:1px solid var(--border); }
 .ss-search i { position:absolute; left:1rem; top:50%; transform:translateY(-50%); color:var(--text-light); font-size:.8rem; pointer-events:none; }
 .ss-search input { width:100%; padding:.5rem .6rem .5rem 2rem; border:1px solid var(--border); border-radius:8px; background:var(--bg-input); color:var(--text); }
-.ss-options { max-height:240px; overflow-y:auto; padding:.3rem; }
+.ss-options { max-height:240px; overflow-y:auto; padding:.3rem; min-height:0; }
 .ss-opt { padding:.55rem .7rem; border-radius:8px; cursor:pointer; font-size:.9rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ss-opt:hover { background:var(--bg-2); }
 .ss-opt.sel { background:var(--primary-soft); color:var(--primary); font-weight:600; }
@@ -891,9 +891,9 @@ textarea { resize:vertical; }
 
 /* POS Bill Panel */
 .pos-bill { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius-lg); box-shadow:var(--shadow); display:flex; flex-direction:column; overflow:hidden; max-height:calc(100vh - var(--topbar-height) - 4.5rem); position:sticky; top:calc(var(--topbar-height) + 1rem); }
-.pos-bill-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.35rem; border-bottom:1px solid var(--border); }
+.pos-bill-header { display:flex; align-items:center; justify-content:space-between; padding:1.1rem 1.35rem; border-bottom:1px solid var(--border); flex-shrink:0; }
 .pos-bill-header h3 { font-size:1.02rem; font-weight:700; display:flex; align-items:center; gap:.5rem; }
-.pos-bill-items { flex:1; overflow-y:auto; padding:.85rem; }
+.pos-bill-items { flex:1 1 auto; min-height:0; overflow-y:auto; padding:.85rem; }
 .pos-bill-empty { text-align:center; padding:2.5rem 1rem; color:var(--text-light); }
 .pos-bill-empty i { font-size:2rem; margin-bottom:.5rem; display:block; }
 .pos-bill-empty p { font-size:.85rem; }
@@ -909,14 +909,16 @@ textarea { resize:vertical; }
 .pos-bill-row-total { font-weight:800; font-size:.85rem; min-width:58px; text-align:right; }
 .pos-bill-row-remove { background:none; border:none; color:var(--text-light); font-size:.78rem; cursor:pointer; padding:3px; border-radius:6px; }
 .pos-bill-row-remove:hover { color:var(--danger); background:#fef0f0; }
-.pos-bill-summary { padding:.85rem 1.35rem; border-top:1px solid var(--border); background:var(--bg-2); }
+.pos-bill-summary { padding:.85rem 1.35rem; border-top:1px solid var(--border); background:var(--bg-2); flex:0 1 auto; min-height:0; overflow-y:auto; }
 .pos-bill-line { display:flex; justify-content:space-between; font-size:.85rem; color:var(--text-secondary); margin-bottom:.3rem; }
 .pos-bill-line strong { color:var(--text); font-weight:700; }
 .pos-bill-total { font-size:1.1rem; color:var(--text); margin-top:.45rem; padding-top:.5rem; border-top:2px dashed var(--border-strong); }
 .pos-bill-total strong { font-size:1.35rem; color:var(--primary); }
-.pos-bill-actions { padding:.85rem 1.35rem; border-top:1px solid var(--border); }
+.pos-bill-actions { padding:.85rem 1.35rem; border-top:1px solid var(--border); flex-shrink:0; position:relative; z-index:2; background:var(--bg-card); }
 .pos-bill-actions .form-row { gap:.5rem; }
-.pos-today-summary { padding:.85rem 1.35rem; border-top:1px solid var(--border); background:var(--bg-2); }
+.pos-today-summary { padding:.85rem 1.35rem; border-top:1px solid var(--border); background:var(--bg-2); flex-shrink:0; }
+.po-field-head { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.4rem; }
+.po-field-head label { margin-bottom:0; }
 .pos-summary-empty { text-align:center; font-size:.8rem; color:var(--text-light); padding:.25rem 0; }
 .pos-summary-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text-secondary); margin-bottom:.6rem; display:flex; align-items:center; gap:.4rem; }
 .pos-summary-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:.5rem; }

@@ -9,14 +9,18 @@ const Purchase = (() => {
     document.getElementById('po-clear').addEventListener('click', () => { items = []; _renderBill(); renderProducts(); });
     document.getElementById('po-submit').addEventListener('click', _submit);
     document.getElementById('po-back-orders').addEventListener('click', () => App.goTo('orders'));
-    document.getElementById('po-add-seller').addEventListener('click', () => {
-      if (typeof Parties === 'undefined') return;
+    document.getElementById('po-add-seller').addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (typeof SearchableSelect !== 'undefined') SearchableSelect.closeAll();
+      if (typeof Parties === 'undefined') { App.showToast('Suppliers are not available right now', 'error'); return; }
       Parties.openModal(null, {
         defaultType: 'seller',
         onAdded: (p) => {
-          _populateSellers();
-          if (p && p.id) document.getElementById('po-seller').value = p.id;
-          SearchableSelect.refresh(document.getElementById('po-seller'));
+          _populateFilters();
+          const sel = document.getElementById('po-seller');
+          if (p && p.id && sel) sel.value = p.id;
+          if (typeof SearchableSelect !== 'undefined') SearchableSelect.refresh(sel);
         },
       });
     });
@@ -38,7 +42,7 @@ const Purchase = (() => {
       cats.map(c => '<option value="' + c.id + '">' + _esc(c.name) + '</option>').join('');
     if (keepCat) document.getElementById('po-cat-filter').value = keepCat;
     const sellers = Store.getPartiesByType(Auth.ownerId(), 'seller');
-    document.getElementById('po-seller').innerHTML = '<option value="">-- Select seller --</option>' +
+    document.getElementById('po-seller').innerHTML = '<option value="">-- Select supplier --</option>' +
       sellers.map(s => '<option value="' + s.id + '">' + _esc(s.name) + '</option>').join('');
     if (keepSeller) document.getElementById('po-seller').value = keepSeller;
     const locs = Store.getLocationsByOwner(Auth.ownerId());
@@ -123,25 +127,35 @@ const Purchase = (() => {
     document.getElementById('po-total').textContent = '\u20B9' + total.toFixed(2);
   }
 
-  function _submit() {
-    const sellerId = document.getElementById('po-seller').value;
-    const locId = document.getElementById('po-location').value;
-    if (!sellerId) { App.showToast('Select a seller', 'warning'); return; }
-    if (!locId) { App.showToast('Select a location', 'warning'); return; }
-    if (!items.length) { App.showToast('Add at least one product', 'warning'); return; }
-    const paid = parseFloat(document.getElementById('po-paid').value) || 0;
-    const payload = items.map(i => ({
-      productId: i.productId, name: i.name, sku: i.sku, qty: i.qty,
-      unitPrice: i.unitPrice, expiryDate: i.expiryDate || null,
-    }));
-    const order = Store.createManualPurchase(Auth.ownerId(), sellerId, payload, locId);
-    Store.receiveManualPurchase(order.id, paid, locId);
-    items = [];
-    document.getElementById('po-paid').value = 0;
-    App.showToast('Purchase recorded. Stock & Khata updated.', 'success');
-    if (window.Inventory) Inventory.render();
-    if (window.Dashboard) Dashboard.refresh();
-    App.goTo('orders');
+  function _submit(e) {
+    if (e) { e.preventDefault(); e.stopPropagation(); }
+    try {
+      const sellerId = document.getElementById('po-seller').value;
+      const locId = document.getElementById('po-location').value;
+      if (!sellerId) { App.showToast('Select a supplier', 'warning'); return; }
+      if (!locId) { App.showToast('Select a location', 'warning'); return; }
+      if (!items.length) { App.showToast('Add at least one product', 'warning'); return; }
+      const paid = parseFloat(document.getElementById('po-paid').value) || 0;
+      const payload = items.map(i => ({
+        productId: i.productId, name: i.name, sku: i.sku, qty: i.qty,
+        unitPrice: i.unitPrice, expiryDate: i.expiryDate || null,
+      }));
+      const order = Store.createManualPurchase(Auth.ownerId(), sellerId, payload, locId);
+      const received = Store.receiveManualPurchase(order.id, paid, locId);
+      if (!received || received.success === false) {
+        App.showToast((received && received.message) || 'Could not complete this purchase', 'error');
+        return;
+      }
+      items = [];
+      document.getElementById('po-paid').value = 0;
+      _renderBill();
+      if (typeof Inventory !== 'undefined') Inventory.render();
+      if (typeof Dashboard !== 'undefined') Dashboard.refresh();
+      App.showToast('Purchase recorded. Stock & Khata updated.', 'success');
+      App.goTo('orders');
+    } catch (err) {
+      App.showToast((err && err.message) || 'Could not complete this purchase', 'error');
+    }
   }
 
   function _esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }

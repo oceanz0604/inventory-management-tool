@@ -12,7 +12,8 @@ const Orders = (() => {
         render();
       });
     });
-    document.getElementById('print-invoice-btn').addEventListener('click', _printInvoice);
+    const printBtn = document.getElementById('print-invoice-btn');
+    if (printBtn) printBtn.addEventListener('click', _printInvoice);
 
     // Field-sale delivery (payment) modal
     const fulfillConfirm = document.getElementById('fulfill-confirm');
@@ -74,7 +75,8 @@ const Orders = (() => {
           ' <button class="btn btn-sm btn-danger" onclick="Orders.cancelCustom(\'' + o.id + '\')">Cancel</button>';
         else if (o.status === 'open') actionBtns += ' <button class="btn btn-sm btn-success" onclick="Orders.settle(\'' + o.id + '\')">Mark Paid</button>';
       } else if (o.kind === 'manual_purchase') {
-        if (o.status === 'open') actionBtns += ' <button class="btn btn-sm btn-success" onclick="Orders.settle(\'' + o.id + '\')">Mark Paid</button>';
+        if (o.status === 'pending') actionBtns += ' <button type="button" class="btn btn-sm btn-primary" onclick="Orders.receivePurchase(\'' + o.id + '\')">Receive</button>';
+        if (o.status === 'open') actionBtns += ' <button type="button" class="btn btn-sm btn-success" onclick="Orders.settle(\'' + o.id + '\')">Mark Paid</button>';
       } else {
         if (activeTab === 'sales') {
           if (o.status === 'pending') actionBtns += ' <button class="btn btn-sm btn-success" onclick="Orders.approve(\'' + o.id + '\')">Approve</button>';
@@ -308,7 +310,13 @@ const Orders = (() => {
       '<table class="data-table order-items-table"><thead><tr><th>Product</th><th>SKU</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>' + itemRows + '</tbody>' +
       '<tfoot><tr><td colspan="4" style="text-align:right;font-weight:700">Total</td><td><strong>\u20B9' + subtotal.toFixed(2) + '</strong></td></tr></tfoot></table>';
 
-    document.getElementById('order-detail-footer').innerHTML = '<button class="btn btn-secondary modal-close">Close</button>';
+    let footer = '<button type="button" class="btn btn-secondary modal-close">Close</button>';
+    if (!isField && order.status === 'pending') {
+      footer = '<button type="button" class="btn btn-primary" onclick="Orders.receivePurchase(\'' + order.id + '\')">Receive</button>' + footer;
+    } else if (!isField && order.status === 'open') {
+      footer = '<button type="button" class="btn btn-success" onclick="Orders.settle(\'' + order.id + '\')">Mark Paid</button>' + footer;
+    }
+    document.getElementById('order-detail-footer').innerHTML = footer;
     document.querySelectorAll('#order-detail-footer .modal-close').forEach(b =>
       b.addEventListener('click', () => document.getElementById('order-detail-modal').classList.add('hidden')));
     document.getElementById('order-detail-modal').classList.remove('hidden');
@@ -317,7 +325,34 @@ const Orders = (() => {
   // ---- Field-sale workflow (office / owner) ----
   function acceptFieldSale(orderId) { Store.acceptOrder(orderId); App.showToast('Order accepted', 'success'); render(); }
   function cancelCustom(orderId) { Store.cancelOrder(orderId); App.showToast('Order cancelled', 'success'); render(); Dashboard.refresh(); }
-  function settle(orderId) { Store.settleOrder(orderId); App.showToast('Marked as paid', 'success'); render(); }
+  function settle(orderId) {
+    Store.settleOrder(orderId);
+    const modal = document.getElementById('order-detail-modal');
+    if (modal) modal.classList.add('hidden');
+    App.showToast('Marked as paid', 'success');
+    render();
+  }
+
+  function receivePurchase(orderId) {
+    const order = Store.getOrderById(orderId);
+    if (!order) { App.showToast('Order not found', 'error'); return; }
+    try {
+      const loc = order.fulfillmentLocationId || ((Store.getDefaultLocation(Auth.ownerId()) || {}).id);
+      const res = Store.receiveManualPurchase(orderId, order.amountPaid || 0, loc);
+      if (!res || res.success === false) {
+        App.showToast((res && res.message) || 'Could not receive this purchase', 'error');
+        return;
+      }
+      const modal = document.getElementById('order-detail-modal');
+      if (modal) modal.classList.add('hidden');
+      App.showToast('Purchase received. Stock updated.', 'success');
+      render();
+      if (typeof Inventory !== 'undefined') Inventory.render();
+      if (typeof Dashboard !== 'undefined') Dashboard.refresh();
+    } catch (err) {
+      App.showToast((err && err.message) || 'Could not receive this purchase', 'error');
+    }
+  }
 
   function openDeliver(orderId) {
     const order = Store.getOrderById(orderId);
@@ -376,7 +411,7 @@ const Orders = (() => {
   function _populateMpSellers() {
     const sellerSel = document.getElementById('mp-seller');
     const sellers = Store.getPartiesByType(Auth.ownerId(), 'seller');
-    sellerSel.innerHTML = '<option value="">-- Select seller --</option>' + sellers.map(s => '<option value="' + s.id + '">' + _esc(s.name) + '</option>').join('');
+    sellerSel.innerHTML = '<option value="">-- Select supplier --</option>' + sellers.map(s => '<option value="' + s.id + '">' + _esc(s.name) + '</option>').join('');
   }
 
   function openManualPurchase() {
@@ -420,13 +455,17 @@ const Orders = (() => {
     if (mpItems.length === 0) { App.showToast('Add at least one product', 'warning'); return; }
     const paid = parseFloat(document.getElementById('mp-paid').value) || 0;
     const order = Store.createManualPurchase(Auth.ownerId(), sellerId, mpItems.map(i => ({ ...i })), locId);
-    Store.receiveManualPurchase(order.id, paid, locId);
+    const received = Store.receiveManualPurchase(order.id, paid, locId);
+    if (!received || received.success === false) {
+      App.showToast((received && received.message) || 'Could not complete this purchase', 'error');
+      return;
+    }
     document.getElementById('manual-purchase-modal').classList.add('hidden');
     App.showToast('Purchase recorded. Stock & Khata updated.', 'success');
     activeTab = 'purchase';
     render();
-    if (window.Inventory) Inventory.render();
-    Dashboard.refresh();
+    if (typeof Inventory !== 'undefined') Inventory.render();
+    if (typeof Dashboard !== 'undefined') Dashboard.refresh();
   }
 
   function _capitalize(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
@@ -434,6 +473,6 @@ const Orders = (() => {
 
   return {
     init, render, viewDetail, approve, ship, deliver, cancel, showInvoice,
-    acceptFieldSale, cancelCustom, settle, openDeliver, openManualPurchase,
+    acceptFieldSale, cancelCustom, settle, receivePurchase, openDeliver, openManualPurchase,
   };
 })();

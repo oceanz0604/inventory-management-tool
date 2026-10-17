@@ -78,23 +78,51 @@ const SearchableSelect = (() => {
     }));
   }
 
+  let _ignoreScrollUntil = 0;
   function _toggle(sel) { sel._ssPanel.classList.contains('hidden') ? _open(sel) : _close(sel); }
+  function _place(sel) {
+    const panel = sel._ssPanel;
+    const rect = sel._ssBtn.getBoundingClientRect();
+    const width = Math.max(rect.width, 180);
+    const below = window.innerHeight - rect.bottom;
+    panel.style.position = 'fixed';
+    panel.style.zIndex = '250';
+    panel.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)) + 'px';
+    panel.style.width = width + 'px';
+    panel.style.right = 'auto';
+    if (below < 200 && rect.top > below) {
+      panel.style.top = 'auto';
+      panel.style.bottom = (window.innerHeight - rect.top + 4) + 'px';
+      panel.style.maxHeight = Math.max(120, rect.top - 12) + 'px';
+    } else {
+      panel.style.bottom = 'auto';
+      panel.style.top = (rect.bottom + 4) + 'px';
+      panel.style.maxHeight = Math.max(120, below - 12) + 'px';
+    }
+  }
   function _open(sel) {
     if (sel.disabled) return;
     _closeAll();
+    _place(sel);
+    _ignoreScrollUntil = Date.now() + 400;
     sel._ssPanel.classList.remove('hidden');
     const i = sel._ssPanel.querySelector('input');
     i.value = '';
     _renderOptions(sel, '');
     setTimeout(() => i.focus(), 0);
   }
-  function _close(sel) { sel._ssPanel.classList.add('hidden'); }
+  function _close(sel) { if (sel && sel._ssPanel) sel._ssPanel.classList.add('hidden'); }
   function _closeAll() { document.querySelectorAll('.ss-panel').forEach(p => p.classList.add('hidden')); }
+  window.addEventListener('scroll', (e) => {
+    if (Date.now() < _ignoreScrollUntil) return;
+    if (e.target && e.target.closest && e.target.closest('.ss-panel')) return;
+    _closeAll();
+  }, true);
 
   // Enhance / refresh every native combobox within a root element.
   function enhanceAll(root) {
     (root || document).querySelectorAll('select.select-input').forEach(enhance);
   }
 
-  return { enhance, enhanceAll, refresh };
+  return { enhance, enhanceAll, refresh, closeAll: _closeAll };
 })();
