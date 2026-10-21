@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Zentory UI harness</title>
+  <style>.hidden { display: none !important; }</style>
+</head>
+<body>
+  <input id="pos-search" type="text">
+  <select id="pos-location"></select>
+  <select id="pos-cat-filter"></select>
+  <select id="pos-payment"><option value="cash">Cash</option><option value="upi">UPI</option></select>
+  <input id="pos-customer-name" type="text">
+  <button id="pos-clear-bill" type="button">Clear</button>
+  <button id="pos-checkout-btn" type="button" disabled>Complete Sale</button>
+  <button id="pos-print-receipt" type="button">Print</button>
+  <div id="pos-product-grid"></div>
+  <div id="no-pos-products" class="hidden"></div>
+  <div id="pos-bill-items"></div>
+  <span id="pos-item-count"></span>
+  <span id="pos-subtotal"></span>
+  <span id="pos-gst"></span>
+  <span id="pos-total"></span>
+  <div id="pos-today-summary"></div>
+  <div id="pos-receipt-modal" class="hidden"><div id="pos-receipt-body"></div></div>
+
+  <div id="view-purchase">
+    <input id="po-search" type="text">
+    <select id="po-cat-filter"></select>
+    <select id="po-seller"></select>
+    <select id="po-location"></select>
+    <button id="po-clear" type="button">Clear</button>
+    <button id="po-submit" type="button">Record purchase</button>
+    <button id="po-back-orders" type="button">Back</button>
+    <button id="po-add-seller" type="button">Add supplier</button>
+    <div id="po-product-grid"></div>
+    <div id="no-po-products" class="hidden"></div>
+    <div id="po-bill-items"></div>
+    <span id="po-item-count"></span>
+    <span id="po-total"></span>
+    <input id="po-paid" type="number" value="0">
+  </div>
+
+  <input id="parties-search" type="text">
+  <select id="parties-type-filter"><option value="">All</option><option value="seller">Seller</option></select>
+  <table><tbody id="parties-table-body"></tbody></table>
+  <div id="no-parties" class="hidden"></div>
+  <div id="party-modal" class="hidden">
+    <form id="party-form">
+      <h2 id="party-modal-title"></h2>
+      <input id="party-id">
+      <input id="party-name">
+      <select id="party-type">
+        <option value="seller">seller</option>
+        <option value="customer">customer</option>
+        <option value="both">both</option>
+      </select>
+      <input id="party-location">
+      <input id="party-phone">
+      <input id="party-gstin">
+      <button type="submit">Save party</button>
+    </form>
+  </div>
+
+  <div id="order-tabs">
+    <button class="tab active" data-tab="sales" type="button">Sales</button>
+    <button class="tab" data-tab="purchase" type="button">Purchase</button>
+  </div>
+  <div id="order-party-header"></div>
+  <div class="card">
+    <table>
+      <tbody id="orders-table-body"></tbody>
+    </table>
+  </div>
+  <div id="no-orders" class="hidden"></div>
+  <div id="order-detail-modal" class="hidden">
+    <div id="order-detail-title"></div>
+    <div id="order-detail-body"></div>
+    <div id="order-detail-footer"></div>
+  </div>
+
+  <pre id="result"></pre>
+
+  <script>
+    window.App = {
+      toasts: [],
+      lastView: null,
+      showToast(msg, type) { this.toasts.push({ msg: msg, type: type }); },
+      goTo(view) { this.lastView = view; },
+    };
+    window.Auth = {
+      ownerId() { return 'co_ui'; },
+      getUser() { return { id: 'user_ui', companyId: 'co_ui', name: 'Cafe', shopName: 'OceanZ Test', role: 'owner', gstin: '' }; },
+      getRole() { return 'owner'; },
+    };
+    window.SearchableSelect = { enhanceAll() {}, enhance() {}, refresh() {}, closeAll() {} };
+  </script>
+  <script src="/js/store.js"></script>
+  <script src="/js/parties.js"></script>
+  <script src="/js/pos.js"></script>
+  <script src="/js/purchase.js"></script>
+  <script src="/js/orders.js"></script>
+  <script>
+    const OWNER = 'co_ui';
+    const results = [];
+
+    function fail(msg) { throw new Error(msg); }
+    function lastToast() { return App.toasts[App.toasts.length - 1] || {}; }
+
+    function scenario(name, fn) {
+      try {
+        fn();
+        results.push({ name: name, pass: true });
+      } catch (err) {
+        results.push({ name: name, pass: false, detail: err && err.stack ? err.stack : String(err) });
+      }
+    }
+
+    function seed() {
+      Store.addLocation({ id: 'loc_ui', ownerId: OWNER, name: 'Cafe Counter', isDefault: true });
+      Store.addProduct({ id: 'tea', ownerId: OWNER, name: 'Tea', type: 'simple', sku: 'TEA', price: 100, costPrice: 40, gstRate: 0, unit: 'cup' });
+      Store.addBatch({ id: 'tea-lot', productId: 'tea', locationId: 'loc_ui', qty: 5, unitCost: 40 });
+      Store.addProduct({ id: 'soda', ownerId: OWNER, name: 'Soda', type: 'simple', sku: 'SODA', price: 30, costPrice: 10, gstRate: 0, unit: 'btl' });
+      Store.addBatch({ id: 'soda-lot', productId: 'soda', locationId: 'loc_ui', qty: 1, unitCost: 10 });
+      Store.addProduct({ id: 'beans', ownerId: OWNER, name: 'Beans', type: 'raw', sku: 'BNS', price: 0, costPrice: 10, gstRate: 0, unit: 'kg' });
+      Store.addProduct({ id: 'cookie', ownerId: OWNER, name: 'Cookie', type: 'simple', sku: 'CK', price: 25, costPrice: 10, gstRate: 0, unit: 'pcs' });
+      Store.addBatch({ id: 'cookie-lot', productId: 'cookie', locationId: 'loc_ui', qty: 2, unitCost: 10 });
+      Store.addProduct({ id: 'rawbeans', ownerId: OWNER, name: 'Roast', type: 'raw', sku: 'RST', price: 0, costPrice: 1, unit: 'g' });
+      Store.addBatch({ id: 'raw-old', productId: 'rawbeans', locationId: 'loc_ui', qty: 0, unitCost: 1, createdAt: '2025-01-01T00:00:00.000Z', purchaseDate: '2025-01-01T00:00:00.000Z' });
+      Store.addBatch({ id: 'raw-new', productId: 'rawbeans', locationId: 'loc_ui', qty: 0, unitCost: 9, createdAt: '2026-06-01T00:00:00.000Z', purchaseDate: '2026-06-01T00:00:00.000Z' });
+      Store.addProduct({
+        id: 'latte', ownerId: OWNER, name: 'Latte', type: 'complex', sku: 'LAT', price: 120, costPrice: 0, gstRate: 0, unit: 'cup',
+        recipe: { outputQty: 1, ingredients: [{ productId: 'rawbeans', qty: 10 }] },
+      });
+    }
+
+    function boot() {
+      seed();
+      POS.init();
+      Purchase.init();
+      Parties.init();
+      Orders.init();
+      POS.refresh();
+      Purchase.refresh();
+    }
+
+    boot();
+
+    scenario('Complete Sale stays clickable on an empty bill', () => {
+      const btn = document.getElementById('pos-checkout-btn');
+      if (btn.disabled) fail('checkout button is disabled');
+      btn.click();
+      if (lastToast().msg !== 'Add a product to the bill first') fail('toast was ' + lastToast().msg);
+    });
+
+    scenario('Complete Sale reduces stock and opens the receipt', () => {
+      POS.addToBill('tea');
+      document.getElementById('pos-checkout-btn').click();
+      if (Store.getBatchQty('tea', 'loc_ui') !== 4) fail('tea qty ' + Store.getBatchQty('tea', 'loc_ui'));
+      const modal = document.getElementById('pos-receipt-modal');
+      if (modal.classList.contains('hidden')) fail('receipt modal stayed hidden');
+      if (!document.getElementById('pos-receipt-body').textContent.includes('RCT-')) fail('receipt has no number');
+      if (lastToast().msg !== 'Sale completed! Stock updated.') fail('toast was ' + lastToast().msg);
+    });
+
+    scenario('Complete Sale reports a stock miss and leaves quantity', () => {
+      POS.addToBill('soda');
+      Store.updateBatch('soda-lot', { qty: 0 });
+      document.getElementById('pos-checkout-btn').click();
+      if (Store.getBatchQty('soda', 'loc_ui') !== 0) fail('soda qty changed');
+      if (!/Not enough stock/.test(lastToast().msg || '')) fail('toast was ' + lastToast().msg);
+      POS.clearBill();
+    });
+
+    scenario('Add supplier opens the party form and selects the new seller', () => {
+      document.getElementById('po-add-seller').click();
+      const modal = document.getElementById('party-modal');
+      if (modal.classList.contains('hidden')) fail('party modal stayed hidden');
+      if (document.getElementById('party-type').value !== 'seller') fail('default type ' + document.getElementById('party-type').value);
+      document.getElementById('party-name').value = 'Farm Co';
+      document.getElementById('party-form').requestSubmit();
+      const sel = document.getElementById('po-seller');
+      if (!sel.value) fail('supplier was not selected');
+      if (modal.classList.contains('hidden') === false) fail('party modal stayed open');
+    });
+
+    scenario('Record purchase asks for a supplier, then updates stock', () => {
+      const sel = document.getElementById('po-seller');
+      const sellerId = sel.value;
+      sel.value = '';
+      document.getElementById('po-submit').click();
+      if (lastToast().msg !== 'Select a supplier') fail('toast was ' + lastToast().msg);
+      sel.value = sellerId;
+      Purchase.add('beans');
+      document.getElementById('po-paid').value = '10';
+      document.getElementById('po-submit').click();
+      if (Store.getBatchQty('beans', 'loc_ui') !== 1) fail('beans qty ' + Store.getBatchQty('beans', 'loc_ui'));
+      if (lastToast().msg !== 'Purchase recorded. Stock & Khata updated.') fail('toast was ' + lastToast().msg);
+      if (App.lastView !== 'orders') fail('landed on ' + App.lastView);
+    });
+
+    scenario('Receive on a pending purchase increases stock', () => {
+      const sellerId = document.getElementById('po-seller').value;
+      const before = Store.getBatchQty('cookie', 'loc_ui');
+      Store.createManualPurchase(OWNER, sellerId, [{ productId: 'cookie', name: 'Cookie', qty: 3, unitPrice: 10 }], 'loc_ui');
+      document.querySelector('#order-tabs .tab[data-tab="purchase"]').click();
+      const recv = [...document.querySelectorAll('#orders-table-body button')].find(b => b.textContent.trim() === 'Receive');
+      if (!recv) fail('Receive button missing. Table: ' + document.getElementById('orders-table-body').textContent);
+      recv.click();
+      if (Store.getBatchQty('cookie', 'loc_ui') !== before + 3) fail('cookie qty ' + Store.getBatchQty('cookie', 'loc_ui'));
+      if (lastToast().msg !== 'Purchase received. Stock updated.') fail('toast was ' + lastToast().msg);
+    });
+
+    scenario('Tracked make-to-order cannot be added without ingredients', () => {
+      POS.clearBill();
+      POS.addToBill('latte');
+      if (lastToast().msg !== 'Not enough ingredients to make more') fail('toast was ' + lastToast().msg);
+      if (document.getElementById('pos-item-count').textContent !== '0') fail('latte was added to the bill');
+      if (Store.getBatchById('raw-old').qty !== 0 || Store.getBatchById('raw-new').qty !== 0) fail('ingredient qty changed');
+    });
+
+    scenario('Untracked make-to-order sells and keeps ingredient quantity', () => {
+      Store.addCompany({ id: OWNER, name: 'Cafe', trackIngredientStock: false });
+      POS.refresh();
+      POS.addToBill('latte');
+      document.getElementById('pos-checkout-btn').click();
+      if (Store.getBatchById('raw-old').qty !== 0 || Store.getBatchById('raw-new').qty !== 0) fail('ingredient qty changed');
+      const sale = Store.getPosSales(OWNER).slice(-1)[0];
+      if (!sale || sale.items[0].productId !== 'latte') fail('latte sale missing');
+      if (sale.items[0].costPrice !== 90) fail('costPrice ' + sale.items[0].costPrice);
+      if (document.getElementById('pos-receipt-modal').classList.contains('hidden')) fail('receipt hidden');
+    });
+
+    document.getElementById('result').textContent = JSON.stringify({ done: true, results: results });
+  </script>
+</body>
+</html>

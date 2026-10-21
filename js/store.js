@@ -610,24 +610,54 @@ const Store = (() => {
     if (!order) return { success: false, message: 'Order not found' };
     const loc = locationId || order.fulfillmentLocationId || (getDefaultLocation(order.sellerId) || {}).id;
     if (!loc) return { success: false, message: 'No location selected' };
-    // Verify every line can be satisfied from stock before consuming anything.
+    // Verify every line can be satisfied before any batch is reduced. Make-to-order
+    // lines used to consume ingredients inside this loop, so a later short line
+    // left raw stock already deducted.
     const plan = [];
+    const ingredientNeed = {};
+    const simpleNeed = {};
     for (const i of order.items) {
       const product = getProductById(i.productId);
       if (product && isMakeToOrder(product)) {
-        const res = consumeForSale(product, loc, i.qty);
-        if (!res.success) return { success: false, message: 'Not enough ingredients for ' + (i.name || product.name) };
-        plan.push({ item: i, cost: res.cost });
+        const untracked = product.ownerId && !tracksIngredientStock(product.ownerId);
+        if (!untracked) {
+          const check = checkBom(product, loc, i.qty);
+          if (!check.ok) return { success: false, message: 'Not enough ingredients for ' + (i.name || product.name) };
+          _bomNeeds(product, i.qty).forEach(n => {
+            ingredientNeed[n.productId] = (ingredientNeed[n.productId] || 0) + n.qty;
+          });
+        }
+        plan.push({ item: i, mto: true, product });
       } else {
         const picks = pickLots(i.productId, loc, i.qty, (lotChoices || {})[i.productId]);
         if (!picks) return { success: false, message: 'Not enough stock of ' + i.name + ' at this location' };
-        plan.push({ item: i, picks });
+        simpleNeed[i.productId] = (simpleNeed[i.productId] || 0) + i.qty;
+        plan.push({ item: i, picks: true });
       }
     }
-    plan.forEach(p => {
-      if (p.picks) p.item.costPrice = consumeLots(p.picks) / Math.max(1, p.item.qty);
-      else p.item.costPrice = (p.cost || 0) / Math.max(1, p.item.qty);
-    });
+    for (const pid of Object.keys(ingredientNeed)) {
+      if (getBatchQty(pid, loc) + 1e-6 < ingredientNeed[pid]) {
+        const ip = getProductById(pid);
+        return { success: false, message: 'Not enough ingredients for ' + (ip ? ip.name : 'ingredient') };
+      }
+    }
+    for (const pid of Object.keys(simpleNeed)) {
+      if (getBatchQty(pid, loc) + 1e-6 < simpleNeed[pid]) {
+        const prod = getProductById(pid);
+        return { success: false, message: 'Not enough stock of ' + (prod ? prod.name : pid) + ' at this location' };
+      }
+    }
+    for (const p of plan) {
+      if (p.mto) {
+        const res = consumeForSale(p.product, loc, p.item.qty);
+        if (!res.success) return { success: false, message: 'Not enough ingredients for ' + (p.item.name || p.product.name) };
+        p.item.costPrice = res.cost / Math.max(1, p.item.qty);
+      } else {
+        const picks = pickLots(p.item.productId, loc, p.item.qty, (lotChoices || {})[p.item.productId]);
+        if (!picks) return { success: false, message: 'Not enough stock of ' + p.item.name + ' at this location' };
+        p.item.costPrice = consumeLots(picks) / Math.max(1, p.item.qty);
+      }
+    }
     _setOrder(orderId, o => { o.items = order.items; });
     const paid = Math.max(0, amountReceived || 0);
     const balance = order.total - paid;
