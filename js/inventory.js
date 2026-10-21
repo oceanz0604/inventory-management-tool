@@ -8,6 +8,8 @@ const Inventory = (() => {
     document.getElementById('add-stock-btn').addEventListener('click', () => openBatchModal());
     document.getElementById('add-first-stock-btn').addEventListener('click', () => openBatchModal());
     document.getElementById('stock-form').addEventListener('submit', _handleSubmit);
+    const moveForm = document.getElementById('move-form');
+    if (moveForm) moveForm.addEventListener('submit', _handleMove);
     document.getElementById('inventory-search').addEventListener('input', render);
     document.getElementById('filter-location').addEventListener('change', render);
     document.getElementById('filter-category').addEventListener('change', render);
@@ -102,23 +104,33 @@ const Inventory = (() => {
       const isOpen = !!expanded[key];
       const type = s.product.type || 'simple';
       const mto = Store.isMakeToOrder(s.product);
+      const ready = Store.getBatchQty(s.productId, s.locationId);
       const makeable = mto ? Store.maxMakeQty(s.product, s.locationId) : s.quantity;
-      const badge = mto
-        ? (makeable > 0 ? '<span class="badge badge-success">Can make ' + makeable + '</span>' : '<span class="badge badge-warning">MTO · short</span>')
-        : s.quantity === 0 ? '<span class="badge badge-danger">Out</span>' : s.quantity <= s.minStock ? '<span class="badge badge-warning">Low</span>' : '<span class="badge badge-success">In Stock</span>';
+      let badge;
+      if (mto) {
+        if (ready > 0 && makeable > 0 && makeable !== Infinity) badge = '<span class="badge badge-success">' + ready + ' ready · can make ' + makeable + '</span>';
+        else if (ready > 0) badge = '<span class="badge badge-success">' + ready + ' ready</span>';
+        else if (makeable === Infinity || makeable > 0) badge = '<span class="badge badge-success">' + (makeable === Infinity ? 'Open' : 'Can make ' + makeable) + '</span>';
+        else badge = '<span class="badge badge-warning">MTO · short</span>';
+      } else {
+        badge = s.quantity === 0 ? '<span class="badge badge-danger">Out</span>' : s.quantity <= s.minStock ? '<span class="badge badge-warning">Low</span>' : '<span class="badge badge-success">In Stock</span>';
+      }
       const lots = Store.getBatchesByProduct(s.productId, s.locationId).filter(b => b.qty > 0).sort((a, b) => {
         const ax = a.expiryDate ? new Date(a.expiryDate).getTime() : Infinity;
         const bx = b.expiryDate ? new Date(b.expiryDate).getTime() : Infinity;
         return ax - bx;
       });
       const lotCount = lots.length;
+      const qtyCell = mto
+        ? '<strong>' + ready + '</strong> <span style="color:var(--text-light);font-size:.75rem">ready' + (makeable === Infinity ? ' · open' : ' · ' + makeable + ' can make') + '</span>'
+        : '<strong>' + s.quantity + '</strong> <span style="color:var(--text-light);font-size:.75rem">(' + lotCount + ' lot' + (lotCount !== 1 ? 's' : '') + ')</span>';
 
       const main = '<tr>' +
         '<td>' + (lotCount ? '<button class="btn-icon" onclick="Inventory.toggle(\'' + key + '\')"><i class="fas fa-chevron-' + (isOpen ? 'down' : 'right') + '"></i></button>' : '') + '</td>' +
         '<td><strong>' + _esc(s.product.name) + '</strong> <code style="background:var(--bg);padding:1px 5px;border-radius:4px;font-size:.72rem">' + _esc(s.product.sku) + '</code></td>' +
         '<td><span class="type-pill ' + type + '">' + (mto ? 'Make to order' : ({ raw: 'Raw', simple: 'Simple', complex: 'Complex' }[type])) + '</span></td>' +
         '<td>' + _esc(s.location.name) + '</td>' +
-        '<td><strong>' + (mto ? makeable : s.quantity) + '</strong> <span style="color:var(--text-light);font-size:.75rem">' + (mto ? 'makeable' : '(' + lotCount + ' lot' + (lotCount !== 1 ? 's' : '') + ')') + '</span></td>' +
+        '<td>' + qtyCell + '</td>' +
         '<td>' + s.minStock + '</td>' +
         '<td>' + badge + '</td>' +
         '<td><div class="action-btns">' +
@@ -144,6 +156,7 @@ const Inventory = (() => {
           '<td>' + (sup ? _esc(sup) : (b.note ? '<span style="color:var(--text-light)">' + _esc(b.note) + '</span>' : '—')) + '</td>' +
           '<td><div class="action-btns">' +
           '<button class="btn-icon edit" title="Edit lot" onclick="Inventory.openBatchModal(\'' + b.id + '\')"><i class="fas fa-pen"></i></button>' +
+          '<button class="btn-icon" title="Move lot" onclick="Inventory.openMove(\'' + b.id + '\')"><i class="fas fa-right-left"></i></button>' +
           '<button class="btn-icon delete" title="Delete lot" onclick="Inventory.deleteBatch(\'' + b.id + '\')"><i class="fas fa-trash-can"></i></button>' +
           '</div></td></tr>';
       }).join('');
@@ -248,6 +261,40 @@ const Inventory = (() => {
     Dashboard.refresh();
   }
 
+  function openMove(batchId) {
+    const b = Store.getBatchById(batchId);
+    if (!b) return;
+    const locs = Store.getLocationsByOwner(Auth.ownerId()).filter(l => l.id !== b.locationId);
+    if (!locs.length) { App.showToast('Add another location before moving a lot', 'warning'); return; }
+    const prod = Store.getProductById(b.productId);
+    const from = Store.getLocationById(b.locationId);
+    document.getElementById('move-batch-id').value = b.id;
+    document.getElementById('move-hint').textContent = (prod ? prod.name : 'This lot') + ' · ' + (b.batchNumber || 'lot') + ' is at ' + (from ? from.name : 'this location') + ' (' + b.qty + ' on hand). Cost and expiry stay with the lot.';
+    document.getElementById('move-location').innerHTML = locs.map(l => '<option value="' + l.id + '">' + _esc(l.name) + '</option>').join('');
+    const qty = document.getElementById('move-qty');
+    qty.max = b.qty;
+    qty.value = b.qty;
+    SearchableSelect.enhanceAll(document.getElementById('move-modal'));
+    document.getElementById('move-modal').classList.remove('hidden');
+  }
+
+  function _handleMove(e) {
+    e.preventDefault();
+    const id = document.getElementById('move-batch-id').value;
+    const to = document.getElementById('move-location').value;
+    const qty = parseFloat(document.getElementById('move-qty').value);
+    const res = Store.transferBatch(id, to, qty);
+    if (!res || res.success === false) {
+      App.showToast((res && res.message) || 'Could not move this lot', 'error');
+      return;
+    }
+    document.getElementById('move-modal').classList.add('hidden');
+    App.showToast('Lot moved', 'success');
+    render();
+    if (window.Products) Products.render();
+    Dashboard.refresh();
+  }
+
   function deleteBatch(batchId) {
     const b = Store.getBatchById(batchId);
     if (!b) return;
@@ -268,5 +315,5 @@ const Inventory = (() => {
 
   function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-  return { init, render, openBatchModal, openMin, toggle, deleteBatch, refreshFilters };
+  return { init, render, openBatchModal, openMin, openMove, toggle, deleteBatch, refreshFilters };
 })();

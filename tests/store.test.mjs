@@ -397,4 +397,159 @@ describe("store business rules", { concurrency: false }, () => {
     assert.equal(Store.getCart().sellerId, "seller-a");
     assert.equal(Store.getCartItemCount(), 1);
   });
+
+  test("produced cups sell first and wastage applies only to cups still made to order", () => {
+    const { Store } = loadStore();
+    const owner = "co_ready";
+    const loc = company(Store, owner);
+    Store.addProduct({ id: "milk", ownerId: owner, name: "Milk", type: "raw", sku: "MLK", price: 0, costPrice: 0.1, unit: "ml" });
+    Store.addProduct({ id: "beans", ownerId: owner, name: "Beans", type: "raw", sku: "BNS", price: 0, costPrice: 2, unit: "g" });
+    Store.addProduct({
+      id: "chai", ownerId: owner, name: "Cutting Chai", type: "complex", sku: "CHAI", price: 40, unit: "cup",
+      recipe: { outputQty: 1, ingredients: [
+        { productId: "beans", qty: 8, wastagePct: 0 },
+        { productId: "milk", qty: 50, wastagePct: 10 },
+      ] },
+    });
+    Store.addBatch({ id: "milk-early", productId: "milk", locationId: loc.id, qty: 80, unitCost: 0.1, expiryDate: "2026-11-01" });
+    Store.addBatch({ id: "milk-late", productId: "milk", locationId: loc.id, qty: 50, unitCost: 0.2, expiryDate: "2026-12-15" });
+    Store.addBatch({ id: "beans-lot", productId: "beans", locationId: loc.id, qty: 40, unitCost: 2 });
+
+    const made = Store.produceComplex("chai", loc.id, 1);
+    assert.equal(made.success, true);
+    assert.equal(Store.getBatchById("beans-lot").qty, 32);
+    assert.equal(Store.getBatchById("milk-early").qty, 25);
+    const finished = Store.getBatchesByProduct("chai", loc.id).find(b => b.qty > 0);
+    assert.equal(finished.batchNumber.startsWith("PROD-"), true);
+    assert.equal(Store.availableSellQty(Store.getProductById("chai"), loc.id), 2);
+
+    const soldReady = Store.createPosSale(owner, loc.id, [{ productId: "chai", name: "Cutting Chai", price: 40, qty: 1 }], "cash");
+    assert.equal(soldReady.success, true);
+    assert.equal(Store.getBatchById(finished.id).qty, 0);
+    assert.equal(soldReady.sale.items[0].costPrice, 21.5);
+    assert.equal(Store.getBatchById("beans-lot").qty, 32);
+    assert.equal(Store.getBatchById("milk-early").qty, 25);
+
+    const mixed = Store.createPosSale(owner, loc.id, [{ productId: "chai", name: "Cutting Chai", price: 40, qty: 1 }], "cash");
+    assert.equal(mixed.success, true);
+    assert.equal(Store.getBatchById("beans-lot").qty, 24);
+    assert.equal(Store.getBatchById("milk-early").qty, 0);
+    assert.equal(Store.getBatchById("milk-late").qty, 20);
+    assert.equal(mixed.sale.items[0].costPrice, 24.5);
+
+    const beansLeft = Store.getBatchQty("beans", loc.id);
+    const milkLeft = Store.getBatchQty("milk", loc.id);
+    const tooMany = Store.createPosSale(owner, loc.id, [{ productId: "chai", name: "Cutting Chai", price: 40, qty: 1 }], "cash");
+    assert.equal(tooMany.success, false);
+    assert.equal(Store.getPosSales(owner).length, 2);
+    assert.equal(Store.getBatchQty("beans", loc.id), beansLeft);
+    assert.equal(Store.getBatchQty("milk", loc.id), milkLeft);
+  });
+
+  test("a raw line and a recipe share one ingredient pool", () => {
+    const { Store } = loadStore();
+    const owner = "co_pool";
+    const loc = company(Store, owner);
+    Store.addProduct({ id: "beans", ownerId: owner, name: "Beans", type: "raw", sku: "BNS", price: 2, costPrice: 2, unit: "g" });
+    Store.addProduct({
+      id: "chai", ownerId: owner, name: "Cutting Chai", type: "complex", sku: "CHAI", price: 40, unit: "cup",
+      recipe: { outputQty: 1, ingredients: [{ productId: "beans", qty: 8 }] },
+    });
+    Store.addBatch({ id: "beans-lot", productId: "beans", locationId: loc.id, qty: 10, unitCost: 2 });
+    const share = Store.createPosSale(owner, loc.id, [
+      { productId: "beans", name: "Beans", price: 2, qty: 8 },
+      { productId: "chai", name: "Cutting Chai", price: 40, qty: 1 },
+    ], "cash");
+    assert.equal(share.success, false);
+    assert.equal(Store.getBatchQty("beans", loc.id), 10);
+    assert.equal(Store.getPosSales(owner).length, 0);
+  });
+
+  test("a lot can move in full or in part and keeps its cost and expiry", () => {
+    const { Store } = loadStore();
+    const owner = "co_move";
+    const counter = company(Store, owner);
+    const dry = Store.addLocation({ id: "loc_dry", ownerId: owner, name: "Dry Store" });
+    Store.addProduct({ id: "milk", ownerId: owner, name: "Milk", type: "raw", sku: "MLK", price: 0, costPrice: 0.2, unit: "ml" });
+    Store.addBatch({ id: "milk-lot", productId: "milk", locationId: dry.id, qty: 120, unitCost: 0.2, expiryDate: "2026-12-20", batchNumber: "MILK-1" });
+    assert.equal(Store.transferBatch("milk-lot", dry.id, 10).success, false);
+    assert.equal(Store.transferBatch("milk-lot", counter.id, 500).success, false);
+    assert.equal(Store.getBatchQty("milk", dry.id), 120);
+
+    const part = Store.transferBatch("milk-lot", counter.id, 50);
+    assert.equal(part.success, true);
+    assert.equal(part.batch.unitCost, 0.2);
+    assert.equal(part.batch.expiryDate, "2026-12-20");
+    assert.equal(part.batch.batchNumber, "MILK-1");
+    assert.equal(part.batch.locationId, counter.id);
+    assert.equal(Store.getBatchQty("milk", dry.id), 70);
+    assert.equal(Store.getBatchQty("milk", counter.id), 50);
+    assert.equal(Store.getStockRecord("milk", dry.id).quantity, 70);
+    assert.equal(Store.getStockRecord("milk", counter.id).quantity, 50);
+
+    const rest = Store.transferBatch("milk-lot", counter.id, 70);
+    assert.equal(rest.success, true);
+    assert.equal(Store.getBatchById("milk-lot").locationId, counter.id);
+    assert.equal(Store.getBatchQty("milk", dry.id), 0);
+    assert.equal(Store.getBatchQty("milk", counter.id), 120);
+    assert.equal(Store.getStockRecord("milk", dry.id).quantity, 0);
+  });
+
+  test("an untracked company sells a produced batch and does not touch ingredients", () => {
+    const { Store } = loadStore();
+    const owner = "co_untracked_ready";
+    const loc = company(Store, owner, { trackIngredientStock: false });
+    Store.addProduct({ id: "beans", ownerId: owner, name: "Beans", type: "raw", sku: "BNS", price: 0, costPrice: 1, unit: "g" });
+    Store.addProduct({
+      id: "cup", ownerId: owner, name: "Espresso", type: "complex", sku: "ESP", price: 90, unit: "cup",
+      recipe: { outputQty: 1, ingredients: [{ productId: "beans", qty: 10 }] },
+    });
+    Store.addBatch({ id: "old", productId: "beans", locationId: loc.id, qty: 4, unitCost: 1, createdAt: "2025-01-01T00:00:00.000Z" });
+    Store.addBatch({ id: "newer-empty", productId: "beans", locationId: loc.id, qty: 0, unitCost: 9, createdAt: "2026-06-01T00:00:00.000Z" });
+    const made = Store.produceComplex("cup", loc.id, 1);
+    assert.equal(made.success, true);
+    assert.equal(Store.getBatchById("old").qty, 4);
+    const result = Store.createPosSale(owner, loc.id, [{ productId: "cup", name: "Espresso", price: 90, qty: 2 }], "cash");
+    assert.equal(result.success, true);
+    assert.equal(result.sale.consumedLots.length, 1);
+    assert.equal(result.sale.consumedLots[0].productId, "cup");
+    assert.equal(Store.getBatchQty("cup", loc.id), 0);
+    assert.equal(Store.getBatchById("old").qty, 4);
+    assert.equal(result.sale.items[0].costPrice, 90);
+  });
+
+  test("a short-paid field sale of a produced cup does not deduct the recipe again", () => {
+    const { Store } = loadStore();
+    const owner = "co_field_ready";
+    const loc = company(Store, owner);
+    Store.addProduct({ id: "beans", ownerId: owner, name: "Beans", type: "raw", sku: "BNS", price: 0, costPrice: 2, unit: "g" });
+    Store.addProduct({
+      id: "cup", ownerId: owner, name: "Espresso", type: "complex", sku: "ESP", price: 80, unit: "cup",
+      recipe: { outputQty: 1, ingredients: [{ productId: "beans", qty: 10 }] },
+    });
+    Store.addBatch({ id: "beans-lot", productId: "beans", locationId: loc.id, qty: 30, unitCost: 2 });
+    Store.produceComplex("cup", loc.id, 1);
+    const beansAfter = Store.getBatchQty("beans", loc.id);
+    const customer = Store.addParty({ ownerId: owner, name: "Ramesh", type: "customer" });
+    const order = Store.createFieldSale(owner, customer.id, [{ productId: "cup", name: "Espresso", qty: 1, unitPrice: 80 }]);
+    const done = Store.fulfillFieldSale(order.id, 30, loc.id);
+    assert.equal(done.success, true);
+    assert.equal(done.order.status, "open");
+    assert.equal(Store.getBatchQty("cup", loc.id), 0);
+    assert.equal(Store.getBatchQty("beans", loc.id), beansAfter);
+    assert.equal(Store.getKhataBalance(owner, customer.id), 50);
+  });
+
+  test("delivering an order that is short leaves stock and status unchanged", () => {
+    const { Store } = loadStore();
+    const owner = "co_deliver_short";
+    const loc = company(Store, owner);
+    Store.addProduct({ id: "tea", ownerId: owner, name: "Tea", type: "simple", sku: "TEA", price: 20, costPrice: 8, unit: "cup" });
+    Store.addBatch({ id: "tea-lot", productId: "tea", locationId: loc.id, qty: 1, unitCost: 8 });
+    const order = Store.createOrder("buyer_x", owner, [{ productId: "tea", name: "Tea", sku: "TEA", qty: 3, unitPrice: 20 }]);
+    const updated = Store.updateOrderStatus(order.id, "delivered", loc.id);
+    assert.equal(updated, null);
+    assert.equal(Store.getOrderById(order.id).status, "pending");
+    assert.equal(Store.getBatchQty("tea", loc.id), 1);
+  });
 });

@@ -6,7 +6,7 @@ const Products = (() => {
   const TYPE_HINTS = {
     raw: 'Bought as ingredients (in batches at different rates). Never sold or published. No selling price.',
     simple: 'Bought from vendors in batches and resold as-is. Cost is the weighted average of your purchase batches.',
-    complex: 'Make to order — each sale deducts recipe ingredients. Produce is optional if you want finished lots on the shelf.',
+    complex: 'Make to order — a sale uses finished cups on the shelf first, then the recipe (including wastage) for the rest. Produce builds those finished lots.',
   };
 
   function _currentType() { return document.getElementById('product-type').value || 'simple'; }
@@ -167,9 +167,17 @@ const Products = (() => {
       const typeLabel = type === 'complex' ? 'Make to order' : ({ raw: 'Raw', simple: 'Simple' }[type] || type);
       const loc = Store.getDefaultLocation(Auth.ownerId());
       const trackIng = Store.tracksIngredientStock(p.ownerId);
-      const stockLabel = Store.isMakeToOrder(p) && loc
-        ? (trackIng ? Store.maxMakeQty(p, loc.id) + ' makeable' : 'Not tracked')
-        : totalStock.toLocaleString();
+      let stockLabel = totalStock.toLocaleString();
+      if (Store.isMakeToOrder(p) && loc) {
+        if (!trackIng) stockLabel = 'Not tracked';
+        else {
+          const ready = Store.getBatchQty(p.id, loc.id);
+          const make = Store.maxMakeQty(p, loc.id);
+          if (ready > 0 && make > 0) stockLabel = ready + ' ready · ' + make + ' makeable';
+          else if (ready > 0) stockLabel = ready + ' ready';
+          else stockLabel = make + ' makeable';
+        }
+      }
 
       let actions = '<button class="btn-icon edit" title="Open" onclick="Products.openDetail(\'' + p.id + '\')"><i class="fas fa-arrow-up-right-from-square"></i></button>';
       if (type === 'complex') actions = '<button class="btn-icon" title="Produce" onclick="event.stopPropagation();Products.openProduce(\'' + p.id + '\')"><i class="fas fa-industry"></i></button>' + actions;
@@ -472,7 +480,9 @@ const Products = (() => {
     const margin = sell > 0 ? ((sell - cost) / sell * 100) : 0;
     const trackIng = Store.tracksIngredientStock(p.ownerId);
     const makeable = locId && mto ? Store.maxMakeQty(p, locId) : Store.getTotalStockForProduct(p.id);
-    const makeText = mto && !trackIng ? 'Not tracked' : (makeable === Infinity ? '—' : makeable);
+    const readyQty = locId && mto ? Store.getBatchQty(p.id, locId) : 0;
+    const sellableQty = mto && trackIng && makeable !== Infinity ? readyQty + makeable : makeable;
+    const makeText = mto && !trackIng ? 'Not tracked' : (sellableQty === Infinity ? '—' : sellableQty);
     const cat = Store.getCategoryById(p.categoryId);
     document.getElementById('pd-hero').innerHTML =
       '<div class="pd-hero-text"><h2>' + _esc(p.name) + '</h2>' +
@@ -483,7 +493,7 @@ const Products = (() => {
       '<div><span>Sell</span><strong>\u20B9' + sell.toFixed(2) + '</strong></div>' +
       '<div><span>Cost</span><strong>\u20B9' + cost.toFixed(2) + '</strong></div>' +
       '<div><span>Margin</span><strong>' + (sellable ? margin.toFixed(1) + '%' : '—') + '</strong></div>' +
-      '<div><span>' + (mto && !trackIng ? 'Ingredients' : (mto ? 'Can make' : 'Stock')) + '</span><strong>' + makeText + '</strong></div></div>';
+      '<div><span>' + (mto && !trackIng ? 'Ingredients' : (mto ? 'Can sell' : 'Stock')) + '</span><strong>' + makeText + '</strong></div></div>';
 
     document.getElementById('pd-type').value = type;
     document.getElementById('pd-name').value = p.name || '';
@@ -527,7 +537,8 @@ const Products = (() => {
         const ok = have + 1e-6 >= need;
         return '<tr><td>' + _esc(ip ? ip.name : '?') + '</td><td>' + (Math.round(need * 1000) / 1000) + ' ' + _esc((ip && ip.unit) || '') + (ing.wastagePct ? ' (incl. ' + ing.wastagePct + '% waste)' : '') + '</td><td>' + (Math.round(have * 1000) / 1000) + '</td><td>' + (ok ? '<span class="badge badge-success">OK</span>' : '<span class="badge badge-danger">Short</span>') + '</td></tr>';
       }).join('');
-      bomBody.innerHTML = '<p class="form-hint">At ' + _esc(loc.name) + ' you can make <strong>' + makeable + '</strong> right now.</p>' +
+      const readyHere = Store.getBatchQty(p.id, locId);
+      bomBody.innerHTML = '<p class="form-hint">At ' + _esc(loc.name) + ' there are <strong>' + readyHere + '</strong> ready and you can make <strong>' + makeable + '</strong> more.</p>' +
         '<div class="table-wrap"><table class="data-table"><thead><tr><th>Ingredient</th><th>Per plate</th><th>On hand</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>';
     } else if (type === 'complex') {
       bomBody.innerHTML = '<p class="form-hint">Add a recipe and a default location to see make-to-order availability.</p>';

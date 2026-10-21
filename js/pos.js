@@ -54,7 +54,15 @@ const POS = (() => {
       const icon = catIcons[p.categoryId] || 'fa-box';
       const inBill = bill.find(b => b.productId === p.id);
       const billQty = inBill ? inBill.qty : 0;
-      const stockLabel = mto && !trackIng ? 'Always available' : (mto ? qty + ' can make' : qty + ' in stock');
+      let stockLabel = qty + ' in stock';
+      if (mto && !trackIng) stockLabel = 'Always available';
+      else if (mto) {
+        const ready = Store.getBatchQty(p.id, locId);
+        const make = Store.maxMakeQty(p, locId);
+        if (ready > 0 && make > 0) stockLabel = ready + ' ready · ' + make + ' can make';
+        else if (ready > 0) stockLabel = ready + ' ready';
+        else stockLabel = make + ' can make';
+      }
       return '<div class="pos-item-card ' + (billQty > 0 ? 'in-bill' : '') + '" onclick="POS.addToBill(\'' + p.id + '\')">' +
         '<div class="pos-item-icon"><i class="fas ' + icon + '"></i></div>' +
         '<div class="pos-item-name">' + _esc(p.name) + '</div>' +
@@ -140,7 +148,7 @@ const POS = (() => {
       subtotal += lineTotal;
       gst += lineGst;
       itemCount += b.qty;
-      const lots = locId && !Store.isMakeToOrder(Store.getProductById(b.productId) || {}) ? Store.availableLots(b.productId, locId) : [];
+      const lots = locId ? Store.availableLots(b.productId, locId) : [];
       let lotPicker = '';
       if (lots.length > 1) {
         lotPicker = '<div class="pos-bill-lot"><select onchange="POS.setLot(\'' + b.productId + '\',this.value)">' +

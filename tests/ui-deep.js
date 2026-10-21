@@ -858,6 +858,198 @@
       assert($('chart-pnl'), 'pnl chart');
     });
 
+    await scenario('Cafe day: buy milk into the dry store, move it, sell a recipe, then sell the produced cup', async function () {
+      function toasts() { return document.querySelectorAll('#toast-container .toast span').length; }
+      async function waitToast(part) {
+        const before = toasts();
+        return waitFor(function () { return toasts() > before && lastToast().indexOf(part) >= 0; }, lastToast());
+      }
+      async function buyMilk(qty, cost, expiry, paid) {
+        App.goTo('purchase');
+        if (text('po-item-count') !== '0') $('po-clear').click();
+        setVal('po-search', '');
+        setVal('po-cat-filter', '');
+        setVal('po-location', 'loc_store');
+        setVal('po-search', 'milk');
+        const card = Array.from(document.querySelectorAll('#po-product-grid .pos-item-card')).find(function (c) { return c.textContent.indexOf('Milk') >= 0; });
+        assert(card, 'milk was not on the purchase grid');
+        card.click();
+        setVal(document.querySelector('.po-qty'), String(qty));
+        setVal(document.querySelector('.po-cost'), String(cost));
+        setVal(document.querySelector('.po-expiry'), expiry);
+        if (!$('po-seller').value) {
+          const opt = Array.from($('po-seller').options).find(function (o) { return o.textContent.indexOf('Valley') >= 0; });
+          assert(opt, 'supplier missing');
+          setVal('po-seller', opt.value);
+        }
+        setVal('po-paid', String(paid));
+        const before = toasts();
+        $('po-submit').click();
+        await waitFor(function () { return toasts() > before && lastToast().indexOf('Purchase recorded') >= 0; }, lastToast());
+      }
+
+      App.goTo('products');
+      $('add-product-btn').click();
+      assert(!hidden('product-modal'), 'product modal');
+      setVal('product-type', 'raw');
+      setVal('product-name', 'Milk');
+      setVal('product-sku', 'MILK');
+      setVal('product-unit', 'ml');
+      const added = toasts();
+      $('product-form').requestSubmit();
+      await waitFor(function () { return toasts() > added && lastToast() === 'Product added'; }, lastToast());
+      const milk = Store.getProductsByOwner('co_test').find(function (p) { return p.name === 'Milk'; });
+      assert(milk, 'milk was not saved');
+
+      function isoDays(n) {
+        const d = new Date();
+        d.setDate(d.getDate() + n);
+        return d.toISOString().slice(0, 10);
+      }
+      await buyMilk(80, 0.1, isoDays(15), 8);
+      assert(Store.getBatchQty(milk.id, 'loc_store') === 80, 'first milk lot ' + Store.getBatchQty(milk.id, 'loc_store'));
+      await buyMilk(120, 0.2, isoDays(40), 24);
+      assert(Store.getBatchQty(milk.id, 'loc_store') === 200, 'both milk lots ' + Store.getBatchQty(milk.id, 'loc_store'));
+      const early = Store.getBatchesByProduct(milk.id, 'loc_store').filter(function (b) { return b.qty > 0; }).sort(function (a, b) {
+        return new Date(a.expiryDate) - new Date(b.expiryDate);
+      })[0];
+      const later = Store.getBatchesByProduct(milk.id, 'loc_store').filter(function (b) { return b.id !== early.id && b.qty > 0; })[0];
+      assert(early && later, 'expected two milk lots');
+
+      App.goTo('inventory');
+      setVal('inventory-search', 'milk');
+      setVal('filter-location', 'loc_store');
+      const milkRow = Array.from(document.querySelectorAll('#inventory-table-body tr')).find(function (r) {
+        return r.textContent.indexOf('Milk') >= 0 && r.querySelector('button');
+      });
+      assert(milkRow, 'milk row missing');
+      milkRow.querySelector('button').click();
+      await waitFor(function () { return text('inventory-table-body').indexOf(early.batchNumber) >= 0; }, 'milk lots');
+      function lotRow(num) {
+        return Array.from(document.querySelectorAll('#inventory-table-body tr')).find(function (r) {
+          return r.cells && r.cells[0] && r.cells[0].textContent.indexOf(num) >= 0;
+        });
+      }
+      lotRow(early.batchNumber).querySelector('button[title="Move lot"]').click();
+      assert(!hidden('move-modal'), 'move modal');
+      assert($('move-hint').textContent.indexOf('Dry Store') >= 0, $('move-hint').textContent);
+      setVal('move-location', 'loc_main');
+      const moved = toasts();
+      $('move-form').requestSubmit();
+      await waitFor(function () { return toasts() > moved && lastToast() === 'Lot moved'; }, lastToast());
+      assert(Store.getBatchById(early.id).locationId === 'loc_main', 'early lot stayed in the store');
+      assert(Store.getBatchQty(milk.id, 'loc_main') === 80, 'counter milk ' + Store.getBatchQty(milk.id, 'loc_main'));
+      lotRow(later.batchNumber).querySelector('button[title="Move lot"]').click();
+      setVal('move-qty', '50');
+      setVal('move-location', 'loc_main');
+      const movedPart = toasts();
+      $('move-form').requestSubmit();
+      await waitFor(function () { return toasts() > movedPart && lastToast() === 'Lot moved'; }, 'partial move ' + lastToast());
+      assert(Store.getBatchQty(milk.id, 'loc_store') === 70, 'store remainder ' + Store.getBatchQty(milk.id, 'loc_store'));
+      assert(Store.getBatchQty(milk.id, 'loc_main') === 130, 'counter after partial ' + Store.getBatchQty(milk.id, 'loc_main'));
+      assert(Store.getBatchesByProduct(milk.id, 'loc_main').some(function (b) { return b.unitCost === 0.2 && b.expiryDate === later.expiryDate && b.qty === 50; }), 'moved lot lost cost or expiry');
+      lotRow(later.batchNumber).querySelector('button[title="Edit lot"]').click();
+      assert($('stock-modal-title').textContent === 'Edit Batch', $('stock-modal-title').textContent);
+      setVal('stock-quantity', '60');
+      const edited = toasts();
+      $('stock-form').requestSubmit();
+      await waitFor(function () { return toasts() > edited && lastToast() === 'Batch updated'; }, lastToast());
+      assert(Store.getBatchQty(milk.id, 'loc_store') === 60, 'edited store qty ' + Store.getBatchQty(milk.id, 'loc_store'));
+
+      App.goTo('products');
+      $('add-product-btn').click();
+      setVal('product-type', 'complex');
+      setVal('product-name', 'Cutting Chai');
+      setVal('product-sku', 'CHAI');
+      setVal('product-unit', 'pcs');
+      setVal('product-price', '40');
+      setVal('product-gst', '5');
+      const firstIng = document.querySelector('#product-ingredients .ingredient-row');
+      assert(firstIng, 'recipe row missing');
+      setVal(firstIng.querySelector('.ing-product'), 'beans');
+      setVal(firstIng.querySelector('.ing-qty'), '8');
+      setVal(firstIng.querySelector('.ing-wastage'), '0');
+      $('product-add-ingredient').click();
+      const rows = document.querySelectorAll('#product-ingredients .ingredient-row');
+      assert(rows.length === 2, 'second ingredient missing');
+      setVal(rows[1].querySelector('.ing-product'), milk.id);
+      setVal(rows[1].querySelector('.ing-qty'), '50');
+      setVal(rows[1].querySelector('.ing-wastage'), '10');
+      const expectedCost = Store.calcMakingCost({
+        recipe: { outputQty: 1, ingredients: [
+          { productId: 'beans', qty: 8, wastagePct: 0 },
+          { productId: milk.id, qty: 50, wastagePct: 10 },
+        ] },
+      });
+      assert($('product-makingcost').value === '\u20B9' + expectedCost.toFixed(2), $('product-makingcost').value + ' vs ' + expectedCost);
+      const saved = toasts();
+      $('product-form').requestSubmit();
+      await waitFor(function () { return toasts() > saved && lastToast() === 'Product added'; }, lastToast());
+      const chai = Store.getProductsByOwner('co_test').find(function (p) { return p.name === 'Cutting Chai'; });
+      assert(chai && chai.recipe.ingredients[1].wastagePct === 10, 'wastage was not saved');
+      byText('#products-table-body tr', 'Cutting Chai').querySelector('.btn-icon.edit').click();
+      assert(viewOn('product-detail'), 'chai detail');
+      assert(text('pd-bom-body').indexOf('55') >= 0 && text('pd-bom-body').indexOf('10% waste') >= 0, text('pd-bom-body'));
+
+      const beansBefore = Store.getBatchQty('beans', 'loc_main');
+      const earlyBefore = Store.getBatchById(early.id).qty;
+      App.goTo('pos');
+      if (text('pos-item-count') !== '0') $('pos-clear-bill').click();
+      setVal('pos-location', 'loc_main');
+      setVal('pos-search', 'chai');
+      const chaiCard = Array.from(document.querySelectorAll('#pos-product-grid .pos-item-card')).find(function (c) { return c.textContent.indexOf('Cutting Chai') >= 0; });
+      assert(chaiCard, 'chai card missing');
+      assert(chaiCard.textContent.indexOf('can make') >= 0, chaiCard.textContent);
+      chaiCard.click();
+      assert(text('pos-item-count') === '1', text('pos-item-count'));
+      const sold = toasts();
+      $('pos-checkout-btn').click();
+      await waitFor(function () { return toasts() > sold && lastToast().indexOf('Sale completed') >= 0; }, lastToast());
+      assert(Store.getBatchQty('beans', 'loc_main') === beansBefore - 8, 'beans after chai ' + Store.getBatchQty('beans', 'loc_main'));
+      assert(Store.getBatchById(early.id).qty === earlyBefore - 55, 'FEFO milk ' + Store.getBatchById(early.id).qty);
+      const lateOnCounter = Store.getBatchesByProduct(milk.id, 'loc_main').find(function (b) { return b.expiryDate === later.expiryDate; });
+      assert(lateOnCounter.qty === 50, 'later milk was used first');
+
+      App.goTo('products');
+      $('produce-btn').click();
+      setVal('produce-product', chai.id);
+      setVal('produce-location', 'loc_main');
+      setVal('produce-qty', '1');
+      const milkBeforeProduce = Store.getBatchQty(milk.id, 'loc_main');
+      const beansBeforeProduce = Store.getBatchQty('beans', 'loc_main');
+      const produced = toasts();
+      $('produce-form').requestSubmit();
+      await waitFor(function () { return toasts() > produced && lastToast().indexOf('Produced') >= 0; }, lastToast());
+      assert(Store.getBatchQty(milk.id, 'loc_main') === milkBeforeProduce - 55, 'produce milk ' + Store.getBatchQty(milk.id, 'loc_main'));
+      assert(Store.getBatchQty('beans', 'loc_main') === beansBeforeProduce - 8, 'produce beans');
+      const finished = Store.getBatchesByProduct(chai.id, 'loc_main').find(function (b) { return b.qty > 0 && b.batchNumber.indexOf('PROD-') === 0; });
+      assert(finished && finished.qty === 1, 'finished cup missing');
+
+      App.goTo('pos');
+      setVal('pos-location', 'loc_main');
+      setVal('pos-search', 'chai');
+      const readyCard = Array.from(document.querySelectorAll('#pos-product-grid .pos-item-card')).find(function (c) { return c.textContent.indexOf('Cutting Chai') >= 0; });
+      assert(readyCard && readyCard.textContent.indexOf('1 ready') >= 0, readyCard ? readyCard.textContent : 'no card');
+      readyCard.click();
+      POS.updateBillQty(chai.id, 5);
+      assert(lastToast().indexOf('Exceeds') >= 0, lastToast());
+      assert(text('pos-item-count') === '1', 'oversell changed the bill');
+      const milkHeld = Store.getBatchQty(milk.id, 'loc_main');
+      const beansHeld = Store.getBatchQty('beans', 'loc_main');
+      const soldReady = toasts();
+      $('pos-checkout-btn').click();
+      await waitFor(function () { return toasts() > soldReady && lastToast().indexOf('Sale completed') >= 0; }, lastToast());
+      assert(Store.getBatchById(finished.id).qty === 0, 'finished cup was not sold');
+      assert(Store.getBatchQty(milk.id, 'loc_main') === milkHeld, 'selling the cup consumed milk again');
+      assert(Store.getBatchQty('beans', 'loc_main') === beansHeld, 'selling the cup consumed beans again');
+      POS.addToBill(chai.id);
+      assert(lastToast().indexOf('Not enough') >= 0, lastToast());
+      assert(Store.getBatchQty(milk.id, 'loc_main') === milkHeld, 'refused sale moved milk');
+
+      App.goTo('reports');
+      await waitFor(function () { return text('expiry-table-body').indexOf('Milk') >= 0; }, text('expiry-table-body'));
+    });
+
     await scenario('Staff can use POS and is kept out of the other pages', async function () {
       await loginAs('sam');
       assert(viewOn('pos'), 'staff did not land on POS');

@@ -112,7 +112,29 @@ function latestUnitCost(productId, batches, fallback) {
 function recipeLineQty(ing) {
   const q = Number(ing && ing.qty) || 0;
   const waste = Math.max(0, Number(ing && ing.wastagePct) || 0);
-  return q * (1 + waste / 100);
+  return Math.round(q * (1 + waste / 100) * 1000) / 1000;
+}
+
+function money(n) {
+  return Math.round((Number(n) || 0) * 100) / 100;
+}
+
+function isMtoProduct(product) {
+  if (!product || product.fulfillment === "stock") return false;
+  const recipe = product.recipe;
+  return (product.type || "simple") === "complex"
+    && recipe && Array.isArray(recipe.ingredients) && recipe.ingredients.length > 0;
+}
+
+function onHand(batches, productId, locationId) {
+  return liveLots(batches, productId, locationId).reduce((sum, lot) => sum + (Number(lot.qty) || 0), 0);
+}
+
+function releasePicks(batches, picks) {
+  for (const pk of picks || []) {
+    const lot = batches.find((b) => b && b.id === pk.batchId);
+    if (lot) lot.qty = (Number(lot.qty) || 0) + pk.qty;
+  }
 }
 
 function theoreticalMakingCost(product, ownerId, qty, batches, productsById) {
@@ -128,20 +150,41 @@ function theoreticalMakingCost(product, ownerId, qty, batches, productsById) {
 }
 
 function consumeSaleQty(product, locationId, ownerId, qty, ctx) {
-  const recipe = product.recipe;
-  const mto = (product.type || "simple") === "complex" && recipe && Array.isArray(recipe.ingredients) && recipe.ingredients.length;
-  if (mto && ctx && ctx.trackIngredients === false) {
-    const costTotal = theoreticalMakingCost(product, ownerId, qty, ctx.batches, ctx.productsById);
-    return { picks: [], costTotal };
+  const mto = isMtoProduct(product);
+  if (!mto) {
+    const picks = reserveLots(ctx.batches, product.id, locationId, qty);
+    if (!picks) {
+      throw Object.assign(new Error(`Insufficient stock for ${product.name} (need ${qty})`), { status: 409 });
+    }
+    const costTotal = money(picks.reduce((sum, pk) => sum + pk.qty * pk.unitCost, 0));
+    return { picks, costTotal };
   }
-  if (mto) {
-    const scale = qty / Math.max(1, Number(recipe.outputQty) || 1);
-    const picks = [];
+
+  const ready = onHand(ctx.batches, product.id, locationId);
+  const fromStock = Math.min(Math.max(0, ready), qty);
+  const toMake = qty - fromStock;
+  const picks = [];
+  if (fromStock > 0) {
+    const finished = reserveLots(ctx.batches, product.id, locationId, fromStock);
+    if (!finished) {
+      throw Object.assign(new Error(`Insufficient stock for ${product.name} (need ${fromStock})`), { status: 409 });
+    }
+    picks.push(...finished);
+  }
+  if (toMake > 0 && ctx && ctx.trackIngredients === false) {
+    const made = theoreticalMakingCost(product, ownerId, toMake, ctx.batches, ctx.productsById);
+    const costLots = picks.reduce((sum, pk) => sum + pk.qty * pk.unitCost, 0);
+    return { picks, costTotal: money(costLots + made) };
+  }
+  if (toMake > 0) {
+    const recipe = product.recipe;
+    const scale = toMake / Math.max(1, Number(recipe.outputQty) || 1);
     for (const ing of recipe.ingredients) {
-      const need = (Number(ing.qty) || 0) * scale;
+      const need = recipeLineQty(ing) * scale;
       if (need <= 0) continue;
       const lotPicks = reserveLots(ctx.batches, ing.productId, locationId, need);
       if (!lotPicks) {
+        releasePicks(ctx.batches, picks);
         throw Object.assign(
           new Error(`Insufficient stock for ${product.name} (need ${need} of an ingredient)`),
           { status: 409 }
@@ -149,14 +192,8 @@ function consumeSaleQty(product, locationId, ownerId, qty, ctx) {
       }
       picks.push(...lotPicks);
     }
-    const costTotal = picks.reduce((sum, pk) => sum + pk.qty * pk.unitCost, 0);
-    return { picks, costTotal };
   }
-  const picks = reserveLots(ctx.batches, product.id, locationId, qty);
-  if (!picks) {
-    throw Object.assign(new Error(`Insufficient stock for ${product.name} (need ${qty})`), { status: 409 });
-  }
-  const costTotal = picks.reduce((sum, pk) => sum + pk.qty * pk.unitCost, 0);
+  const costTotal = money(picks.reduce((sum, pk) => sum + pk.qty * pk.unitCost, 0));
   return { picks, costTotal };
 }
 
@@ -230,21 +267,23 @@ export async function listProducts({ ownerId, locationId }) {
   const productsById = Object.fromEntries(productDocs.map((p) => [p.id, p]));
 
   function makeableQty(p) {
-    const recipe = p.recipe;
-    const mto = (p.type || "simple") === "complex" && recipe && Array.isArray(recipe.ingredients) && recipe.ingredients.length;
+    const mto = isMtoProduct(p);
+    const ready = batchQty[p.id] || 0;
     if (mto && !trackIngredients) return 9999;
     if (!mto) {
       return stockMap[p.id] ?? 0;
     }
+    const recipe = p.recipe;
     const out = Math.max(1, Number(recipe.outputQty) || 1);
     let max = Infinity;
     recipe.ingredients.forEach((ing) => {
-      const per = Number(ing.qty) || 0;
+      const per = recipeLineQty(ing);
       if (per <= 0) return;
       const have = batchQty[ing.productId] || 0;
       max = Math.min(max, Math.floor((have / per) * out + 1e-9));
     });
-    return max === Infinity ? 0 : Math.max(0, max);
+    const canMake = max === Infinity ? 0 : Math.max(0, max);
+    return ready + canMake;
   }
 
   const productsOut = productDocs
@@ -256,7 +295,7 @@ export async function listProducts({ ownerId, locationId }) {
     .map((p) => {
       const cat = catById[p.categoryId] || {};
       const categoryName = String(cat.name || "").trim() || "Uncategorized";
-      const mto = (p.type || "simple") === "complex" && p.recipe && Array.isArray(p.recipe.ingredients) && p.recipe.ingredients.length;
+      const mto = isMtoProduct(p);
       let costPrice = Number(p.costPrice) || 0;
       if (mto && !trackIngredients) {
         costPrice = Math.round(theoreticalMakingCost(p, ownerId, 1, batches, productsById) * 100) / 100;

@@ -249,16 +249,18 @@ const Orders = (() => {
 
   function deliver(orderId) {
     const order = Store.getOrderById(orderId);
+    let updated;
     if (!order.fulfillmentLocationId) {
-      const user = Auth.getUser();
       const defaultLoc = Store.getDefaultLocation(Auth.ownerId());
-      if (defaultLoc) Store.updateOrderStatus(orderId, 'delivered', defaultLoc.id);
-      else { App.showToast('No fulfillment location set', 'error'); return; }
+      if (!defaultLoc) { App.showToast('No fulfillment location set', 'error'); return; }
+      updated = Store.updateOrderStatus(orderId, 'delivered', defaultLoc.id);
     } else {
-      Store.updateOrderStatus(orderId, 'delivered');
+      updated = Store.updateOrderStatus(orderId, 'delivered');
     }
-
-    const updated = Store.getOrderById(orderId);
+    if (!updated || updated.status !== 'delivered') {
+      App.showToast('Not enough stock at the fulfillment location', 'error');
+      return;
+    }
     const seller = Store.getUserById(updated.sellerId);
     const buyer = Store.getUserById(updated.buyerId);
     if (seller && buyer) {

@@ -354,6 +354,140 @@ describe("Zentory HTTP API", { concurrency: false }, () => {
     assert.equal(res.statusCode, 404);
   });
 
+  test("make-to-order wastage is consumed and the catalog stock uses it", async () => {
+    const { ownerId, locationId } = nextOwner();
+    const milk = `milk_${ownerId}`;
+    const cup = `cup_${ownerId}`;
+    await setDoc("products", milk, {
+      id: milk, ownerId, name: "Milk", type: "raw", price: 0, costPrice: 0.1, unit: "ml", available: true,
+    });
+    await setDoc("products", cup, {
+      id: cup, ownerId, name: "Chai", type: "complex", price: 40, gstRate: 0, unit: "cup", available: true,
+      recipe: { outputQty: 1, ingredients: [{ productId: milk, qty: 50, wastagePct: 10 }] },
+    });
+    await setDoc("batches", `b_${milk}`, {
+      id: `b_${milk}`, ownerId, productId: milk, locationId, qty: 100, unitCost: 0.1,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    await setDoc("stock", `stk_${milk}`, {
+      id: `stk_${milk}`, ownerId, productId: milk, locationId, quantity: 100, minStock: 0,
+    });
+    await setDoc("companies", ownerId, { id: ownerId, name: "Cafe", trackIngredientStock: true });
+    const catalog = await call(productsHandler, {
+      method: "GET",
+      url: `/api/products?ownerId=${ownerId}&locationId=${locationId}`,
+      headers: authHeaders(),
+    });
+    const row = catalog.body.products.find((p) => p.id === cup);
+    assert.equal(row.stock, 1);
+    const res = await call(salesHandler, {
+      method: "POST", url: "/api/sales", headers: authHeaders(),
+      body: { ownerId, locationId, externalId: "waste-1", items: [{ productId: cup, qty: 1 }] },
+    });
+    assert.equal(res.statusCode, 201);
+    assert.equal(res.body.sale.items[0].costPrice, 5.5);
+    assert.equal((await getDoc("batches", `b_${milk}`)).qty, 45);
+  });
+
+  test("a finished batch is sold before ingredients", async () => {
+    const { ownerId, locationId } = nextOwner();
+    const beans = `beans_${ownerId}`;
+    const cup = `cup_${ownerId}`;
+    const finishedId = `fin_${ownerId}`;
+    await setDoc("products", beans, {
+      id: beans, ownerId, name: "Beans", type: "raw", price: 0, costPrice: 2, unit: "g", available: true,
+    });
+    await setDoc("products", cup, {
+      id: cup, ownerId, name: "Espresso", type: "complex", price: 80, gstRate: 0, unit: "cup", available: true,
+      recipe: { outputQty: 1, ingredients: [{ productId: beans, qty: 10 }] },
+    });
+    await setDoc("batches", `b_${beans}`, {
+      id: `b_${beans}`, ownerId, productId: beans, locationId, qty: 40, unitCost: 2,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    await setDoc("batches", finishedId, {
+      id: finishedId, ownerId, productId: cup, locationId, qty: 1, unitCost: 15,
+      createdAt: "2026-02-01T00:00:00.000Z",
+    });
+    await setDoc("companies", ownerId, { id: ownerId, name: "Cafe", trackIngredientStock: true });
+    const first = await call(salesHandler, {
+      method: "POST", url: "/api/sales", headers: authHeaders(),
+      body: { ownerId, locationId, externalId: "ready-1", items: [{ productId: cup, qty: 1 }] },
+    });
+    assert.equal(first.statusCode, 201);
+    assert.equal(first.body.sale.items[0].costPrice, 15);
+    assert.equal((await getDoc("batches", finishedId)).qty, 0);
+    assert.equal((await getDoc("batches", `b_${beans}`)).qty, 40);
+    const second = await call(salesHandler, {
+      method: "POST", url: "/api/sales", headers: authHeaders(),
+      body: { ownerId, locationId, externalId: "ready-2", items: [{ productId: cup, qty: 1 }] },
+    });
+    assert.equal(second.statusCode, 201);
+    assert.equal(second.body.sale.items[0].costPrice, 20);
+    assert.equal((await getDoc("batches", `b_${beans}`)).qty, 30);
+  });
+
+  test("a short remainder after a finished cup rolls back and writes nothing", async () => {
+    const { ownerId, locationId } = nextOwner();
+    const beans = `beans_${ownerId}`;
+    const cup = `cup_${ownerId}`;
+    const finishedId = `fin_${ownerId}`;
+    await setDoc("products", beans, {
+      id: beans, ownerId, name: "Beans", type: "raw", price: 0, costPrice: 2, unit: "g", available: true,
+    });
+    await setDoc("products", cup, {
+      id: cup, ownerId, name: "Espresso", type: "complex", price: 80, unit: "cup", available: true,
+      recipe: { outputQty: 1, ingredients: [{ productId: beans, qty: 10 }] },
+    });
+    await setDoc("batches", `b_${beans}`, {
+      id: `b_${beans}`, ownerId, productId: beans, locationId, qty: 0, unitCost: 2,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    await setDoc("batches", finishedId, {
+      id: finishedId, ownerId, productId: cup, locationId, qty: 1, unitCost: 15,
+      createdAt: "2026-02-01T00:00:00.000Z",
+    });
+    await setDoc("companies", ownerId, { id: ownerId, name: "Cafe", trackIngredientStock: true });
+    fake.zero();
+    const res = await call(salesHandler, {
+      method: "POST", url: "/api/sales", headers: authHeaders(),
+      body: { ownerId, locationId, externalId: "ready-short", items: [{ productId: cup, qty: 2 }] },
+    });
+    assert.equal(res.statusCode, 409);
+    assert.equal(fake.stats.writes, 0);
+    assert.equal((await getDoc("batches", finishedId)).qty, 1);
+    assert.equal((await getDoc("batches", `b_${beans}`)).qty, 0);
+  });
+
+  test("a raw line and a recipe that share an ingredient are refused together", async () => {
+    const { ownerId, locationId } = nextOwner();
+    const beans = `beans_${ownerId}`;
+    const cup = `cup_${ownerId}`;
+    await setDoc("products", beans, {
+      id: beans, ownerId, name: "Beans", type: "simple", price: 2, costPrice: 2, unit: "g", available: true,
+    });
+    await setDoc("products", cup, {
+      id: cup, ownerId, name: "Espresso", type: "complex", price: 80, unit: "cup", available: true,
+      recipe: { outputQty: 1, ingredients: [{ productId: beans, qty: 8 }] },
+    });
+    await setDoc("batches", `b_${beans}`, {
+      id: `b_${beans}`, ownerId, productId: beans, locationId, qty: 10, unitCost: 2,
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
+    await setDoc("companies", ownerId, { id: ownerId, name: "Cafe", trackIngredientStock: true });
+    fake.zero();
+    const res = await call(salesHandler, {
+      method: "POST", url: "/api/sales", headers: authHeaders(),
+      body: {
+        ownerId, locationId, externalId: "share-1",
+        items: [{ productId: beans, qty: 8 }, { productId: cup, qty: 1 }],
+      },
+    });
+    assert.equal(res.statusCode, 409);
+    assert.equal(fake.stats.writes, 0);
+    assert.equal((await getDoc("batches", `b_${beans}`)).qty, 10);
+  });
+
   test("the product catalog is cached for the second read", async () => {
     const { ownerId, locationId } = nextOwner();
     await seedSimple({ ownerId, locationId, categoryName: "Beverages" });
