@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zentory-v32';
+const CACHE_NAME = 'zentory-v33';
 const STATIC_URLS = [
   './',
   './index.html',
@@ -33,7 +33,10 @@ const STATIC_URLS = [
   './js/admin.js',
   './js/app.js',
   './manifest.json',
-  './icons/icon.svg'
+  './icons/icon.svg',
+  './icons/icon-180.png',
+  './icons/icon-192.png',
+  './icons/icon-512.png'
 ];
 
 self.addEventListener('install', (e) => {
