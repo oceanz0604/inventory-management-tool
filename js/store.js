@@ -1068,6 +1068,26 @@ const Store = (() => {
     local.concat(pub || []).forEach(p => { if (p && p.id) map[p.id] = p; });
     _set(KEYS.PRODUCTS, Object.values(map));
     if (companies && companies.length) _set(KEYS.COMPANIES, companies);
+    // Shop's Add button reads stock. Other companies' rows are not in the boot
+    // cache, so fetch them here — one owner query per shop, cached with the catalog.
+    const sellers = [];
+    const seenSeller = {};
+    (pub || []).forEach(p => {
+      if (p && p.ownerId && p.ownerId !== scopeId && !seenSeller[p.ownerId]) {
+        seenSeller[p.ownerId] = true;
+        sellers.push(p.ownerId);
+      }
+    });
+    const foreign = [];
+    for (let i = 0; i < sellers.length; i++) {
+      try {
+        const rows = await Firebase.listByOwner('stock', sellers[i]);
+        (rows || []).forEach(s => { if (s) foreign.push(s); });
+      } catch (e) { /* catalog still renders; that shop shows as out of stock */ }
+    }
+    const stockMap = {};
+    getStock().filter(s => s && s.ownerId === scopeId).concat(foreign).forEach(s => { if (s && s.id) stockMap[s.id] = s; });
+    _set(KEYS.STOCK, Object.values(stockMap));
     localStorage.setItem('ims_mkt_at', String(Date.now()));
   }
 

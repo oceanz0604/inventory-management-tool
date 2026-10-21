@@ -12,13 +12,14 @@ From the repo root, with Node 18 or newer and Chrome available:
 npm test
 ```
 
-That command runs three layers:
+That command runs four layers:
 
 | Layer | File | What it exercises |
 | --- | --- | --- |
 | HTTP API | `tests/api.test.mjs` | `GET /api/health`, `GET /api/products`, `POST /api/sales`, `POST /api/sales/void` |
 | Business rules | `tests/store.test.mjs` | `js/store.js` in a fresh `localStorage`, including the sync budget |
-| UI | `tests/ui-runner.mjs` + `tests/ui-harness.html` | Real `pos.js`, `purchase.js`, `orders.js`, and `parties.js` in headless Chrome |
+| UI focus | `tests/ui-runner.mjs` + `tests/ui-harness.html` | POS, purchase, receive, and make-to-order against the real scripts |
+| UI pages | `tests/ui-deep-runner.mjs` + `tests/ui-deep.js` | The real `index.html` in headless Chrome, with an in-memory Firebase stand-in |
 
 API calls are served by `tests/fake-firestore.mjs`. It stores documents in the same encoded field shape the production client writes, and it counts reads the way Spark does: one read per returned document, and one read for an empty query. A sale for company A must not be billed for company B's batches.
 
@@ -91,7 +92,11 @@ The field-sale checks above also lock a stock fix: make-to-order ingredients are
 
 ## UI cases (automated)
 
-Headless Chrome opens `tests/ui-harness.html`, which contains the same element ids the screens bind to (`#pos-checkout-btn`, `#po-add-seller`, `#order-tabs`, `#party-form`, and the orders table inside `.card`).
+Two Chrome runs. The focused harness opens `tests/ui-harness.html` and drives POS, purchase, receive, and make-to-order. The page suite opens the real `index.html`. Chart.js, jsPDF, SheetJS, and the Firebase CDN are replaced with local stand-ins, and the service worker is not registered, so the run never reaches `inventory-management-oceanz`.
+
+The page suite signs in as the owner and walks every sidebar destination, then staff and marketing. On each page it uses the search box, the filters, the sortable headers, the add and edit forms, and the destructive buttons. Stock and money assertions sit behind the clicks: a POS line can choose the later tea lot, a short-paid field delivery posts Khata, a purchase paid in full does not, and a second shop is refused while the cart still holds the first.
+
+Focused harness:
 
 | Case | Steps and expected result |
 | --- | --- |
@@ -104,30 +109,22 @@ Headless Chrome opens `tests/ui-harness.html`, which contains the same element i
 | Tracked make-to-order | Add Latte while the company still tracks ingredients and the roast lot is empty. Toast "Not enough ingredients to make more". The bill stays empty and both roast lots stay at zero. |
 | Untracked make-to-order | Turn ingredient tracking off, add Latte, complete the sale. Roast lots stay at zero, the sale cost is ₹90 from the latest batch (10 g × ₹9), and the receipt opens. |
 
-## Manual cases
+The page suite covers sign-in (unknown code, change company, wrong password, owner login, logout), the sidebar and every nav group, theme, refresh, the low-stock bell, the bottom bar and More sheet, dashboard stat cards and quick actions, locations, categories, products (filters, sort, MRP guard, detail save, publish, delete), produce, the sector catalog, CSV import including its back buttons, inventory (search, low and location filters, add batch, edit lot, reorder level, delete lot, CSV and PDF export), purchase (search, category combobox, qty, remove, clear, new supplier, paid-in-full record), orders (sort, receive, approve, ship, deliver, invoice print, field accept, short pay, mark paid, cancel), POS (empty bill, search, category combobox, other location, lot picker, GST, checkout, clear), shop (search, seller and category filters, cart qty, one-seller guard, place order), field orders, Khata, parties, team (short password, ingredient switch, remove worker), and the four report ranges. Staff land on POS and marketing lands on field orders; a disallowed `App.goTo` bounces back.
 
-Run these in a browser against a test company. Leave the OceanZ company document alone: do not write `trackIngredientStock` onto `co_mqgbs2zvzjfei8`. Create the `pos_sales` composite index (`ownerId` ascending, `createdAt` ascending) in the Firebase console before judging sync cost; until that index exists, boot falls back to reading every sale for the company. Do not deploy Firestore rules or indexes from the CLI.
+## Still for a person
 
-| Area | What to do | Pass when |
+These need a signed-in browser, a phone, or the live project. Leave the OceanZ company document alone: do not write `trackIngredientStock` onto `co_mqgbs2zvzjfei8`. Create the `pos_sales` composite index (`ownerId` ascending, `createdAt` ascending) in the Firebase console before judging sync cost. Do not deploy Firestore rules or indexes from the CLI.
+
+| Area | Why it is not in `npm test` | Pass when |
 | --- | --- | --- |
-| Sign-in | Log in with a company username. Log out. Log in again. | Second boot within 10 minutes does not reload the whole catalog. The top-bar refresh forces a sync. |
-| Roles | Sign in as staff, then as marketing. | Staff lands on POS. Marketing can raise a field order. Owner sees purchases, Khata, and reports. |
-| Dashboard | Open Dashboard after a POS sale and after a purchase. | Today's figures and low-stock list match the stock screen. |
-| Products | Filter by type, category, unit, and published. Edit a product. Sort a column. | The grid and the edit form show the saved values. Raw items stay out of POS. |
-| Make-to-order recipe | Add a recipe row and save. Produce one with tracking on, then turn tracking off for a test company and sell. | Tracking on blocks a sale that is short. Tracking off sells and the ingredient lot does not move. Making cost follows the latest batch. |
-| Searchable selects | Open supplier, product, and location dropdowns near the bottom of the panel. Scroll the page. | The panel stays on screen, closes on outside scroll, and the choice sticks. |
-| Shop | Publish a product from company A. Open Shop as company B. Add it, then try a product from company C. | Cart keeps a single seller. Checkout creates an order company A can accept, ship, and deliver, and company B receives stock at its default location. |
-| Field order | Marketing creates an order. Office accepts, delivers a partial payment, then marks the rest paid. | Stock falls on delivery. Khata shows the customer balance. Mark Paid completes the order. |
-| Khata screen | Record a credit and a debit for one party. | Running balance matches the store rule: credit increases what they owe, debit decreases it. |
-| Reports | Open 7, 30, 90, and 365 day ranges. | Charts render. A range wider than the cached POS window loads once, then stays cached. |
-| Invoice and receipt | Print a delivered order and a POS receipt. | A print window opens with the party, lines, GST, and total. |
-| Import | Import a small CSV and a catalog template. | New products appear for that company. A bad row is reported and earlier rows stay consistent. |
-| Team | Create a worker, sign in as that worker, remove the worker. | The worker sees only their role. Removal blocks the next sign-in. |
-| Onboarding | Create a new company, location, and first product. | POS and Purchase both list that location. |
-| Theme and layout | Toggle dark mode. Collapse the sidebar. Resize to a phone width. | Dashboard, Orders, and POS stay pinned. Purchase and POS action buttons stay on screen. |
-| PWA | Load the deployed app, go offline, reload. | The shell opens from the service worker. After this release the cache name is `zentory-v30`. |
-| Admin | Sign in to `admin.html` as the super admin. Edit a customer. | The change is visible after refresh. The page does not download every order in the project. |
-| API from the cafe | Post a sale with a fresh `externalId`, repeat it, then void it. | Stock moves once, the repeat returns the same sale id, and void puts the quantity back. |
+| Onboarding | The suite signs in with onboarding already completed, so the overlay never covers the buttons. | A brand-new company can add a location and a first product, and both show up in POS and Purchase. |
+| Last location | Deleting the final location would remove the counter the later checks use. | The toast is "You must have at least one location" and the counter stays. |
+| Phone layout | Chrome runs at a desktop size. Bottom-nav clicks are covered; the visual stacking is not. | At a phone width, Dashboard, Orders, and POS stay reachable and the POS and Purchase buttons stay on screen. |
+| Real print | `window.open` is stubbed so headless Chrome does not throw. | Print on an invoice and a receipt shows the party, lines, GST, and total. |
+| PWA offline | The suite strips the service worker so it cannot serve a stale shell. | After this release the cache name is `zentory-v31`. Offline reload still opens the shell. |
+| Admin console | `admin.html` is a separate page and is not loaded. | A super-admin edit is still there after refresh, and the page does not download every order. |
+| Office role | Staff and marketing are the restricted landings. Office is the same gate with a wider view list. | An office login can open orders and cannot open team. |
+| Live API | Covered against the in-memory store. | A fresh `externalId` moves stock once, the repeat returns the same sale, and void puts the quantity back. |
 
 ## Results
 
@@ -137,8 +134,9 @@ Run these in a browser against a test company. Leave the OceanZ company document
 | --- | --- |
 | API (`tests/api.test.mjs`) | 16 passed |
 | Business rules (`tests/store.test.mjs`) | 22 passed |
-| UI (`tests/ui-runner.mjs`) | 8 passed |
+| UI focus (`tests/ui-runner.mjs`) | 8 passed |
+| UI pages (`tests/ui-deep-runner.mjs`) | 27 passed |
 
-46 automated cases passed. The manual table is still for a person to walk through in a signed-in browser. The known API gap remains: a sales body of `{` returns 500.
+73 automated cases passed. The known API gap remains: a sales body of `{` returns 500.
 
-One product fix came out of the business-rule cases. A field sale that started with a make-to-order line used to deduct ingredients before later lines were checked, so a short later line left raw stock already consumed. Delivery now confirms every line, including two recipe lines that would overdraw the same ingredient, and only then reduces lots. Service worker cache is `zentory-v30` because `js/store.js` changed.
+Three product fixes came out of the page suite. The shop cart looked up the seller as a user, so "Ordering from" was blank for another company; it now uses the company name. The reports revenue canvas reused the dashboard id `chart-revenue`, so that chart was drawn on the dashboard; the reports canvas is `chart-report-revenue`. Opening Shop did not load other companies' stock, so every marketplace product showed Out of stock; the shop sync now reads each other company's stock once and keeps that with the six-hour catalog cache. Service worker cache is `zentory-v31`.

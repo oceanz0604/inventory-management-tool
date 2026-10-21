@@ -6,6 +6,6 @@
   "description": "Zentory HTTP API for OceanZ cafe dual-write sales",
   "engines": { "node": ">=18" },
   "scripts": {
-    "test": "node --test tests/api.test.mjs tests/store.test.mjs && node tests/ui-runner.mjs"
+    "test": "node --test tests/api.test.mjs tests/store.test.mjs && node tests/ui-runner.mjs && node tests/ui-deep-runner.mjs"
   }
 }

@@ -80,7 +80,7 @@ const Reports = (() => {
     const step = Math.max(1, Math.floor(labels.length / 10));
     const displayLabels = labels.map((l, i) => i % step === 0 ? l : '');
 
-    const ctx = document.getElementById('chart-revenue');
+    const ctx = document.getElementById('chart-report-revenue');
     charts.revenue = new Chart(ctx, {
       type: 'line',
       data: {

@@ -118,10 +118,14 @@ const Shop = (() => {
     }
 
     footer.classList.remove('hidden');
-    const seller = cart.sellerId ? Store.getUserById(cart.sellerId) : null;
+    const sellerUser = cart.sellerId ? Store.getUserById(cart.sellerId) : null;
+    const sellerCo = cart.sellerId ? Store.getCompanyById(cart.sellerId) : null;
+    const sellerLabel = sellerUser
+      ? (sellerUser.shopName || sellerUser.name || '')
+      : (sellerCo ? (sellerCo.name || '') : '');
     let total = 0;
 
-    body.innerHTML = (seller ? `<p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:.75rem">Ordering from: <strong>${_esc(seller.name || seller.shopName)}</strong></p>` : '') +
+    body.innerHTML = (sellerLabel ? `<p style="font-size:.8rem;color:var(--text-secondary);margin-bottom:.75rem">Ordering from: <strong>${_esc(sellerLabel)}</strong></p>` : '') +
       cart.items.map(ci => {
         const product = Store.getProductById(ci.productId);
         if (!product) return '';

@@ -345,10 +345,16 @@ describe("store business rules", { concurrency: false }, () => {
         return [];
       },
       list(c) { return c === "companies" ? [{ id: "other", name: "Other Co" }] : []; },
+      listByOwner(c, id) {
+        if (c === "stock" && id === "other") return [{ id: "stk", ownerId: "other", productId: "pub1", locationId: "l", quantity: 4 }];
+        return [];
+      },
     });
     await Store.syncMarketplace();
     assert.equal(calls.filter(c => c.op === "listWhere" && c.f === "isPublished").length, 1);
+    assert.equal(calls.filter(c => c.op === "listByOwner" && c.c === "stock" && c.id === "other").length, 1);
     assert.equal(Store.getPublishedProducts("other").length, 1);
+    assert.equal(Store.getTotalStockForProduct("pub1"), 4);
     const n = calls.length;
     await Store.syncMarketplace();
     assert.equal(calls.length, n);
