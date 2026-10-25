@@ -7,6 +7,7 @@ const KhataModule = (() => {
     if (firstBtn) firstBtn.addEventListener('click', () => openModal());
     document.getElementById('khata-form').addEventListener('submit', _handleSubmit);
     document.getElementById('khata-search').addEventListener('input', render);
+    if (typeof Views !== 'undefined') Views.mount(document.getElementById('khata-view-switch'), 'khata', render, 'cards');
     document.getElementById('khata-ledger-close').addEventListener('click', () => {
       document.getElementById('khata-ledger-card').classList.add('hidden');
     });
@@ -40,13 +41,15 @@ const KhataModule = (() => {
       '<div class="stat-card"><div class="stat-icon blue"><i class="fas fa-scale-balanced"></i></div><div class="stat-info"><span class="stat-value">₹' + (totalOwed - totalOwing).toFixed(0) + '</span><span class="stat-label">Net Balance</span></div></div>' +
       '<div class="stat-card"><div class="stat-icon purple"><i class="fas fa-users"></i></div><div class="stat-info"><span class="stat-value">' + parties.length + '</span><span class="stat-label">Parties</span></div></div>';
 
+    if (typeof Views !== 'undefined') Views.applyLayout(container, 'khata', 'cards');
     container.innerHTML = filtered.map(p => {
       const initials = p.partyName.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
       const balClass = p.total > 0 ? 'positive' : p.total < 0 ? 'negative' : '';
       const sign = p.total > 0 ? '+' : '';
+      const tone = p.total > 0 ? 'They owe you' : p.total < 0 ? 'You owe them' : 'Settled';
       return '<div class="khata-party-card" onclick="KhataModule.showLedger(\'' + p.partyId + '\')">' +
         '<div class="khata-party-avatar">' + initials + '</div>' +
-        '<div class="khata-party-info"><h4>' + _esc(p.partyName) + '</h4><span>Click to view ledger</span></div>' +
+        '<div class="khata-party-info"><h4>' + _esc(p.partyName) + '</h4><span>' + tone + '</span></div>' +
         '<div class="khata-balance ' + balClass + '">' + sign + '₹' + Math.abs(p.total).toFixed(2) + '</div></div>';
     }).join('');
   }

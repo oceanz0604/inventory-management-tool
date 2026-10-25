@@ -14,6 +14,7 @@ const Parties = (() => {
     if (search) search.addEventListener('input', render);
     const filter = document.getElementById('parties-type-filter');
     if (filter) filter.addEventListener('change', render);
+    if (typeof Views !== 'undefined') Views.mount(document.getElementById('parties-view-switch'), 'parties', render);
   }
 
   function render() {
@@ -28,11 +29,12 @@ const Parties = (() => {
     if (typeF) parties = parties.filter(p => p.type === typeF);
     if (search) parties = parties.filter(p => p.name.toLowerCase().includes(search) || (p.location || '').toLowerCase().includes(search));
 
-    if (total === 0) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+    if (total === 0) { tbody.innerHTML = ''; empty.classList.remove('hidden'); _paintViews(); return; }
     empty.classList.add('hidden');
 
     if (parties.length === 0) {
       tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text-secondary);padding:1.5rem">No parties match your search</td></tr>';
+      _paintViews();
       return;
     }
 
@@ -46,6 +48,11 @@ const Parties = (() => {
       '<button class="btn-icon edit" title="Edit" onclick="Parties.openModal(\'' + p.id + '\')"><i class="fas fa-pen"></i></button>' +
       '<button class="btn-icon delete" title="Delete" onclick="Parties.confirmDelete(\'' + p.id + '\')"><i class="fas fa-trash-can"></i></button>' +
       '</div></td></tr>').join('');
+    _paintViews();
+  }
+
+  function _paintViews() {
+    if (typeof Views !== 'undefined') Views.syncFrom('parties', 'parties-table-body', 'parties-alt');
   }
 
   function openModal(id, opts) {

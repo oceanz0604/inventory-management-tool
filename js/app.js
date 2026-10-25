@@ -120,6 +120,7 @@ const App = (() => {
     Parties.init();
     Team.init();
     FieldOrders.init();
+    if (typeof Settings !== 'undefined') Settings.init();
     Onboarding.init();
     _navigate(_defaultView());
     Shop.refreshBadges();
@@ -144,8 +145,8 @@ const App = (() => {
 
   // Views each role may reach. Owner/super-admin get everything.
   const ROLE_VIEWS = {
-    owner: ['dashboard', 'locations', 'products', 'inventory', 'pos', 'orders', 'purchase', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties', 'team'],
-    office: ['dashboard', 'locations', 'products', 'inventory', 'orders', 'purchase', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties'],
+    owner: ['dashboard', 'locations', 'products', 'inventory', 'pos', 'orders', 'purchase', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties', 'team', 'settings'],
+    office: ['dashboard', 'locations', 'products', 'inventory', 'orders', 'purchase', 'categories', 'reports', 'khata', 'shop', 'field-order', 'parties', 'settings'],
     staff: ['pos'],
     marketing: ['field-order'],
   };
@@ -338,7 +339,7 @@ const App = (() => {
     inventory: 'Inventory', pos: 'POS Counter', orders: 'Orders', purchase: 'Purchase',
     categories: 'Categories', shop: 'Shop',
     reports: 'Reports', khata: 'Khata / Credit',
-    'field-order': 'Field Orders', parties: 'Customers / Sellers', team: 'Team'
+    'field-order': 'Field Orders', parties: 'Customers / Sellers', team: 'Team', settings: 'Settings'
   };
 
   function _navigate(view) {
@@ -389,6 +390,7 @@ const App = (() => {
     if (view === 'field-order') FieldOrders.render();
     if (view === 'parties') Parties.render();
     if (view === 'team') Team.render();
+    if (view === 'settings' && typeof Settings !== 'undefined') Settings.render();
     if (typeof TableSort !== 'undefined') TableSort.refresh(el);
   }
 
@@ -409,6 +411,7 @@ const App = (() => {
     'field-order': { icon: 'fa-route', label: 'Field' },
     parties: { icon: 'fa-address-book', label: 'Customers' },
     team: { icon: 'fa-users-gear', label: 'Team' },
+    settings: { icon: 'fa-sliders', label: 'Settings' },
   };
   // Sensible bottom-bar defaults per role (owner can override + persist).
   const BOTTOM_DEFAULTS = {
@@ -615,6 +618,7 @@ const App = (() => {
       document.getElementById('color-preview').style.background = e.target.value;
     });
     document.getElementById('category-search').addEventListener('input', _renderCategories);
+    if (typeof Views !== 'undefined') Views.mount(document.getElementById('categories-view-switch'), 'categories', _renderCategories, 'cards');
   }
 
   function _openCategoryModal(catId) {
@@ -672,6 +676,7 @@ const App = (() => {
     }
 
     const user = Auth.getUser();
+    if (typeof Views !== 'undefined') Views.applyLayout(grid, 'categories', 'cards');
     grid.innerHTML = cats.map(cat => {
       const prods = Store.getProductsByOwner(Auth.ownerId()).filter(p => p.categoryId === cat.id);
       return '<div class="category-card">' +

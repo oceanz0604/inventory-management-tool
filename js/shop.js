@@ -3,6 +3,10 @@ const Shop = (() => {
     document.getElementById('shop-search').addEventListener('input', renderProducts);
     document.getElementById('shop-seller-filter').addEventListener('change', renderProducts);
     document.getElementById('shop-category-filter').addEventListener('change', renderProducts);
+    const stock = document.getElementById('shop-stock-filter');
+    if (stock) stock.addEventListener('change', renderProducts);
+    const sort = document.getElementById('shop-sort');
+    if (sort) sort.addEventListener('change', renderProducts);
     document.getElementById('open-cart-btn').addEventListener('click', openCart);
     document.getElementById('close-cart-btn').addEventListener('click', closeCart);
     document.getElementById('cart-overlay').addEventListener('click', closeCart);
@@ -29,6 +33,8 @@ const Shop = (() => {
     const search = document.getElementById('shop-search').value.toLowerCase().trim();
     const sellerFilter = document.getElementById('shop-seller-filter').value;
     const catFilter = document.getElementById('shop-category-filter').value;
+    const stockFilter = (document.getElementById('shop-stock-filter') || {}).value || '';
+    const sort = (document.getElementById('shop-sort') || {}).value || 'name';
 
     const shops = Store.getCompanies().filter(c => c.id !== Auth.ownerId());
     let products = [];
@@ -41,6 +47,14 @@ const Shop = (() => {
     if (search) products = products.filter(p => p.name.toLowerCase().includes(search) || p.sku.toLowerCase().includes(search));
     if (sellerFilter) products = products.filter(p => p.ownerId === sellerFilter);
     if (catFilter) products = products.filter(p => p.categoryId === catFilter);
+    if (stockFilter === 'in') products = products.filter(p => Store.getTotalStockForProduct(p.id) > 0);
+    if (stockFilter === 'out') products = products.filter(p => Store.getTotalStockForProduct(p.id) <= 0);
+    products.sort((a, b) => {
+      if (sort === 'price-asc') return (a.price || 0) - (b.price || 0);
+      if (sort === 'price-desc') return (b.price || 0) - (a.price || 0);
+      if (sort === 'shop') return (a.shopName || '').localeCompare(b.shopName || '') || a.name.localeCompare(b.name);
+      return a.name.localeCompare(b.name);
+    });
 
     const grid = document.getElementById('shop-grid');
     const empty = document.getElementById('no-shop-products');
@@ -54,21 +68,27 @@ const Shop = (() => {
 
     const catIcons = { cat_elec: 'fa-microchip', cat_furn: 'fa-couch', cat_supp: 'fa-paperclip', cat_clth: 'fa-shirt', cat_food: 'fa-mug-hot', cat_health: 'fa-heart-pulse', cat_tools: 'fa-wrench' };
 
+    const cart = Store.getCart();
     grid.innerHTML = products.map(p => {
       const icon = catIcons[p.categoryId] || 'fa-box';
       const totalStock = Store.getTotalStockForProduct(p.id);
       const inStock = totalStock > 0;
+      const inCart = (cart.items || []).find(i => i.productId === p.id);
+      const qty = inCart && cart.sellerId === p.ownerId ? inCart.qty : 0;
+      const control = !inStock
+        ? '<span class="badge badge-danger">Out of Stock</span>'
+        : (qty > 0
+          ? '<div class="shop-stepper"><button type="button" onclick="Shop.updateQty(\'' + p.id + '\',' + (qty - 1) + ')" aria-label="Less">−</button><span>' + qty + '</span><button type="button" onclick="Shop.updateQty(\'' + p.id + '\',' + (qty + 1) + ')" aria-label="More">+</button></div>'
+          : '<button class="btn btn-primary btn-sm btn-add-cart" onclick="Shop.addToCart(\'' + p.ownerId + '\',\'' + p.id + '\')"><i class="fas fa-cart-plus"></i> Add</button>');
       return `<div class="shop-product-card">
-        <div class="product-thumb"><i class="fas ${icon}"></i></div>
+        <div class="product-thumb"><i class="fas ${icon}"></i>${inStock ? '<span class="shop-stock-pill">' + totalStock + ' in stock</span>' : ''}</div>
         <div class="product-body">
           <div class="product-shop">${_esc(p.shopName)}</div>
           <h4>${_esc(p.name)}</h4>
-          <div class="product-desc">${_esc(p.description || '')}</div>
+          <div class="product-desc">${_esc(p.description || 'Available from this shop')}</div>
           <div class="product-footer">
             <span class="product-price">₹${p.price.toFixed(2)}</span>
-            ${inStock
-              ? `<button class="btn btn-primary btn-sm btn-add-cart" onclick="Shop.addToCart('${p.ownerId}','${p.id}')"><i class="fas fa-cart-plus"></i> Add</button>`
-              : '<span class="badge badge-danger">Out of Stock</span>'}
+            ${control}
           </div>
         </div>
       </div>`;
@@ -83,6 +103,7 @@ const Shop = (() => {
     }
     App.showToast('Added to cart', 'success');
     _updateCartBadges();
+    renderProducts();
   }
 
   function _updateCartBadges() {
@@ -149,11 +170,13 @@ const Shop = (() => {
   function updateQty(productId, qty) {
     Store.updateCartItemQty(productId, qty);
     renderCart();
+    renderProducts();
   }
 
   function clearCart() {
     Store.clearCart();
     renderCart();
+    renderProducts();
     _updateCartBadges();
     App.showToast('Cart cleared', 'success');
   }
@@ -171,6 +194,7 @@ const Shop = (() => {
     Store.createOrder(Auth.ownerId(), cart.sellerId, orderItems);
     Store.clearCart();
     renderCart();
+    renderProducts();
     _updateCartBadges();
     closeCart();
     App.showToast('Order placed successfully!', 'success');

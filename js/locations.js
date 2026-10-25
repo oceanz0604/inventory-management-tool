@@ -6,6 +6,7 @@ const Locations = (() => {
     document.getElementById('add-first-location-btn').addEventListener('click', () => openModal());
     document.getElementById('location-form').addEventListener('submit', _handleSubmit);
     document.getElementById('location-search').addEventListener('input', render);
+    if (typeof Views !== 'undefined') Views.mount(document.getElementById('locations-view-switch'), 'locations', render, 'cards');
   }
 
   function render() {
@@ -29,6 +30,7 @@ const Locations = (() => {
       return;
     }
 
+    if (typeof Views !== 'undefined') Views.applyLayout(grid, 'locations', 'cards');
     grid.innerHTML = locs.map(loc => {
       const stockEntries = Store.getStockByLocation(loc.id);
       const totalQty = stockEntries.reduce((s, e) => s + e.quantity, 0);

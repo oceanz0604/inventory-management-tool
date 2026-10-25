@@ -291,7 +291,8 @@ const Dashboard = (() => {
   }
 
   function _updateNotifications() {
-    const lowItems = Store.getLowStockItems(Auth.ownerId());
+    const alertsOn = typeof Settings === 'undefined' || Settings.alertsOn();
+    const lowItems = alertsOn ? Store.getLowStockItems(Auth.ownerId()) : [];
     const badge = document.getElementById('notification-badge');
     const list = document.getElementById('notification-list');
     if (!list) return;

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'zentory-v34';
+const CACHE_NAME = 'zentory-v35';
 const STATIC_URLS = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const STATIC_URLS = [
   './js/creds.js',
   './js/select.js',
   './js/tables.js',
+  './js/views.js',
   './js/store.js',
   './js/auth.js',
   './js/locations.js',
@@ -29,6 +30,7 @@ const STATIC_URLS = [
   './js/parties.js',
   './js/team.js',
   './js/field-orders.js',
+  './js/settings.js',
   './js/onboarding.js',
   './js/admin.js',
   './js/app.js',

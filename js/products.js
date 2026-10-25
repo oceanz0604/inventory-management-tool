@@ -78,6 +78,7 @@ const Products = (() => {
     document.getElementById('pd-sku-generate').addEventListener('click', () => {
       document.getElementById('pd-sku').value = _nextSku(document.getElementById('pd-name').value);
     });
+    if (typeof Views !== 'undefined') Views.mount(document.getElementById('products-view-switch'), 'products', render);
 
     // Finished-lot builder. Sales already make a make-to-order item; this only stocks cups ahead.
     document.getElementById('produce-form').addEventListener('submit', _handleProduce);
@@ -149,6 +150,7 @@ const Products = (() => {
       tbody.innerHTML = '';
       empty.classList.remove('hidden');
       tbody.closest('.card').querySelector('table').classList.add('hidden');
+      _paintViews();
       return;
     }
     empty.classList.add('hidden');
@@ -156,6 +158,7 @@ const Products = (() => {
 
     if (prods.length === 0) {
       tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;padding:2rem;color:var(--text-secondary)">No products match your filters</td></tr>';
+      _paintViews();
       return;
     }
 
@@ -205,6 +208,11 @@ const Products = (() => {
         '<td>' + publishCell + '</td>' +
         '<td><div class="action-btns">' + actions + '</div></td></tr>';
     }).join('');
+    _paintViews();
+  }
+
+  function _paintViews() {
+    if (typeof Views !== 'undefined') Views.syncFrom('products', 'products-table-body', 'products-alt');
   }
 
   // ---------- Recipe builder (complex products) ----------
@@ -313,7 +321,8 @@ const Products = (() => {
     } else {
       title.textContent = 'Add Product';
       document.getElementById('product-type').value = 'simple';
-      document.getElementById('product-published').checked = true;
+      const cfg = Auth.getCompanyConfig ? Auth.getCompanyConfig() : null;
+      document.getElementById('product-published').checked = !cfg || cfg.publishByDefault !== false;
       document.getElementById('product-recipe-outqty').value = 1;
     }
     _applyTypeUI(_currentType());

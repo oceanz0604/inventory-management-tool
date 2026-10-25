@@ -14,7 +14,37 @@ const Inventory = (() => {
     document.getElementById('filter-location').addEventListener('change', render);
     document.getElementById('filter-category').addEventListener('change', render);
     document.getElementById('filter-stock').addEventListener('change', render);
+    if (typeof Views !== 'undefined') Views.mount(document.getElementById('inventory-view-switch'), 'inventory', render);
+    const qty = document.getElementById('stock-quantity');
+    const unit = document.getElementById('stock-cost');
+    const total = document.getElementById('stock-total');
+    if (qty && unit && total) {
+      qty.addEventListener('input', () => _syncCost('unit'));
+      unit.addEventListener('input', () => _syncCost('unit'));
+      total.addEventListener('input', () => _syncCost('total'));
+    }
   }
+
+  let _costLock = false;
+  function _syncCost(from) {
+    if (_costLock) return;
+    const qtyEl = document.getElementById('stock-quantity');
+    const unitEl = document.getElementById('stock-cost');
+    const totalEl = document.getElementById('stock-total');
+    if (!qtyEl || !unitEl || !totalEl) return;
+    _costLock = true;
+    const qty = parseFloat(qtyEl.value) || 0;
+    if (from === 'total') {
+      const total = parseFloat(totalEl.value) || 0;
+      unitEl.value = qty > 0 ? (Math.round((total / qty) * 100) / 100).toFixed(2) : '0.00';
+    } else {
+      const unit = parseFloat(unitEl.value) || 0;
+      totalEl.value = (Math.round(qty * unit * 100) / 100).toFixed(2);
+    }
+    _costLock = false;
+  }
+
+  function _q(n) { return Store.formatQty ? Store.formatQty(n) : String(n); }
 
   // Products that can be stocked via purchase batches (raw + simple; complex is
   // stocked by Produce only).
@@ -62,10 +92,13 @@ const Inventory = (() => {
     if (stockFilter === 'low') rows = rows.filter(s => s.quantity > 0 && s.quantity <= s.minStock);
     else if (stockFilter === 'out') rows = rows.filter(s => s.quantity === 0);
     else if (stockFilter === 'ok') rows = rows.filter(s => s.quantity > s.minStock);
-    else if (stockFilter === 'expiring') rows = rows.filter(s => Store.availableLots(s.productId, s.locationId).some(b => {
-      if (!b.expiryDate) return false;
-      return Math.ceil((new Date(b.expiryDate) - new Date()) / 86400000) <= 30;
-    }));
+    else if (stockFilter === 'expiring') {
+      const warn = (typeof Settings !== 'undefined') ? Settings.expiryDays() : 90;
+      rows = rows.filter(s => Store.availableLots(s.productId, s.locationId).some(b => {
+        if (!b.expiryDate) return false;
+        return Math.ceil((new Date(b.expiryDate) - new Date()) / 86400000) <= warn;
+      }));
+    }
 
     rows.sort((a, b) => {
       let va, vb;
@@ -89,6 +122,7 @@ const Inventory = (() => {
       tbody.innerHTML = '';
       empty.classList.remove('hidden');
       tbody.closest('.card').querySelector('table').classList.add('hidden');
+      _paintViews();
       return;
     }
     empty.classList.add('hidden');
@@ -96,6 +130,7 @@ const Inventory = (() => {
 
     if (rows.length === 0) {
       tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;padding:2rem;color:var(--text-secondary)">No stock matches your filters</td></tr>';
+      _paintViews();
       return;
     }
 
@@ -108,9 +143,11 @@ const Inventory = (() => {
       const makeable = mto ? Store.maxMakeQty(s.product, s.locationId) : s.quantity;
       let badge;
       if (mto) {
-        if (ready > 0 && makeable > 0 && makeable !== Infinity) badge = '<span class="badge badge-success">' + ready + ' ready · can make ' + makeable + '</span>';
-        else if (ready > 0) badge = '<span class="badge badge-success">' + ready + ' ready</span>';
-        else if (makeable === Infinity || makeable > 0) badge = '<span class="badge badge-success">' + (makeable === Infinity ? 'Open' : 'Can make ' + makeable) + '</span>';
+        const readyTxt = _q(ready);
+        const makeTxt = makeable === Infinity ? 'Open' : _q(makeable);
+        if (ready > 0 && makeable > 0 && makeable !== Infinity) badge = '<span class="badge badge-success">' + readyTxt + ' ready · can make ' + makeTxt + '</span>';
+        else if (ready > 0) badge = '<span class="badge badge-success">' + readyTxt + ' ready</span>';
+        else if (makeable === Infinity || makeable > 0) badge = '<span class="badge badge-success">' + (makeable === Infinity ? 'Open' : 'Can make ' + makeTxt) + '</span>';
         else badge = '<span class="badge badge-warning">MTO · short</span>';
       } else {
         badge = s.quantity === 0 ? '<span class="badge badge-danger">Out</span>' : s.quantity <= s.minStock ? '<span class="badge badge-warning">Low</span>' : '<span class="badge badge-success">In Stock</span>';
@@ -122,8 +159,8 @@ const Inventory = (() => {
       });
       const lotCount = lots.length;
       const qtyCell = mto
-        ? '<strong>' + ready + '</strong> <span style="color:var(--text-light);font-size:.75rem">ready' + (makeable === Infinity ? ' · open' : ' · ' + makeable + ' can make') + '</span>'
-        : '<strong>' + s.quantity + '</strong> <span style="color:var(--text-light);font-size:.75rem">(' + lotCount + ' lot' + (lotCount !== 1 ? 's' : '') + ')</span>';
+        ? '<strong>' + _q(ready) + '</strong> <span style="color:var(--text-light);font-size:.75rem">ready' + (makeable === Infinity ? ' · open' : ' · ' + _q(makeable) + ' can make') + '</span>'
+        : '<strong>' + _q(s.quantity) + '</strong> <span style="color:var(--text-light);font-size:.75rem">(' + lotCount + ' lot' + (lotCount !== 1 ? 's' : '') + ')</span>';
 
       const main = '<tr>' +
         '<td>' + (lotCount ? '<button class="btn-icon" onclick="Inventory.toggle(\'' + key + '\')"><i class="fas fa-chevron-' + (isOpen ? 'down' : 'right') + '"></i></button>' : '') + '</td>' +
@@ -150,7 +187,7 @@ const Inventory = (() => {
         const sup = b.supplierPartyId ? (Store.getPartyById(b.supplierPartyId) || {}).name : '';
         return '<tr>' +
           '<td><code style="font-size:.75rem">' + _esc(b.batchNumber || '—') + '</code></td>' +
-          '<td>' + b.qty + '</td>' +
+          '<td>' + _q(b.qty) + '</td>' +
           '<td>\u20B9' + (b.unitCost || 0).toFixed(2) + '</td>' +
           '<td>' + exp + '</td>' +
           '<td>' + (sup ? _esc(sup) : (b.note ? '<span style="color:var(--text-light)">' + _esc(b.note) + '</span>' : '—')) + '</td>' +
@@ -165,6 +202,11 @@ const Inventory = (() => {
         '<table class="data-table" style="margin:.25rem 0"><thead><tr><th>Lot #</th><th>Qty</th><th>Unit cost</th><th>Expiry</th><th>Supplier / Note</th><th></th></tr></thead><tbody>' + lotRows + '</tbody></table>' +
         '</td></tr>';
     }).join('');
+    _paintViews();
+  }
+
+  function _paintViews() {
+    if (typeof Views !== 'undefined') Views.syncFrom('inventory', 'inventory-table-body', 'inventory-alt');
   }
 
   function toggle(key) { expanded[key] = !expanded[key]; render(); }
@@ -189,7 +231,7 @@ const Inventory = (() => {
       document.getElementById('stock-modal-title').textContent = 'Edit Batch';
       prodSel.value = b.productId; locSel.value = b.locationId;
       prodSel.disabled = true; locSel.disabled = true;
-      document.getElementById('stock-quantity').value = b.qty;
+      document.getElementById('stock-quantity').value = Store.roundQty ? Store.roundQty(b.qty) : b.qty;
       document.getElementById('stock-cost').value = b.unitCost || 0;
       document.getElementById('stock-batch').value = b.batchNumber || '';
       document.getElementById('stock-expiry').value = b.expiryDate || '';
@@ -204,6 +246,7 @@ const Inventory = (() => {
       const rec = (productId && locationId) ? Store.getStockRecord(productId, locationId) : null;
       document.getElementById('stock-min').value = rec ? rec.minStock : 0;
     }
+    _syncCost('unit');
     SearchableSelect.enhanceAll(document.getElementById('stock-modal'));
     document.getElementById('stock-modal').classList.remove('hidden');
   }
@@ -236,8 +279,8 @@ const Inventory = (() => {
       Store.setStock(productId, locationId, Store.getBatchQty(productId, locationId), min);
       App.showToast('Reorder level updated', 'success');
     } else {
-      const qty = parseFloat(document.getElementById('stock-quantity').value) || 0;
-      const unitCost = parseFloat(document.getElementById('stock-cost').value) || 0;
+      const qty = Store.roundQty(parseFloat(document.getElementById('stock-quantity').value) || 0);
+      const unitCost = Math.round((parseFloat(document.getElementById('stock-cost').value) || 0) * 100) / 100;
       const batchNumber = document.getElementById('stock-batch').value.trim();
       const expiryDate = document.getElementById('stock-expiry').value || null;
       const supplierPartyId = document.getElementById('stock-supplier').value || null;
@@ -269,7 +312,7 @@ const Inventory = (() => {
     const prod = Store.getProductById(b.productId);
     const from = Store.getLocationById(b.locationId);
     document.getElementById('move-batch-id').value = b.id;
-    document.getElementById('move-hint').textContent = (prod ? prod.name : 'This lot') + ' · ' + (b.batchNumber || 'lot') + ' is at ' + (from ? from.name : 'this location') + ' (' + b.qty + ' on hand). Cost and expiry stay with the lot.';
+    document.getElementById('move-hint').textContent = (prod ? prod.name : 'This lot') + ' · ' + (b.batchNumber || 'lot') + ' is at ' + (from ? from.name : 'this location') + ' (' + _q(b.qty) + ' on hand). Cost and expiry stay with the lot.';
     document.getElementById('move-location').innerHTML = locs.map(l => '<option value="' + l.id + '">' + _esc(l.name) + '</option>').join('');
     const qty = document.getElementById('move-qty');
     qty.max = b.qty;
@@ -298,7 +341,7 @@ const Inventory = (() => {
   function deleteBatch(batchId) {
     const b = Store.getBatchById(batchId);
     if (!b) return;
-    document.getElementById('delete-message').textContent = 'Delete this lot (' + (b.batchNumber || 'batch') + ', ' + b.qty + ' units)?';
+    document.getElementById('delete-message').textContent = 'Delete this lot (' + (b.batchNumber || 'batch') + ', ' + _q(b.qty) + ' units)?';
     document.getElementById('delete-modal').classList.remove('hidden');
     const btn = document.getElementById('confirm-delete-btn');
     const clone = btn.cloneNode(true);

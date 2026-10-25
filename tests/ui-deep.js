@@ -204,7 +204,7 @@
         dashboard: 'Dashboard', locations: 'Locations', products: 'Products',
         inventory: 'Inventory', pos: 'POS Counter', orders: 'Orders', purchase: 'Purchase',
         categories: 'Categories', shop: 'Shop', reports: 'Reports', khata: 'Khata / Credit',
-        'field-order': 'Field Orders', parties: 'Customers / Sellers', team: 'Team',
+        'field-order': 'Field Orders', parties: 'Customers / Sellers', team: 'Team', settings: 'Settings',
       };
       const items = Array.from(document.querySelectorAll('.sidebar .nav-item[data-view]'));
       assert(items.length === Object.keys(titles).length, 'nav count ' + items.length);
