@@ -93,8 +93,12 @@ const Purchase = (() => {
   function updateLine(idx, field, value) {
     const line = items[idx];
     if (!line) return;
-    if (field === 'qty') line.qty = Math.max(1, parseFloat(value) || 1);
+    if (field === 'qty') line.qty = Math.max(0.01, parseFloat(value) || 1);
     if (field === 'unitPrice') line.unitPrice = Math.max(0, parseFloat(value) || 0);
+    if (field === 'lineTotal') {
+      const total = Math.max(0, parseFloat(value) || 0);
+      line.unitPrice = line.qty > 0 ? Math.round((total / line.qty) * 100) / 100 : 0;
+    }
     if (field === 'expiryDate') line.expiryDate = value || '';
     _renderBill();
     renderProducts();
@@ -117,7 +121,8 @@ const Purchase = (() => {
           '<button class="pos-bill-row-remove" onclick="Purchase.remove(' + idx + ')" title="Remove"><i class="fas fa-xmark"></i></button></div>' +
           '<div class="po-bill-meta">' +
             '<label>Qty <input class="po-qty" type="number" min="0.01" step="0.01" value="' + i.qty + '" onchange="Purchase.updateLine(' + idx + ',\'qty\',this.value)"></label>' +
-            '<label>Cost <input class="po-cost" type="number" min="0" step="0.01" value="' + i.unitPrice + '" onchange="Purchase.updateLine(' + idx + ',\'unitPrice\',this.value)"></label>' +
+            '<label>Unit <input class="po-cost" type="number" min="0" step="0.01" value="' + i.unitPrice + '" onchange="Purchase.updateLine(' + idx + ',\'unitPrice\',this.value)"></label>' +
+            '<label>Line ₹ <input class="po-line" type="number" min="0" step="0.01" value="' + (i.qty * i.unitPrice).toFixed(2) + '" onchange="Purchase.updateLine(' + idx + ',\'lineTotal\',this.value)"></label>' +
             '<label>Expiry <input class="po-expiry" type="date" value="' + (i.expiryDate || '') + '" onchange="Purchase.updateLine(' + idx + ',\'expiryDate\',this.value)"></label>' +
             '<span class="po-line-total">\u20B9' + (i.qty * i.unitPrice).toFixed(2) + '</span>' +
           '</div></div>').join('');

@@ -153,6 +153,7 @@
         </button>
         <div class="nav-group-body">
           <a href="#" class="nav-item" data-view="team"><i class="fas fa-users-gear"></i><span>Team</span></a>
+          <a href="#" class="nav-item" data-view="settings"><i class="fas fa-sliders"></i><span>Settings</span></a>
         </div>
       </div>
     </nav>
@@ -277,6 +278,7 @@
         <div class="search-bar"><i class="fas fa-search"></i>
           <input type="text" id="location-search" placeholder="Search locations..."></div>
         <div class="toolbar-actions">
+          <div id="locations-view-switch"></div>
           <button class="btn btn-primary" id="add-location-btn"><i class="fas fa-plus"></i> Add Location</button>
         </div>
       </div>
@@ -306,6 +308,7 @@
           </select>
         </div>
         <div class="toolbar-actions">
+          <div id="products-view-switch"></div>
           <button class="btn btn-secondary" id="catalog-btn"><i class="fas fa-layer-group"></i> Catalog</button>
           <button class="btn btn-secondary" id="import-btn"><i class="fas fa-file-import"></i> Import</button>
           <button class="btn btn-primary" id="add-product-btn"><i class="fas fa-plus"></i> Add Product</button>
@@ -328,6 +331,7 @@
             <th class="no-sort">Actions</th>
           </tr></thead><tbody id="products-table-body"></tbody></table>
         </div>
+        <div id="products-alt" class="view-alt hidden"></div>
         <div class="empty-state hidden" id="no-products"><i class="fas fa-box-open"></i><p>No products yet</p>
           <button class="btn btn-primary" id="add-first-product-btn">Add Your First Product</button></div>
       </div></div>
@@ -466,6 +470,7 @@
           </select>
         </div>
         <div class="toolbar-actions">
+          <div id="inventory-view-switch"></div>
           <div class="export-dropdown">
             <button class="btn btn-secondary" id="export-btn"><i class="fas fa-download"></i> Export</button>
             <div class="export-menu hidden" id="export-menu">
@@ -489,6 +494,7 @@
             <th class="no-sort">Actions</th>
           </tr></thead><tbody id="inventory-table-body"></tbody></table>
         </div>
+        <div id="inventory-alt" class="view-alt hidden"></div>
         <div class="empty-state hidden" id="no-inventory"><i class="fas fa-warehouse"></i><p>No stock yet. Add a purchase batch to get started.</p>
           <button class="btn btn-primary" id="add-first-stock-btn">Add Batch</button></div>
       </div></div>
@@ -500,8 +506,11 @@
         <button class="tab active" data-tab="sales">Sales Orders</button>
         <button class="tab" data-tab="purchase">Purchase Orders</button>
       </div>
-      <div class="toolbar-actions hidden" id="orders-actions" style="margin-top:.75rem;justify-content:flex-end">
-        <button class="btn btn-primary" id="new-manual-purchase-btn"><i class="fas fa-plus"></i> New Manual Purchase</button>
+      <div class="toolbar-actions" style="margin-top:.75rem;justify-content:flex-end">
+        <div id="orders-view-switch"></div>
+        <div class="hidden" id="orders-actions">
+          <button class="btn btn-primary" id="new-manual-purchase-btn"><i class="fas fa-plus"></i> New Manual Purchase</button>
+        </div>
       </div>
       <div class="card" style="margin-top:1rem"><div class="card-body">
         <div class="table-wrap">
@@ -509,6 +518,7 @@
             <th class="sortable">Order #</th><th class="sortable">Date</th><th class="sortable" id="order-party-header">Customer</th><th class="sortable">Items</th><th class="sortable">Total</th><th class="sortable">Status</th><th class="no-sort">Actions</th>
           </tr></thead><tbody id="orders-table-body"></tbody></table>
         </div>
+        <div id="orders-alt" class="view-alt hidden"></div>
         <div class="empty-state hidden" id="no-orders"><i class="fas fa-file-invoice"></i><p>No orders yet</p></div>
       </div></div>
     </section>
@@ -605,6 +615,7 @@
         <div class="search-bar"><i class="fas fa-search"></i>
           <input type="text" id="category-search" placeholder="Search categories..."></div>
         <div class="toolbar-actions">
+          <div id="categories-view-switch"></div>
           <button class="btn btn-primary" id="add-category-btn"><i class="fas fa-plus"></i> Add Category</button>
         </div>
       </div>
@@ -625,40 +636,76 @@
           </select>
         </div>
       </div>
-      <div class="stats-grid" id="report-stats"></div>
-      <div class="charts-grid">
-        <div class="card"><div class="card-header"><h3>Revenue & Profit</h3></div>
-          <div class="card-body chart-container"><canvas id="chart-report-revenue"></canvas></div></div>
-        <div class="card"><div class="card-header"><h3>Top Products by Revenue</h3></div>
-          <div class="card-body chart-container"><canvas id="chart-top-products"></canvas></div></div>
+      <div class="tabs report-tabs" id="report-tabs">
+        <button type="button" class="tab active" data-report="overview">Overview</button>
+        <button type="button" class="tab" data-report="sales">Sales</button>
+        <button type="button" class="tab" data-report="profit">Profit</button>
+        <button type="button" class="tab" data-report="stock">Stock</button>
+        <button type="button" class="tab" data-report="expiry">Expiry</button>
+        <button type="button" class="tab" data-report="purchases">Purchases</button>
+        <button type="button" class="tab" data-report="gst">GST</button>
       </div>
-      <div class="charts-grid" style="margin-top:1rem">
-        <div class="card"><div class="card-header"><h3>Stock Valuation by Category</h3></div>
-          <div class="card-body chart-container"><canvas id="chart-stock-val"></canvas></div></div>
-        <div class="card"><div class="card-header"><h3>P&L Summary</h3></div>
-          <div class="card-body chart-container"><canvas id="chart-pnl"></canvas></div></div>
+      <div data-report-pane="overview">
+        <div class="stats-grid" id="report-stats"></div>
       </div>
-      <div class="card" style="margin-top:1rem">
-        <div class="card-header"><h3>Expiring Soon</h3></div>
-        <div class="card-body">
-          <div class="table-wrap">
-            <table class="data-table"><thead><tr>
-              <th class="sortable">Product</th><th class="sortable">Location</th><th class="sortable">Batch</th><th class="sortable">Qty</th><th class="sortable">Expiry Date</th><th class="sortable">Days Left</th>
-            </tr></thead><tbody id="expiry-table-body"></tbody></table>
-          </div>
-          <div class="empty-state hidden" id="no-expiry"><i class="fas fa-check-circle"></i><p>No items expiring soon</p></div>
+      <div class="hidden" data-report-pane="sales">
+        <div class="charts-grid">
+          <div class="card"><div class="card-header"><h3>Revenue & Profit</h3></div>
+            <div class="card-body chart-container"><canvas id="chart-report-revenue"></canvas></div></div>
+          <div class="card"><div class="card-header"><h3>Top Products by Revenue</h3></div>
+            <div class="card-body chart-container"><canvas id="chart-top-products"></canvas></div></div>
         </div>
       </div>
-      <div class="card" style="margin-top:1rem">
-        <div class="card-header"><h3>Slow Movers (No sales in period)</h3></div>
-        <div class="card-body">
-          <div class="table-wrap">
-            <table class="data-table"><thead><tr>
-              <th class="sortable">Product</th><th class="sortable">SKU</th><th class="sortable">Stock</th><th class="sortable">Value (Cost)</th>
-            </tr></thead><tbody id="slow-mover-body"></tbody></table>
-          </div>
-          <div class="empty-state hidden" id="no-slow-movers"><i class="fas fa-rocket"></i><p>All products are selling!</p></div>
+      <div class="hidden" data-report-pane="profit">
+        <div class="charts-grid">
+          <div class="card"><div class="card-header"><h3>P&L Summary</h3></div>
+            <div class="card-body chart-container"><canvas id="chart-pnl"></canvas></div></div>
         </div>
+      </div>
+      <div class="hidden" data-report-pane="stock">
+        <div class="charts-grid">
+          <div class="card"><div class="card-header"><h3>Stock Valuation by Category</h3></div>
+            <div class="card-body chart-container"><canvas id="chart-stock-val"></canvas></div></div>
+        </div>
+        <div class="card" style="margin-top:1rem">
+          <div class="card-header"><h3>Slow Movers (No sales in period)</h3></div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table class="data-table"><thead><tr>
+                <th class="sortable">Product</th><th class="sortable">SKU</th><th class="sortable">Stock</th><th class="sortable">Value (Cost)</th>
+              </tr></thead><tbody id="slow-mover-body"></tbody></table>
+            </div>
+            <div class="empty-state hidden" id="no-slow-movers"><i class="fas fa-rocket"></i><p>All products are selling!</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="hidden" data-report-pane="expiry">
+        <div class="card">
+          <div class="card-header"><h3>Expiring Soon</h3></div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table class="data-table"><thead><tr>
+                <th class="sortable">Product</th><th class="sortable">Location</th><th class="sortable">Batch</th><th class="sortable">Qty</th><th class="sortable">Expiry Date</th><th class="sortable">Days Left</th>
+              </tr></thead><tbody id="expiry-table-body"></tbody></table>
+            </div>
+            <div class="empty-state hidden" id="no-expiry"><i class="fas fa-check-circle"></i><p>No items expiring soon</p></div>
+          </div>
+        </div>
+      </div>
+      <div class="hidden" data-report-pane="purchases">
+        <div class="card">
+          <div class="card-header"><h3>Purchases <span id="report-purchases-total" style="font-weight:700"></span></h3></div>
+          <div class="card-body">
+            <div class="table-wrap">
+              <table class="data-table"><thead><tr>
+                <th>Date</th><th>What</th><th>From</th><th>Total</th>
+              </tr></thead><tbody id="report-purchases-body"></tbody></table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hidden" data-report-pane="gst">
+        <div class="stats-grid" id="report-gst"></div>
       </div>
     </section>
 
@@ -668,6 +715,7 @@
         <div class="search-bar"><i class="fas fa-search"></i>
           <input type="text" id="khata-search" placeholder="Search parties..."></div>
         <div class="toolbar-actions">
+          <div id="khata-view-switch"></div>
           <button class="btn btn-primary" id="add-khata-btn"><i class="fas fa-plus"></i> Add Entry</button>
         </div>
       </div>
@@ -692,17 +740,33 @@
 
     <!-- ===== Shop View ===== -->
     <section id="view-shop" class="view hidden">
+      <div class="shop-hero">
+        <div>
+          <p class="shop-kicker">Marketplace</p>
+          <h2>Stock up from other shops</h2>
+          <p>Browse published catalogs, keep a running quantity on each card, and send the order while it is still pending.</p>
+        </div>
+        <button class="btn btn-primary" id="open-cart-btn">
+          <i class="fas fa-cart-shopping"></i> Cart <span class="cart-count" id="cart-count">0</span>
+        </button>
+      </div>
       <div class="view-toolbar">
         <div class="search-bar"><i class="fas fa-search"></i>
           <input type="text" id="shop-search" placeholder="Search products..."></div>
         <div class="toolbar-filters">
           <select id="shop-seller-filter" class="select-input"><option value="">All Shops</option></select>
           <select id="shop-category-filter" class="select-input"><option value="">All Categories</option></select>
-        </div>
-        <div class="toolbar-actions">
-          <button class="btn btn-primary" id="open-cart-btn">
-            <i class="fas fa-cart-shopping"></i> Cart <span class="cart-count" id="cart-count">0</span>
-          </button>
+          <select id="shop-stock-filter" class="select-input">
+            <option value="">Any stock</option>
+            <option value="in">In stock</option>
+            <option value="out">Out of stock</option>
+          </select>
+          <select id="shop-sort" class="select-input">
+            <option value="name">Name</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="price-desc">Price: high to low</option>
+            <option value="shop">Shop</option>
+          </select>
         </div>
       </div>
       <div class="shop-grid" id="shop-grid"></div>
@@ -721,6 +785,7 @@
           </select>
         </div>
         <div class="toolbar-actions">
+          <div id="parties-view-switch"></div>
           <button class="btn btn-primary" id="add-party-btn"><i class="fas fa-plus"></i> Add Party</button>
         </div>
       </div>
@@ -730,6 +795,7 @@
             <th class="sortable">Name</th><th class="sortable">Type</th><th class="sortable">Location</th><th class="sortable">Phone</th><th class="no-sort">Actions</th>
           </tr></thead><tbody id="parties-table-body"></tbody></table>
         </div>
+        <div id="parties-alt" class="view-alt hidden"></div>
         <div class="empty-state hidden" id="no-parties"><i class="fas fa-address-book"></i><p>No custom customers or sellers yet</p>
           <button class="btn btn-primary" id="add-first-party-btn">Add First Party</button></div>
       </div></div>
@@ -737,6 +803,13 @@
 
     <!-- ===== Field Order View (marketing) ===== -->
     <section id="view-field-order" class="view hidden">
+      <div class="shop-hero field-hero">
+        <div>
+          <p class="shop-kicker">On the route</p>
+          <h2>Field orders</h2>
+          <p>Pick a customer, add published products, and send the order to the office. They accept it before it is delivered.</p>
+        </div>
+      </div>
       <div class="field-order-layout">
         <div class="card">
           <div class="card-header"><h3>New Field Order</h3></div>
@@ -757,12 +830,13 @@
           </div>
         </div>
         <div class="card">
-          <div class="card-header"><h3>My Field Orders</h3></div>
+          <div class="card-header"><h3>My Field Orders</h3><div id="fo-view-switch"></div></div>
           <div class="card-body">
             <div class="table-wrap">
               <table class="data-table"><thead><tr><th>Order #</th><th>Customer</th><th>Total</th><th>Status</th></tr></thead>
               <tbody id="fo-history-body"></tbody></table>
             </div>
+            <div id="fo-alt" class="view-alt hidden"></div>
             <div class="empty-state hidden" id="no-field-orders"><i class="fas fa-route"></i><p>No field orders placed yet</p></div>
           </div>
         </div>
@@ -771,19 +845,11 @@
 
     <!-- ===== Team View (owner / admin) ===== -->
     <section id="view-team" class="view hidden">
-      <div class="card" id="ingredient-stock-card">
-        <div class="card-header"><h3>Make-to-order ingredients</h3></div>
-        <div class="card-body">
-          <label class="checkbox-label">
-            <input type="checkbox" id="track-ingredient-stock" checked> Track raw material quantities
-          </label>
-          <p class="form-hint">Turn this off when this company should sell every make-to-order item even if ingredients are out of stock. Raw quantities are not reduced on those sales. Making cost still includes each ingredient, using its latest purchase batch rate (or the saved cost if there is no batch).</p>
-        </div>
-      </div>
       <div class="view-toolbar">
         <div class="search-bar"><i class="fas fa-search"></i>
           <input type="text" id="team-search" placeholder="Search team..."></div>
         <div class="toolbar-actions">
+          <div id="team-view-switch"></div>
           <button class="btn btn-primary" id="add-worker-btn"><i class="fas fa-user-plus"></i> Add Worker</button>
         </div>
       </div>
@@ -793,9 +859,65 @@
             <th class="sortable">Name</th><th class="sortable">Username</th><th class="sortable">Role</th><th class="no-sort">Actions</th>
           </tr></thead><tbody id="team-table-body"></tbody></table>
         </div>
+        <div id="team-alt" class="view-alt hidden"></div>
         <div class="empty-state hidden" id="no-team"><i class="fas fa-users-gear"></i><p>No workers yet — add marketing, office, or staff users.</p>
           <button class="btn btn-primary" id="add-first-worker-btn">Add First Worker</button></div>
       </div></div>
+    </section>
+
+    <!-- ===== Settings ===== -->
+    <section id="view-settings" class="view hidden">
+      <div class="settings-lead">
+        <h2>Company settings</h2>
+        <p>These apply to everyone in this company. Ingredient tracking, alerts, and the shop default live here.</p>
+      </div>
+      <div class="settings-grid">
+        <div class="card" id="ingredient-stock-card">
+          <div class="card-header"><h3>Make-to-order</h3></div>
+          <div class="card-body">
+            <label class="checkbox-label">
+              <input type="checkbox" id="track-ingredient-stock" checked> Track raw material quantities
+            </label>
+            <p class="form-hint">Turn this off when this company should sell every make-to-order item even if ingredients are out of stock. Raw quantities are not reduced on those sales. Making cost still includes each ingredient, using its latest purchase batch rate (or the saved cost if there is no batch).</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Alerts</h3></div>
+          <div class="card-body">
+            <label class="checkbox-label">
+              <input type="checkbox" id="settings-low-stock" checked> Low-stock bell on the dashboard
+            </label>
+            <div class="form-group" style="margin-top:1rem">
+              <label for="settings-expiry-days">Warn when a lot expires within</label>
+              <input type="number" id="settings-expiry-days" min="1" step="1" value="90">
+              <p class="form-hint">Days. Inventory’s “Expiring soon” filter and the Expiry report use this window.</p>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Catalog</h3></div>
+          <div class="card-body">
+            <label class="checkbox-label">
+              <input type="checkbox" id="settings-publish-default" checked> Publish new products to the shop
+            </label>
+            <p class="form-hint">New sellable products start with the marketplace switch on. You can still turn a product off after saving it.</p>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>Point of sale</h3></div>
+          <div class="card-body">
+            <div class="form-group">
+              <label for="settings-pos-payment">Default payment method</label>
+              <select id="settings-pos-payment" class="select-input">
+                <option value="cash">Cash</option>
+                <option value="upi">UPI</option>
+                <option value="card">Card</option>
+              </select>
+              <p class="form-hint">The POS counter opens on this method. The cashier can still change it on a bill.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
   </main>
@@ -1007,7 +1129,7 @@
 <!-- Stock Modal -->
 <div class="modal hidden" id="stock-modal">
   <div class="modal-overlay"></div>
-  <div class="modal-content modal-sm">
+  <div class="modal-content modal-batch">
     <div class="modal-header"><h3 id="stock-modal-title">Add Purchase Batch</h3>
       <button class="btn-icon modal-close"><i class="fas fa-xmark"></i></button></div>
     <form id="stock-form">
@@ -1023,9 +1145,12 @@
           <div class="form-row">
             <div class="form-group"><label for="stock-quantity">Quantity *</label>
               <input type="number" id="stock-quantity" min="0" step="0.01" value="0"></div>
-            <div class="form-group"><label for="stock-cost">Unit cost (₹) *</label>
+            <div class="form-group"><label for="stock-cost">Unit cost (₹)</label>
               <input type="number" id="stock-cost" min="0" step="0.01" value="0"></div>
+            <div class="form-group"><label for="stock-total">Total cost (₹)</label>
+              <input type="number" id="stock-total" min="0" step="0.01" value="0"></div>
           </div>
+          <p class="form-hint">Enter a unit cost and the total fills in. Enter a total — ₹240 for 14 pieces — and the unit cost is calculated. Both stay editable.</p>
           <div class="form-row">
             <div class="form-group"><label for="stock-batch">Batch / Lot #</label>
               <input type="text" id="stock-batch" placeholder="Auto if blank"></div>
@@ -1448,6 +1573,7 @@
 <script src="js/creds.js"></script>
 <script src="js/select.js"></script>
 <script src="js/tables.js"></script>
+<script src="js/views.js"></script>
 
 <script src="js/store.js"></script>
 <script src="js/auth.js"></script>
@@ -1468,6 +1594,7 @@
 <script src="js/parties.js"></script>
 <script src="js/team.js"></script>
 <script src="js/field-orders.js"></script>
+<script src="js/settings.js"></script>
 <script src="js/onboarding.js"></script>
 <script src="js/app.js"></script>
 <script>

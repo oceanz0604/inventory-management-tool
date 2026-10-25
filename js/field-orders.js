@@ -9,6 +9,7 @@ const FieldOrders = (() => {
     if (prod) prod.addEventListener('change', _onAddProduct);
     const submit = document.getElementById('fo-submit');
     if (submit) submit.addEventListener('click', _submit);
+    if (typeof Views !== 'undefined') Views.mount(document.getElementById('fo-view-switch'), 'field-order', _renderHistory);
     const addCust = document.getElementById('fo-add-customer');
     if (addCust) addCust.addEventListener('click', () => {
       if (typeof Parties === 'undefined') return;
@@ -116,7 +117,7 @@ const FieldOrders = (() => {
     if (me && Auth.getRole() === 'marketing') orders = orders.filter(o => o.createdBy === me.id);
     orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
-    if (orders.length === 0) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+    if (orders.length === 0) { tbody.innerHTML = ''; empty.classList.remove('hidden'); _paintViews(); return; }
     empty.classList.add('hidden');
 
     tbody.innerHTML = orders.map(o => {
@@ -125,6 +126,11 @@ const FieldOrders = (() => {
         '<td>\u20B9' + (o.total || 0).toFixed(2) + '</td>' +
         '<td><span class="order-status ' + o.status + '">' + _cap(o.status) + '</span></td></tr>';
     }).join('');
+    _paintViews();
+  }
+
+  function _paintViews() {
+    if (typeof Views !== 'undefined') Views.syncFrom('field-order', 'fo-history-body', 'fo-alt');
   }
 
   function _cap(s) { return (s || '').charAt(0).toUpperCase() + (s || '').slice(1); }

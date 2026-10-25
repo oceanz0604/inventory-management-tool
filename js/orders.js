@@ -14,6 +14,7 @@ const Orders = (() => {
     });
     const printBtn = document.getElementById('print-invoice-btn');
     if (printBtn) printBtn.addEventListener('click', _printInvoice);
+    if (typeof Views !== 'undefined') Views.mount(document.getElementById('orders-view-switch'), 'orders', render);
 
     // Field-sale delivery (payment) modal
     const fulfillConfirm = document.getElementById('fulfill-confirm');
@@ -59,6 +60,7 @@ const Orders = (() => {
       tbody.innerHTML = '';
       empty.classList.remove('hidden');
       table.classList.add('hidden');
+      _paintViews();
       return;
     }
     empty.classList.add('hidden');
@@ -69,7 +71,12 @@ const Orders = (() => {
       if (e.kind === 'batch') return _batchRow(e.batch);
       return _orderRow(e.order);
     }).join('');
+    _paintViews();
     if (window.TableSort) TableSort.refresh(document.getElementById('view-orders'));
+  }
+
+  function _paintViews() {
+    if (typeof Views !== 'undefined') Views.syncFrom('orders', 'orders-table-body', 'orders-alt');
   }
 
   function _salesEntries(owner) {
@@ -107,6 +114,8 @@ const Orders = (() => {
         if (o.status === 'approved') actionBtns += ' <button class="btn btn-sm btn-warning" onclick="Orders.ship(\'' + o.id + '\')">Ship</button>';
         if (o.status === 'shipped') actionBtns += ' <button class="btn btn-sm btn-primary" onclick="Orders.deliver(\'' + o.id + '\')">Deliver</button>';
         if (o.status === 'pending' || o.status === 'approved') actionBtns += ' <button class="btn btn-sm btn-danger" onclick="Orders.cancel(\'' + o.id + '\')">Cancel</button>';
+      } else if (o.status === 'pending') {
+        actionBtns += ' <button class="btn btn-sm btn-danger" onclick="Orders.cancel(\'' + o.id + '\')">Cancel</button>';
       }
       if (o.status === 'delivered') actionBtns += ' <button class="btn btn-sm btn-secondary" onclick="Orders.showInvoice(\'' + o.id + '\')" title="Invoice"><i class="fas fa-file-invoice-dollar"></i></button>';
     }
@@ -152,11 +161,19 @@ const Orders = (() => {
       '<td><div class="action-btns"><button class="btn btn-sm btn-secondary" onclick="Orders.viewBatch(\'' + b.id + '\')"><i class="fas fa-eye"></i></button></div></td></tr>';
   }
 
+  function _account(id) {
+    if (!id) return { name: 'Unknown', gstin: '' };
+    const company = Store.getCompanyById ? Store.getCompanyById(id) : null;
+    const user = Store.getUserById(id);
+    if (company && company.name) return { name: company.name, gstin: company.gstin || (user && user.gstin) || '' };
+    if (user) return { name: user.shopName || user.name || 'Unknown', gstin: user.gstin || '' };
+    return { name: 'Unknown', gstin: '' };
+  }
+
   function _orderPartyName(o) {
     if (o.kind === 'field_sale') { const c = Store.getPartyById(o.customerPartyId); return c ? c.name : 'Customer'; }
     if (o.kind === 'manual_purchase') { const s = Store.getPartyById(o.sellerPartyId); return s ? s.name : 'Seller'; }
-    const u = activeTab === 'sales' ? Store.getUserById(o.buyerId) : Store.getUserById(o.sellerId);
-    return u ? (u.name || u.shopName) : 'Unknown';
+    return _account(activeTab === 'sales' ? o.buyerId : o.sellerId).name;
   }
 
   function _tag(label, kind) {
@@ -222,8 +239,8 @@ const Orders = (() => {
     if (!order) return;
     if (order.kind === 'field_sale' || order.kind === 'manual_purchase') { _viewCustomDetail(order); return; }
     const isSeller = order.sellerId === Auth.ownerId();
-    const buyer = Store.getUserById(order.buyerId);
-    const seller = Store.getUserById(order.sellerId);
+    const buyer = _account(order.buyerId);
+    const seller = _account(order.sellerId);
     const loc = order.fulfillmentLocationId ? Store.getLocationById(order.fulfillmentLocationId) : null;
 
     const statuses = ['pending', 'approved', 'shipped', 'delivered'];
@@ -255,8 +272,8 @@ const Orders = (() => {
     document.getElementById('order-detail-title').textContent = order.orderNumber;
     document.getElementById('order-detail-body').innerHTML =
       '<div class="order-detail-grid">' +
-      '<div class="detail-item"><div class="detail-label">Buyer</div><strong>' + _esc(buyer ? buyer.name : 'Unknown') + '</strong>' + (buyer && buyer.gstin ? '<div style="font-size:.75rem;color:var(--text-secondary)">GSTIN: ' + _esc(buyer.gstin) + '</div>' : '') + '</div>' +
-      '<div class="detail-item"><div class="detail-label">Seller</div><strong>' + _esc(seller ? seller.name : 'Unknown') + '</strong>' + (seller && seller.gstin ? '<div style="font-size:.75rem;color:var(--text-secondary)">GSTIN: ' + _esc(seller.gstin) + '</div>' : '') + '</div>' +
+      '<div class="detail-item"><div class="detail-label">Buyer</div><strong>' + _esc(buyer.name) + '</strong>' + (buyer.gstin ? '<div style="font-size:.75rem;color:var(--text-secondary)">GSTIN: ' + _esc(buyer.gstin) + '</div>' : '') + '</div>' +
+      '<div class="detail-item"><div class="detail-label">Seller</div><strong>' + _esc(seller.name) + '</strong>' + (seller.gstin ? '<div style="font-size:.75rem;color:var(--text-secondary)">GSTIN: ' + _esc(seller.gstin) + '</div>' : '') + '</div>' +
       '<div class="detail-item"><div class="detail-label">Date</div>' + new Date(order.createdAt).toLocaleDateString('en-IN', { month: 'long', day: 'numeric', year: 'numeric' }) + '</div>' +
       '<div class="detail-item"><div class="detail-label">Fulfillment</div>' + (loc ? _esc(loc.name) : '<em style="color:var(--text-light)">Not assigned</em>') + '</div></div>' +
       timeline +
@@ -268,6 +285,7 @@ const Orders = (() => {
 
     let footerHtml = '<button class="btn btn-secondary modal-close">Close</button>';
     if (isSeller && order.status === 'pending') footerHtml = '<button class="btn btn-danger" onclick="Orders.cancel(\'' + order.id + '\');document.getElementById(\'order-detail-modal\').classList.add(\'hidden\')">Cancel</button><button class="btn btn-success" onclick="Orders.approve(\'' + order.id + '\');document.getElementById(\'order-detail-modal\').classList.add(\'hidden\')">Approve</button>' + footerHtml;
+    if (!isSeller && order.status === 'pending') footerHtml = '<button class="btn btn-danger" onclick="Orders.cancel(\'' + order.id + '\');document.getElementById(\'order-detail-modal\').classList.add(\'hidden\')">Cancel</button>' + footerHtml;
     if (isSeller && order.status === 'approved') footerHtml = '<button class="btn btn-warning" onclick="Orders.ship(\'' + order.id + '\');document.getElementById(\'order-detail-modal\').classList.add(\'hidden\')">Mark Shipped</button>' + footerHtml;
     if (isSeller && order.status === 'shipped') footerHtml = '<button class="btn btn-primary" onclick="Orders.deliver(\'' + order.id + '\');document.getElementById(\'order-detail-modal\').classList.add(\'hidden\')">Mark Delivered</button>' + footerHtml;
     if (order.status === 'delivered') footerHtml = '<button class="btn btn-secondary" onclick="Orders.showInvoice(\'' + order.id + '\')"><i class="fas fa-file-invoice-dollar"></i> Invoice</button>' + footerHtml;
@@ -282,8 +300,8 @@ const Orders = (() => {
   function showInvoice(orderId) {
     const order = Store.getOrderById(orderId);
     if (!order) return;
-    const seller = Store.getUserById(order.sellerId);
-    const buyer = Store.getUserById(order.buyerId);
+    const seller = _account(order.sellerId);
+    const buyer = _account(order.buyerId);
     const date = new Date(order.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
 
     let subtotal = 0, totalGst = 0;
@@ -306,8 +324,8 @@ const Orders = (() => {
       '<div class="invoice-header"><div><div class="inv-title">TAX INVOICE</div><div style="font-size:.8rem;color:var(--text-secondary)">' + order.orderNumber + '</div></div>' +
       '<div class="inv-meta">Date: ' + date + '</div></div>' +
       '<div class="invoice-parties">' +
-      '<div><div class="inv-party-label">From (Seller)</div><strong>' + _esc(seller ? seller.shopName || seller.name : '—') + '</strong>' + (seller && seller.gstin ? '<div>GSTIN: ' + _esc(seller.gstin) + '</div>' : '') + '</div>' +
-      '<div><div class="inv-party-label">To (Buyer)</div><strong>' + _esc(buyer ? buyer.shopName || buyer.name : '—') + '</strong>' + (buyer && buyer.gstin ? '<div>GSTIN: ' + _esc(buyer.gstin) + '</div>' : '') + '</div></div>' +
+      '<div><div class="inv-party-label">From (Seller)</div><strong>' + _esc(seller.name) + '</strong>' + (seller.gstin ? '<div>GSTIN: ' + _esc(seller.gstin) + '</div>' : '') + '</div>' +
+      '<div><div class="inv-party-label">To (Buyer)</div><strong>' + _esc(buyer.name) + '</strong>' + (buyer.gstin ? '<div>GSTIN: ' + _esc(buyer.gstin) + '</div>' : '') + '</div></div>' +
       '<table class="invoice-table"><thead><tr><th>Item</th><th>HSN</th><th>Qty</th><th>Rate</th><th>GST%</th><th>GST Amt</th><th>Total</th></tr></thead><tbody>' + rows + '</tbody></table>' +
       '<div class="invoice-totals">' +
       '<div class="inv-line"><span>Subtotal</span><span>\u20B9' + subtotal.toFixed(2) + '</span></div>' +

@@ -3,8 +3,23 @@ const Reports = (() => {
 
   function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
+  let activePane = 'overview';
+
   function init() {
     document.getElementById('report-range').addEventListener('change', render);
+    const tabs = document.getElementById('report-tabs');
+    if (tabs) tabs.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-report]');
+      if (!btn) return;
+      _showPane(btn.dataset.report);
+    });
+  }
+
+  function _showPane(name) {
+    activePane = name || 'overview';
+    document.querySelectorAll('#report-tabs [data-report]').forEach(t => t.classList.toggle('active', t.dataset.report === activePane));
+    document.querySelectorAll('[data-report-pane]').forEach(p => p.classList.toggle('hidden', p.dataset.reportPane !== activePane));
+    Object.keys(charts).forEach(k => { try { if (charts[k] && charts[k].resize) charts[k].resize(); } catch (e) { /* hidden canvas */ } });
   }
 
   function refresh() { render(); }
@@ -34,6 +49,9 @@ const Reports = (() => {
     _renderPnL(user, startDate);
     _renderExpiringStock(user);
     _renderSlowMovers(user, startDate);
+    _renderPurchases(user, startDate);
+    _renderGst(user, startDate);
+    _showPane(activePane);
   }
 
   function _renderStats(user, startDate) {
@@ -159,7 +177,8 @@ const Reports = (() => {
   }
 
   function _renderExpiringStock(user) {
-    const expiring = Store.getExpiringStock(Auth.ownerId(), 90);
+    const warn = (typeof Settings !== 'undefined') ? Settings.expiryDays() : 90;
+    const expiring = Store.getExpiringStock(Auth.ownerId(), warn);
     const tbody = document.getElementById('expiry-table-body');
     const empty = document.getElementById('no-expiry');
 
@@ -195,6 +214,61 @@ const Reports = (() => {
       const stock = Store.getTotalStockForProduct(p.id);
       return '<tr><td><strong>' + _esc(p.name) + '</strong></td><td><code style="font-size:.75rem">' + _esc(p.sku) + '</code></td><td>' + stock + '</td><td>₹' + (stock * (p.costPrice || 0)).toFixed(2) + '</td></tr>';
     }).join('');
+  }
+
+  function _renderPurchases(user, startDate) {
+    const tbody = document.getElementById('report-purchases-body');
+    const totalEl = document.getElementById('report-purchases-total');
+    if (!tbody) return;
+    const rows = [];
+    Store.getPurchaseOrders(Auth.ownerId()).forEach(o => {
+      if (new Date(o.createdAt) < startDate) return;
+      rows.push({ when: o.createdAt, what: o.orderNumber || 'Purchase', who: (o.sellerPartyId && (Store.getPartyById(o.sellerPartyId) || {}).name) || 'Supplier', total: o.total || 0 });
+    });
+    Store.getBatches(Auth.ownerId()).forEach(b => {
+      if (!Store.isManualStockEntry(b)) return;
+      const when = b.createdAt || b.purchaseDate;
+      if (new Date(when) < startDate) return;
+      const prod = Store.getProductById(b.productId);
+      const qty = b.origQty != null ? b.origQty : b.qty;
+      rows.push({ when: when, what: (prod ? prod.name : 'Batch') + (b.batchNumber ? ' · ' + b.batchNumber : ''), who: 'Stock entry', total: (Number(qty) || 0) * (Number(b.unitCost) || 0) });
+    });
+    rows.sort((a, b) => new Date(b.when) - new Date(a.when));
+    const sum = rows.reduce((s, r) => s + r.total, 0);
+    if (totalEl) totalEl.textContent = '\u20B9' + sum.toFixed(0);
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:1.2rem">No purchases in this period</td></tr>'; return; }
+    tbody.innerHTML = rows.slice(0, 40).map(r => '<tr><td>' + new Date(r.when).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }) + '</td><td>' + _esc(r.what) + '</td><td>' + _esc(r.who) + '</td><td><strong>\u20B9' + r.total.toFixed(2) + '</strong></td></tr>').join('');
+  }
+
+  function _renderGst(user, startDate) {
+    const box = document.getElementById('report-gst');
+    if (!box) return;
+    let posBase = 0, posGst = 0, b2bBase = 0, b2bGst = 0;
+    Store.getPosSales(Auth.ownerId()).forEach(s => {
+      if (new Date(s.createdAt) < startDate) return;
+      (s.items || []).forEach(i => {
+        const line = (Number(i.qty) || 0) * (Number(i.price) || 0);
+        posBase += line;
+        posGst += line * ((Number(i.gstRate) || 0) / 100);
+      });
+    });
+    Store.getSalesOrders(Auth.ownerId()).forEach(o => {
+      if (o.status !== 'delivered') return;
+      if (new Date(o.updatedAt || o.createdAt) < startDate) return;
+      (o.items || []).forEach(i => {
+        const prod = Store.getProductById(i.productId);
+        const line = (Number(i.qty) || 0) * (Number(i.unitPrice) || 0);
+        b2bBase += line;
+        b2bGst += line * (((prod && prod.gstRate) || 0) / 100);
+      });
+    });
+    const gst = posGst + b2bGst;
+    box.innerHTML =
+      '<div class="stat-card"><div class="stat-icon blue"><i class="fas fa-receipt"></i></div><div class="stat-info"><span class="stat-value">\u20B9' + (posBase + b2bBase).toFixed(0) + '</span><span class="stat-label">Taxable sales</span></div></div>' +
+      '<div class="stat-card"><div class="stat-icon purple"><i class="fas fa-percent"></i></div><div class="stat-info"><span class="stat-value">\u20B9' + gst.toFixed(0) + '</span><span class="stat-label">GST collected</span></div></div>' +
+      '<div class="stat-card"><div class="stat-icon green"><i class="fas fa-cash-register"></i></div><div class="stat-info"><span class="stat-value">\u20B9' + posGst.toFixed(0) + '</span><span class="stat-label">POS GST</span></div></div>' +
+      '<div class="stat-card"><div class="stat-icon red"><i class="fas fa-store"></i></div><div class="stat-info"><span class="stat-value">\u20B9' + b2bGst.toFixed(0) + '</span><span class="stat-label">B2B GST</span></div></div>' +
+      '<p class="form-hint">CGST and SGST are each half of GST collected (\u20B9' + (gst / 2).toFixed(2) + '). This is a working summary from recorded sales, for the period selected above.</p>';
   }
 
   return { init, render, refresh };

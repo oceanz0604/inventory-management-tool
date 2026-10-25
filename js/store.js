@@ -214,6 +214,15 @@ const Store = (() => {
     if (num.indexOf('PO-') === 0 || num.indexOf('PROD-') === 0) return false;
     return true;
   }
+  function roundQty(n) {
+    const x = Number(n);
+    if (!isFinite(x)) return 0;
+    return Math.round(x * 1000) / 1000;
+  }
+  function formatQty(n) {
+    const x = roundQty(n);
+    return String(x);
+  }
   function getBatchById(id) { return (_get(KEYS.BATCHES) || []).find(b => b.id === id); }
   function getBatchesByProduct(productId, locationId) {
     return (_get(KEYS.BATCHES) || []).filter(b => b.productId === productId && (!locationId || b.locationId === locationId));
@@ -1218,7 +1227,7 @@ const Store = (() => {
     getLocations, getLocationsByOwner, getLocationById, addLocation, updateLocation, deleteLocation, getDefaultLocation,
     getProducts, getProductsByOwner, getProductsByType, getSellableProducts, getIngredientProducts, getPublishedProducts, getProductById, addProduct, updateProduct, deleteProduct, isSellableType,
     getStock, getStockByOwner, getStockByLocation, getStockByProduct, getStockRecord, setStock, adjustStock, getTotalStockForProduct, getLowStockItems, getExpiringStock,
-    getBatches, getBatchById, getBatchesByProduct, availableLots, getBatchQty, addBatch, updateBatch, deleteBatch, transferBatch, isManualStockEntry, pickLots, consumeLots,     calcMakingCost, getProductStockValue, produceComplex,
+    getBatches, getBatchById, getBatchesByProduct, availableLots, getBatchQty, addBatch, updateBatch, deleteBatch, transferBatch, isManualStockEntry, roundQty, formatQty, pickLots, consumeLots,     calcMakingCost, getProductStockValue, produceComplex,
     tracksIngredientStock, latestBatchCost, ingredientRate,
     isMakeToOrder, checkBom, maxMakeQty, availableSellQty, consumeForSale, _formatShortages,
     getOrders, getOrderById, getSalesOrders, getPurchaseOrders, createOrder, updateOrderStatus,

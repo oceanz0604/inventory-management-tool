@@ -9,6 +9,9 @@ const POS = (() => {
     document.getElementById('pos-clear-bill').addEventListener('click', clearBill);
     document.getElementById('pos-checkout-btn').addEventListener('click', checkout);
     document.getElementById('pos-print-receipt').addEventListener('click', _printReceipt);
+    const pay = document.getElementById('pos-payment');
+    const cfg = Auth.getCompanyConfig ? Auth.getCompanyConfig() : null;
+    if (pay && cfg && cfg.posPayment) pay.value = cfg.posPayment;
   }
 
   function populateFilters() {

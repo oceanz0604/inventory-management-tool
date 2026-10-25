@@ -12,18 +12,10 @@ const Team = (() => {
     if (form) form.addEventListener('submit', _handleSubmit);
     const search = document.getElementById('team-search');
     if (search) search.addEventListener('input', render);
-    const track = document.getElementById('track-ingredient-stock');
-    if (track) track.addEventListener('change', async () => {
-      try { await Auth.setCompanyConfig({ trackIngredientStock: track.checked }); } catch (e) { /* local copy is already saved */ }
-      App.showToast(track.checked
-        ? 'Raw material quantities are tracked again'
-        : 'Make-to-order sales no longer depend on raw material quantities', 'success');
-    });
+    if (typeof Views !== 'undefined') Views.mount(document.getElementById('team-view-switch'), 'team', render);
   }
 
   function render() {
-    const track = document.getElementById('track-ingredient-stock');
-    if (track) track.checked = Store.tracksIngredientStock(Auth.ownerId());
     const tbody = document.getElementById('team-table-body');
     const empty = document.getElementById('no-team');
     if (!tbody) return;
@@ -33,11 +25,12 @@ const Team = (() => {
     const search = (document.getElementById('team-search').value || '').toLowerCase().trim();
     if (search) workers = workers.filter(w => (w.name || '').toLowerCase().includes(search) || (w.username || '').toLowerCase().includes(search));
 
-    if (all.length === 0) { tbody.innerHTML = ''; empty.classList.remove('hidden'); return; }
+    if (all.length === 0) { tbody.innerHTML = ''; empty.classList.remove('hidden'); _paintViews(); return; }
     empty.classList.add('hidden');
 
     if (workers.length === 0) {
       tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-secondary);padding:1.5rem">No team members match your search</td></tr>';
+      _paintViews();
       return;
     }
 
@@ -48,6 +41,11 @@ const Team = (() => {
       '<td><span class="role-pill role-' + w.role + '">' + (ROLE_LABEL[w.role] || w.role) + '</span></td>' +
       '<td><div class="action-btns"><button class="btn-icon delete" title="Remove" onclick="Team.confirmDelete(\'' + w.id + '\')"><i class="fas fa-user-minus"></i></button></div></td>' +
       '</tr>').join('');
+    _paintViews();
+  }
+
+  function _paintViews() {
+    if (typeof Views !== 'undefined') Views.syncFrom('team', 'team-table-body', 'team-alt');
   }
 
   function openModal() {
