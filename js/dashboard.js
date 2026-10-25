@@ -83,22 +83,53 @@ const Dashboard = (() => {
     const totalStock = stock.reduce((s, e) => s + e.quantity, 0);
     const stockValue = products.reduce((s, p) => s + (Store.getProductStockValue ? Store.getProductStockValue(p.id) : 0), 0);
 
-    // Sales today = POS sales + sales orders delivered today
+    // Today's sale = POS + delivered shop orders + field sales closed today.
+    // Today's purchase = received purchase orders + Add Batch entries.
+    // Day's profit = sales minus those purchases.
     const today = new Date().toDateString();
     const posToday = Store.getPosSalesToday ? Store.getPosSalesToday(owner) : [];
-    const ordersToday = salesOrders.filter(o => o.status === 'delivered' && new Date(o.updatedAt || o.createdAt).toDateString() === today);
+    const ordersToday = salesOrders.filter(o => _bookedToday(o, today));
     const salesToday = posToday.reduce((s, x) => s + (x.total || 0), 0) + ordersToday.reduce((s, x) => s + (x.total || 0), 0);
     const salesCount = posToday.length + ordersToday.length;
+
+    const receivedToday = purchaseOrders.filter(o => _purchasedToday(o, today));
+    const batchesToday = (Store.getBatches(owner) || []).filter(b => Store.isManualStockEntry(b) && _sameDay(b.createdAt, today));
+    const purchaseToday = receivedToday.reduce((s, o) => s + (o.total || 0), 0) + batchesToday.reduce((s, b) => {
+      const qty = b.origQty != null ? b.origQty : b.qty;
+      return s + (Number(qty) || 0) * (Number(b.unitCost) || 0);
+    }, 0);
+    const purchaseCount = receivedToday.length + batchesToday.length;
+    const profit = salesToday - purchaseToday;
 
     _set('stat-total-products', products.length);
     _set('stat-stock-value', _inr(stockValue));
     _set('stat-sales-today', _inr(salesToday));
     _set('stat-sales-today-sub', salesCount + (salesCount === 1 ? ' sale today' : ' sales today'));
+    _set('stat-purchases-today', _inr(purchaseToday));
+    _set('stat-purchases-today-sub', purchaseCount + (purchaseCount === 1 ? ' purchase today' : ' purchases today'));
+    _set('stat-profit-today', _inrSigned(profit));
+    _set('stat-profit-today-sub', 'Sales minus purchases');
+    const profitEl = document.getElementById('stat-profit-today');
+    if (profitEl) profitEl.classList.toggle('neg', profit < 0);
     _set('stat-pending-orders', pendingCount);
     _set('stat-total-stock', totalStock.toLocaleString('en-IN'));
     _set('stat-low-stock', lowStock.length);
   }
+  function _sameDay(iso, today) { return !!iso && new Date(iso).toDateString() === today; }
+  function _bookedToday(o, today) {
+    if (!_sameDay(o.updatedAt || o.createdAt, today)) return false;
+    return o.status === 'delivered' || o.status === 'completed' || o.status === 'open';
+  }
+  function _purchasedToday(o, today) {
+    if (!_sameDay(o.updatedAt || o.createdAt, today)) return false;
+    if (o.kind === 'manual_purchase') return o.status === 'open' || o.status === 'completed';
+    return o.status === 'delivered';
+  }
   function _set(id, val) { const el = document.getElementById(id); if (el) el.textContent = val; }
+  function _inrSigned(n) {
+    const v = Math.round(n || 0);
+    return (v < 0 ? '\u2212' : '') + '\u20B9' + Math.abs(v).toLocaleString('en-IN');
+  }
 
   // ---------- charts ----------
   function _renderCharts() {

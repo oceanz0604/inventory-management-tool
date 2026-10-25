@@ -70,9 +70,9 @@ const Purchase = (() => {
       const qty = line ? line.qty : 0;
       return '<div class="pos-item-card ' + (qty > 0 ? 'in-bill' : '') + '" onclick="Purchase.add(\'' + p.id + '\')">' +
         '<div class="pos-item-icon"><i class="fas fa-box"></i></div>' +
-        '<div class="pos-item-name">' + _esc(p.name) + '</div>' +
+        '<div class="pos-item-copy"><div class="pos-item-name">' + _esc(p.name) + '</div>' +
+        '<div class="pos-item-stock">' + _esc(p.unit || 'pcs') + ' · ' + _esc(p.sku || '') + '</div></div>' +
         '<div class="pos-item-price">\u20B9' + (p.costPrice || 0).toFixed(2) + '</div>' +
-        '<div class="pos-item-stock">' + _esc(p.unit || 'pcs') + ' · ' + _esc(p.sku || '') + '</div>' +
         (qty > 0 ? '<div class="pos-item-badge">' + qty + '</div>' : '') + '</div>';
     }).join('');
   }

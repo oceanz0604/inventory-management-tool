@@ -205,6 +205,15 @@ const Store = (() => {
     const all = _get(KEYS.BATCHES) || [];
     return ownerId ? all.filter(b => b.ownerId === ownerId) : all;
   }
+  // Add Batch rows that are not already a purchase order, a produce run, or a lot move.
+  function isManualStockEntry(b) {
+    if (!b) return false;
+    const note = String(b.note || '').trim();
+    if (/^(Purchase |Received |Produced)/.test(note) || note === 'Moved') return false;
+    const num = b.batchNumber || '';
+    if (num.indexOf('PO-') === 0 || num.indexOf('PROD-') === 0) return false;
+    return true;
+  }
   function getBatchById(id) { return (_get(KEYS.BATCHES) || []).find(b => b.id === id); }
   function getBatchesByProduct(productId, locationId) {
     return (_get(KEYS.BATCHES) || []).filter(b => b.productId === productId && (!locationId || b.locationId === locationId));
@@ -1209,7 +1218,7 @@ const Store = (() => {
     getLocations, getLocationsByOwner, getLocationById, addLocation, updateLocation, deleteLocation, getDefaultLocation,
     getProducts, getProductsByOwner, getProductsByType, getSellableProducts, getIngredientProducts, getPublishedProducts, getProductById, addProduct, updateProduct, deleteProduct, isSellableType,
     getStock, getStockByOwner, getStockByLocation, getStockByProduct, getStockRecord, setStock, adjustStock, getTotalStockForProduct, getLowStockItems, getExpiringStock,
-    getBatches, getBatchById, getBatchesByProduct, availableLots, getBatchQty, addBatch, updateBatch, deleteBatch, transferBatch, pickLots, consumeLots,     calcMakingCost, getProductStockValue, produceComplex,
+    getBatches, getBatchById, getBatchesByProduct, availableLots, getBatchQty, addBatch, updateBatch, deleteBatch, transferBatch, isManualStockEntry, pickLots, consumeLots,     calcMakingCost, getProductStockValue, produceComplex,
     tracksIngredientStock, latestBatchCost, ingredientRate,
     isMakeToOrder, checkBom, maxMakeQty, availableSellQty, consumeForSale, _formatShortages,
     getOrders, getOrderById, getSalesOrders, getPurchaseOrders, createOrder, updateOrderStatus,

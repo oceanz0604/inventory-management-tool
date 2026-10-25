@@ -6,7 +6,7 @@ const Products = (() => {
   const TYPE_HINTS = {
     raw: 'Bought as ingredients (in batches at different rates). Never sold or published. No selling price.',
     simple: 'Bought from vendors in batches and resold as-is. Cost is the weighted average of your purchase batches.',
-    complex: 'Make to order — a sale uses finished cups on the shelf first, then the recipe (including wastage) for the rest. Produce builds those finished lots.',
+    complex: 'Make to order — a sale uses finished cups on the shelf first, then makes the rest from the recipe (including wastage). You do not need a separate produce step.',
   };
 
   function _currentType() { return document.getElementById('product-type').value || 'simple'; }
@@ -72,9 +72,14 @@ const Products = (() => {
     document.getElementById('pd-recipe-outqty').addEventListener('input', _calcDetailMakingCost);
     document.getElementById('pd-price').addEventListener('input', _updateDetailMargin);
     document.getElementById('pd-mrp').addEventListener('input', _updateDetailMargin);
+    document.getElementById('product-sku-generate').addEventListener('click', () => {
+      document.getElementById('product-sku').value = _nextSku(document.getElementById('product-name').value);
+    });
+    document.getElementById('pd-sku-generate').addEventListener('click', () => {
+      document.getElementById('pd-sku').value = _nextSku(document.getElementById('pd-name').value);
+    });
 
-    // Produce flow
-    document.getElementById('produce-btn').addEventListener('click', () => openProduce());
+    // Finished-lot builder. Sales already make a make-to-order item; this only stocks cups ahead.
     document.getElementById('produce-form').addEventListener('submit', _handleProduce);
     document.getElementById('produce-product').addEventListener('change', _renderProduceIngredients);
     document.getElementById('produce-location').addEventListener('change', _renderProduceIngredients);
@@ -179,12 +184,11 @@ const Products = (() => {
         }
       }
 
-      let actions = '<button class="btn-icon edit" title="Open" onclick="Products.openDetail(\'' + p.id + '\')"><i class="fas fa-arrow-up-right-from-square"></i></button>';
-      if (type === 'complex') actions = '<button class="btn-icon" title="Produce" onclick="event.stopPropagation();Products.openProduce(\'' + p.id + '\')"><i class="fas fa-industry"></i></button>' + actions;
+      let actions = '<button class="btn-icon edit" title="Open" onclick="event.stopPropagation();Products.openDetail(\'' + p.id + '\')"><i class="fas fa-arrow-up-right-from-square"></i></button>';
       actions += '<button class="btn-icon delete" title="Delete" onclick="event.stopPropagation();Products.confirmDelete(\'' + p.id + '\')"><i class="fas fa-trash-can"></i></button>';
 
       const publishCell = sellable
-        ? '<label class="toggle"><input type="checkbox" ' + (p.isPublished ? 'checked' : '') + ' onchange="Products.togglePublish(\'' + p.id + '\',this.checked)"><span class="slider"></span></label>'
+        ? '<label class="toggle" onclick="event.stopPropagation()"><input type="checkbox" ' + (p.isPublished ? 'checked' : '') + ' onclick="event.stopPropagation()" onchange="Products.togglePublish(\'' + p.id + '\',this.checked)"><span class="slider"></span></label>'
         : '<span style="color:var(--text-light)">—</span>';
 
       return '<tr class="clickable-row" onclick="Products.openDetail(\'' + p.id + '\')">' +
@@ -454,6 +458,20 @@ const Products = (() => {
     } else {
       App.showToast(res.message, 'error');
     }
+  }
+
+  function _nextSku(name) {
+    const words = String(name || '').toUpperCase().replace(/[^A-Z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
+    let base = words.map(w => w.slice(0, 4)).join('').slice(0, 8);
+    if (base.length < 3) base = (base + 'ITEM').slice(0, 4);
+    const owned = Store.getProductsByOwner(Auth.ownerId()).map(p => String(p.sku || '').toUpperCase());
+    let n = owned.length + 1;
+    let sku = base + '-' + String(n).padStart(3, '0');
+    while (owned.indexOf(sku) >= 0) {
+      n += 1;
+      sku = base + '-' + String(n).padStart(3, '0');
+    }
+    return sku;
   }
 
   function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }

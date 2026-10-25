@@ -44,58 +44,112 @@ const Orders = (() => {
   }
 
   function render() {
-    const orders = activeTab === 'sales' ? Store.getSalesOrders(Auth.ownerId()) : Store.getPurchaseOrders(Auth.ownerId());
-    orders.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
+    const owner = Auth.ownerId();
     const mpBtn = document.getElementById('orders-actions');
     if (mpBtn) mpBtn.classList.toggle('hidden', activeTab !== 'purchase');
 
+    const entries = activeTab === 'sales' ? _salesEntries(owner) : _purchaseEntries(owner);
+    entries.sort((a, b) => new Date(b.when) - new Date(a.when));
+
     const tbody = document.getElementById('orders-table-body');
     const empty = document.getElementById('no-orders');
+    const table = tbody.closest('.card').querySelector('table');
 
-    if (orders.length === 0) {
+    if (entries.length === 0) {
       tbody.innerHTML = '';
       empty.classList.remove('hidden');
-      tbody.closest('.card').querySelector('table').classList.add('hidden');
+      table.classList.add('hidden');
       return;
     }
     empty.classList.add('hidden');
-    tbody.closest('.card').querySelector('table').classList.remove('hidden');
+    table.classList.remove('hidden');
 
-    tbody.innerHTML = orders.map(o => {
-      const partyName = _orderPartyName(o);
-      const itemCount = o.items.reduce((s, i) => s + i.qty, 0);
-      const date = new Date(o.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
-
-      let actionBtns = '<button class="btn btn-sm btn-secondary" onclick="Orders.viewDetail(\'' + o.id + '\')"><i class="fas fa-eye"></i></button>';
-      if (o.kind === 'field_sale') {
-        if (o.status === 'pending') actionBtns += ' <button class="btn btn-sm btn-success" onclick="Orders.acceptFieldSale(\'' + o.id + '\')">Accept</button>' +
-          ' <button class="btn btn-sm btn-danger" onclick="Orders.cancelCustom(\'' + o.id + '\')">Cancel</button>';
-        else if (o.status === 'accepted') actionBtns += ' <button class="btn btn-sm btn-primary" onclick="Orders.openDeliver(\'' + o.id + '\')">Deliver</button>' +
-          ' <button class="btn btn-sm btn-danger" onclick="Orders.cancelCustom(\'' + o.id + '\')">Cancel</button>';
-        else if (o.status === 'open') actionBtns += ' <button class="btn btn-sm btn-success" onclick="Orders.settle(\'' + o.id + '\')">Mark Paid</button>';
-      } else if (o.kind === 'manual_purchase') {
-        if (o.status === 'pending') actionBtns += ' <button type="button" class="btn btn-sm btn-primary" onclick="Orders.receivePurchase(\'' + o.id + '\')">Receive</button>';
-        if (o.status === 'open') actionBtns += ' <button type="button" class="btn btn-sm btn-success" onclick="Orders.settle(\'' + o.id + '\')">Mark Paid</button>';
-      } else {
-        if (activeTab === 'sales') {
-          if (o.status === 'pending') actionBtns += ' <button class="btn btn-sm btn-success" onclick="Orders.approve(\'' + o.id + '\')">Approve</button>';
-          if (o.status === 'approved') actionBtns += ' <button class="btn btn-sm btn-warning" onclick="Orders.ship(\'' + o.id + '\')">Ship</button>';
-          if (o.status === 'shipped') actionBtns += ' <button class="btn btn-sm btn-primary" onclick="Orders.deliver(\'' + o.id + '\')">Deliver</button>';
-          if (o.status === 'pending' || o.status === 'approved') actionBtns += ' <button class="btn btn-sm btn-danger" onclick="Orders.cancel(\'' + o.id + '\')">Cancel</button>';
-        }
-        if (o.status === 'delivered') actionBtns += ' <button class="btn btn-sm btn-secondary" onclick="Orders.showInvoice(\'' + o.id + '\')" title="Invoice"><i class="fas fa-file-invoice-dollar"></i></button>';
-      }
-
-      return '<tr>' +
-        '<td><strong>' + o.orderNumber + '</strong>' + _kindTag(o) + '</td>' +
-        '<td>' + date + '</td>' +
-        '<td>' + _esc(partyName) + '</td>' +
-        '<td>' + itemCount + ' item' + (itemCount !== 1 ? 's' : '') + '</td>' +
-        '<td><strong>\u20B9' + o.total.toFixed(2) + '</strong></td>' +
-        '<td><span class="order-status ' + o.status + '">' + _capitalize(o.status) + '</span></td>' +
-        '<td><div class="action-btns">' + actionBtns + '</div></td></tr>';
+    tbody.innerHTML = entries.map(e => {
+      if (e.kind === 'pos') return _posRow(e.sale);
+      if (e.kind === 'batch') return _batchRow(e.batch);
+      return _orderRow(e.order);
     }).join('');
+    if (window.TableSort) TableSort.refresh(document.getElementById('view-orders'));
+  }
+
+  function _salesEntries(owner) {
+    const rows = Store.getSalesOrders(owner).map(o => ({ kind: 'order', order: o, when: o.createdAt }));
+    Store.getPosSales(owner).forEach(s => rows.push({ kind: 'pos', sale: s, when: s.createdAt }));
+    return rows;
+  }
+
+  function _purchaseEntries(owner) {
+    const rows = Store.getPurchaseOrders(owner).map(o => ({ kind: 'order', order: o, when: o.createdAt }));
+    Store.getBatches(owner).forEach(b => {
+      if (Store.isManualStockEntry(b)) rows.push({ kind: 'batch', batch: b, when: b.createdAt || b.purchaseDate });
+    });
+    return rows;
+  }
+
+  function _orderRow(o) {
+    const partyName = _orderPartyName(o);
+    const itemCount = (o.items || []).reduce((s, i) => s + i.qty, 0);
+    const date = new Date(o.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
+
+    let actionBtns = '<button class="btn btn-sm btn-secondary" onclick="Orders.viewDetail(\'' + o.id + '\')"><i class="fas fa-eye"></i></button>';
+    if (o.kind === 'field_sale') {
+      if (o.status === 'pending') actionBtns += ' <button class="btn btn-sm btn-success" onclick="Orders.acceptFieldSale(\'' + o.id + '\')">Accept</button>' +
+        ' <button class="btn btn-sm btn-danger" onclick="Orders.cancelCustom(\'' + o.id + '\')">Cancel</button>';
+      else if (o.status === 'accepted') actionBtns += ' <button class="btn btn-sm btn-primary" onclick="Orders.openDeliver(\'' + o.id + '\')">Deliver</button>' +
+        ' <button class="btn btn-sm btn-danger" onclick="Orders.cancelCustom(\'' + o.id + '\')">Cancel</button>';
+      else if (o.status === 'open') actionBtns += ' <button class="btn btn-sm btn-success" onclick="Orders.settle(\'' + o.id + '\')">Mark Paid</button>';
+    } else if (o.kind === 'manual_purchase') {
+      if (o.status === 'pending') actionBtns += ' <button type="button" class="btn btn-sm btn-primary" onclick="Orders.receivePurchase(\'' + o.id + '\')">Receive</button>';
+      if (o.status === 'open') actionBtns += ' <button type="button" class="btn btn-sm btn-success" onclick="Orders.settle(\'' + o.id + '\')">Mark Paid</button>';
+    } else {
+      if (activeTab === 'sales') {
+        if (o.status === 'pending') actionBtns += ' <button class="btn btn-sm btn-success" onclick="Orders.approve(\'' + o.id + '\')">Approve</button>';
+        if (o.status === 'approved') actionBtns += ' <button class="btn btn-sm btn-warning" onclick="Orders.ship(\'' + o.id + '\')">Ship</button>';
+        if (o.status === 'shipped') actionBtns += ' <button class="btn btn-sm btn-primary" onclick="Orders.deliver(\'' + o.id + '\')">Deliver</button>';
+        if (o.status === 'pending' || o.status === 'approved') actionBtns += ' <button class="btn btn-sm btn-danger" onclick="Orders.cancel(\'' + o.id + '\')">Cancel</button>';
+      }
+      if (o.status === 'delivered') actionBtns += ' <button class="btn btn-sm btn-secondary" onclick="Orders.showInvoice(\'' + o.id + '\')" title="Invoice"><i class="fas fa-file-invoice-dollar"></i></button>';
+    }
+
+    return '<tr>' +
+      '<td><strong>' + _esc(o.orderNumber) + '</strong>' + _kindTag(o) + '</td>' +
+      '<td>' + date + '</td>' +
+      '<td>' + _esc(partyName) + '</td>' +
+      '<td>' + itemCount + ' item' + (itemCount !== 1 ? 's' : '') + '</td>' +
+      '<td><strong>\u20B9' + (o.total || 0).toFixed(2) + '</strong></td>' +
+      '<td><span class="order-status ' + o.status + '">' + _capitalize(o.status) + '</span></td>' +
+      '<td><div class="action-btns">' + actionBtns + '</div></td></tr>';
+  }
+
+  function _posRow(s) {
+    const date = new Date(s.createdAt).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
+    const itemCount = (s.items || []).reduce((n, i) => n + (Number(i.qty) || 0), 0);
+    return '<tr>' +
+      '<td><strong>' + _esc(s.receiptNumber || 'POS') + '</strong>' + _tag('POS', 'pos') + '</td>' +
+      '<td>' + date + '</td>' +
+      '<td>' + _esc(s.customerName || 'Walk-in') + '</td>' +
+      '<td>' + itemCount + ' item' + (itemCount !== 1 ? 's' : '') + '</td>' +
+      '<td><strong>\u20B9' + (s.total || 0).toFixed(2) + '</strong></td>' +
+      '<td><span class="order-status completed">' + _capitalize(s.paymentMethod || 'cash') + '</span></td>' +
+      '<td><div class="action-btns"><button class="btn btn-sm btn-secondary" onclick="Orders.viewPos(\'' + s.id + '\')"><i class="fas fa-eye"></i></button></div></td></tr>';
+  }
+
+  function _batchRow(b) {
+    const prod = Store.getProductById(b.productId);
+    const loc = Store.getLocationById(b.locationId);
+    const sup = b.supplierPartyId ? Store.getPartyById(b.supplierPartyId) : null;
+    const date = new Date(b.createdAt || b.purchaseDate).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
+    const qty = b.origQty != null ? b.origQty : b.qty;
+    const total = (Number(qty) || 0) * (Number(b.unitCost) || 0);
+    const what = (prod ? prod.name : 'Item') + (loc ? ' · ' + loc.name : '');
+    return '<tr>' +
+      '<td><strong>' + _esc(b.batchNumber || 'Batch') + '</strong>' + _tag('Stock', 'stock') + '</td>' +
+      '<td>' + date + '</td>' +
+      '<td>' + _esc(sup ? sup.name : 'Stock entry') + '</td>' +
+      '<td>' + _esc(what) + ' · ' + qty + '</td>' +
+      '<td><strong>\u20B9' + total.toFixed(2) + '</strong></td>' +
+      '<td><span class="order-status completed">Recorded</span></td>' +
+      '<td><div class="action-btns"><button class="btn btn-sm btn-secondary" onclick="Orders.viewBatch(\'' + b.id + '\')"><i class="fas fa-eye"></i></button></div></td></tr>';
   }
 
   function _orderPartyName(o) {
@@ -105,10 +159,62 @@ const Orders = (() => {
     return u ? (u.name || u.shopName) : 'Unknown';
   }
 
+  function _tag(label, kind) {
+    return ' <span class="entry-tag entry-' + kind + '">' + label + '</span>';
+  }
+
   function _kindTag(o) {
-    if (o.kind === 'field_sale') return ' <span class="role-pill role-marketing" style="font-size:.62rem">Field</span>';
-    if (o.kind === 'manual_purchase') return ' <span class="role-pill" style="font-size:.62rem">Manual</span>';
-    return '';
+    if (o.kind === 'field_sale') return _tag('Field', 'field');
+    if (o.kind === 'manual_purchase') return _tag('Manual', 'manual');
+    return _tag('Shop', 'shop');
+  }
+
+  function _openReadOnly(title, body) {
+    document.getElementById('order-detail-title').textContent = title;
+    document.getElementById('order-detail-body').innerHTML = body;
+    document.getElementById('order-detail-footer').innerHTML = '<button class="btn btn-secondary modal-close">Close</button>';
+    document.querySelectorAll('#order-detail-footer .modal-close').forEach(b =>
+      b.addEventListener('click', () => document.getElementById('order-detail-modal').classList.add('hidden')));
+    document.getElementById('order-detail-modal').classList.remove('hidden');
+  }
+
+  function viewPos(saleId) {
+    const sale = Store.getPosSales(Auth.ownerId()).find(s => s.id === saleId);
+    if (!sale) return;
+    const loc = Store.getLocationById(sale.locationId);
+    const rows = (sale.items || []).map(i => {
+      const line = (Number(i.qty) || 0) * (Number(i.price) || 0);
+      const gst = line * ((Number(i.gstRate) || 0) / 100);
+      return '<tr><td>' + _esc(i.name) + '</td><td>' + i.qty + '</td><td>\u20B9' + (Number(i.price) || 0).toFixed(2) + '</td><td><strong>\u20B9' + (line + gst).toFixed(2) + '</strong></td></tr>';
+    }).join('');
+    _openReadOnly(sale.receiptNumber || 'POS sale',
+      '<div class="order-detail-grid">' +
+      '<div class="detail-item"><div class="detail-label">Type</div>POS sale</div>' +
+      '<div class="detail-item"><div class="detail-label">Customer</div><strong>' + _esc(sale.customerName || 'Walk-in') + '</strong></div>' +
+      '<div class="detail-item"><div class="detail-label">Payment</div>' + _capitalize(sale.paymentMethod || 'cash') + '</div>' +
+      '<div class="detail-item"><div class="detail-label">Location</div>' + _esc(loc ? loc.name : '—') + '</div></div>' +
+      '<table class="data-table order-items-table"><thead><tr><th>Product</th><th>Qty</th><th>Price</th><th>Total</th></tr></thead><tbody>' + rows + '</tbody>' +
+      '<tfoot><tr><td colspan="3" style="text-align:right;font-weight:700">Total</td><td><strong>\u20B9' + (sale.total || 0).toFixed(2) + '</strong></td></tr></tfoot></table>');
+  }
+
+  function viewBatch(batchId) {
+    const b = Store.getBatchById(batchId);
+    if (!b) return;
+    const prod = Store.getProductById(b.productId);
+    const loc = Store.getLocationById(b.locationId);
+    const sup = b.supplierPartyId ? Store.getPartyById(b.supplierPartyId) : null;
+    const qty = b.origQty != null ? b.origQty : b.qty;
+    const total = (Number(qty) || 0) * (Number(b.unitCost) || 0);
+    _openReadOnly(b.batchNumber || 'Stock entry',
+      '<div class="order-detail-grid">' +
+      '<div class="detail-item"><div class="detail-label">Type</div>Add batch</div>' +
+      '<div class="detail-item"><div class="detail-label">Product</div><strong>' + _esc(prod ? prod.name : 'Item') + '</strong></div>' +
+      '<div class="detail-item"><div class="detail-label">Location</div>' + _esc(loc ? loc.name : '—') + '</div>' +
+      '<div class="detail-item"><div class="detail-label">Supplier</div>' + _esc(sup ? sup.name : '—') + '</div>' +
+      '<div class="detail-item"><div class="detail-label">Quantity</div>' + qty + ' ' + _esc(prod ? (prod.unit || '') : '') + '</div>' +
+      '<div class="detail-item"><div class="detail-label">Unit cost</div>\u20B9' + (Number(b.unitCost) || 0).toFixed(2) + '</div>' +
+      '<div class="detail-item"><div class="detail-label">Value</div><strong>\u20B9' + total.toFixed(2) + '</strong></div>' +
+      '<div class="detail-item"><div class="detail-label">On hand now</div>' + b.qty + '</div></div>');
   }
 
   function viewDetail(orderId) {
@@ -474,7 +580,7 @@ const Orders = (() => {
   function _esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
   return {
-    init, render, viewDetail, approve, ship, deliver, cancel, showInvoice,
+    init, render, viewDetail, viewPos, viewBatch, approve, ship, deliver, cancel, showInvoice,
     acceptFieldSale, cancelCustom, settle, receivePurchase, openDeliver, openManualPurchase,
   };
 })();

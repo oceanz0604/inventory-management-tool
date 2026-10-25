@@ -65,9 +65,9 @@ const POS = (() => {
       }
       return '<div class="pos-item-card ' + (billQty > 0 ? 'in-bill' : '') + '" onclick="POS.addToBill(\'' + p.id + '\')">' +
         '<div class="pos-item-icon"><i class="fas ' + icon + '"></i></div>' +
-        '<div class="pos-item-name">' + _esc(p.name) + '</div>' +
+        '<div class="pos-item-copy"><div class="pos-item-name">' + _esc(p.name) + '</div>' +
+        '<div class="pos-item-stock">' + stockLabel + (mto ? ' <span class="type-pill complex">MTO</span>' : '') + '</div></div>' +
         '<div class="pos-item-price">\u20B9' + p.price.toFixed(2) + '</div>' +
-        '<div class="pos-item-stock">' + stockLabel + (mto ? ' <span class="type-pill complex">MTO</span>' : '') + '</div>' +
         (billQty > 0 ? '<div class="pos-item-badge">' + billQty + '</div>' : '') + '</div>';
     }).join('');
   }

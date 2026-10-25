@@ -572,6 +572,10 @@ const App = (() => {
   }
 
   // ========== Modal Close ==========
+  function _syncModalScroll() {
+    document.documentElement.classList.toggle('modal-open', !!document.querySelector('.modal:not(.hidden)'));
+  }
+
   function _bindModalClose() {
     document.querySelectorAll('.modal-close, .modal-overlay').forEach(el => {
       el.addEventListener('click', () => {
@@ -579,6 +583,14 @@ const App = (() => {
         if (modal) modal.classList.add('hidden');
       });
     });
+    const obs = new MutationObserver(_syncModalScroll);
+    document.querySelectorAll('.modal').forEach(m => obs.observe(m, { attributes: true, attributeFilter: ['class'] }));
+    document.addEventListener('touchmove', (e) => {
+      if (!document.documentElement.classList.contains('modal-open')) return;
+      if (e.target.closest && e.target.closest('.modal-content')) return;
+      e.preventDefault();
+    }, { passive: false });
+    _syncModalScroll();
   }
 
   // ========== Notifications ==========
