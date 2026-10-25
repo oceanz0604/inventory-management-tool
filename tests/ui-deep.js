@@ -400,7 +400,10 @@
     await scenario('Produce a make-to-order item from its recipe', async function () {
       App.goTo('products');
       const before = Store.getBatchQty('beans', 'loc_main');
-      $('produce-btn').click();
+      const latteOpen = Array.from(document.querySelectorAll('#products-table-body tr')).find(function (r) { return r.textContent.indexOf('Latte') >= 0; });
+      latteOpen.querySelector('.btn-icon.edit').click();
+      assert(viewOn('product-detail'), 'latte detail before produce');
+      $('pd-produce').click();
       assert(!hidden('produce-modal'), 'produce modal');
       setVal('produce-product', 'latte');
       setVal('produce-location', 'loc_main');
@@ -1011,7 +1014,8 @@
       assert(lateOnCounter.qty === 50, 'later milk was used first');
 
       App.goTo('products');
-      $('produce-btn').click();
+      byText('#products-table-body tr', 'Cutting Chai').querySelector('.btn-icon.edit').click();
+      $('pd-produce').click();
       setVal('produce-product', chai.id);
       setVal('produce-location', 'loc_main');
       setVal('produce-qty', '1');

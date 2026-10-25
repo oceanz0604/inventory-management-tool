@@ -223,6 +223,12 @@
         <button class="stat-card" data-go="pos"><div class="stat-icon green"><i class="fas fa-indian-rupee-sign"></i></div>
           <div class="stat-info"><span class="stat-value" id="stat-sales-today">₹0</span><span class="stat-label" id="stat-sales-today-sub">Sales today</span></div>
           <i class="fas fa-chevron-right stat-go"></i></button>
+        <button class="stat-card" data-go="orders"><div class="stat-icon amber"><i class="fas fa-truck"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-purchases-today">₹0</span><span class="stat-label" id="stat-purchases-today-sub">Purchases today</span></div>
+          <i class="fas fa-chevron-right stat-go"></i></button>
+        <button class="stat-card" data-go="reports"><div class="stat-icon cyan"><i class="fas fa-scale-balanced"></i></div>
+          <div class="stat-info"><span class="stat-value" id="stat-profit-today">₹0</span><span class="stat-label" id="stat-profit-today-sub">Today's profit</span></div>
+          <i class="fas fa-chevron-right stat-go"></i></button>
         <button class="stat-card" data-go="orders"><div class="stat-icon purple"><i class="fas fa-file-invoice-dollar"></i></div>
           <div class="stat-info"><span class="stat-value" id="stat-pending-orders">0</span><span class="stat-label">Pending Orders</span></div>
           <i class="fas fa-chevron-right stat-go"></i></button>
@@ -300,7 +306,6 @@
           </select>
         </div>
         <div class="toolbar-actions">
-          <button class="btn btn-secondary" id="produce-btn"><i class="fas fa-industry"></i> Produce</button>
           <button class="btn btn-secondary" id="catalog-btn"><i class="fas fa-layer-group"></i> Catalog</button>
           <button class="btn btn-secondary" id="import-btn"><i class="fas fa-file-import"></i> Import</button>
           <button class="btn btn-primary" id="add-product-btn"><i class="fas fa-plus"></i> Add Product</button>
@@ -334,7 +339,7 @@
         <button type="button" class="btn btn-secondary" id="pd-back"><i class="fas fa-arrow-left"></i> All products</button>
         <div class="pd-bar-actions">
           <button type="button" class="btn btn-primary" id="pd-edit"><i class="fas fa-pen"></i> Edit product</button>
-          <button type="button" class="btn btn-secondary" id="pd-produce"><i class="fas fa-industry"></i> Produce (optional)</button>
+          <button type="button" class="btn btn-secondary" id="pd-produce" title="Sales already make this from the recipe. Use this only to stock finished cups ahead of time."><i class="fas fa-industry"></i> Build finished lot</button>
           <button type="button" class="btn btn-danger" id="pd-delete"><i class="fas fa-trash-can"></i> Delete</button>
         </div>
       </div>
@@ -357,7 +362,7 @@
                   <div class="form-group"><label for="pd-name">Name *</label>
                     <input type="text" id="pd-name" required></div>
                   <div class="form-group"><label for="pd-sku">SKU *</label>
-                    <input type="text" id="pd-sku" required></div>
+                    <div class="sku-row"><input type="text" id="pd-sku" required><button type="button" class="btn btn-secondary btn-sm" id="pd-sku-generate">Auto</button></div></div>
                 </div>
                 <div class="form-row">
                   <div class="form-group"><label for="pd-category">Category</label>
@@ -919,7 +924,7 @@
           <div class="form-group"><label for="product-name">Name *</label>
             <input type="text" id="product-name" required></div>
           <div class="form-group"><label for="product-sku">SKU *</label>
-            <input type="text" id="product-sku" required></div>
+            <div class="sku-row"><input type="text" id="product-sku" required><button type="button" class="btn btn-secondary btn-sm" id="product-sku-generate">Auto</button></div></div>
         </div>
         <div class="form-row">
           <div class="form-group"><label for="product-category">Category</label>
